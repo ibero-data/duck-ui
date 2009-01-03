@@ -2,6 +2,8 @@
 
 Duck-UI is a web-based interface for interacting with DuckDB, a high-performance analytical database system. This project leverages DuckDB's WebAssembly (WASM) capabilities to provide a seamless and efficient user experience directly in the browser.
 
+![Public Demo](./docs/static/img/sql-editor.png)
+
 # [Official Docs](https://duckui.com?utm_source=github&utm_medium=readme) 🚀
 #  [Demo](https://demo.duckui.com?utm_source=github&utm_medium=readme) 💻
 
