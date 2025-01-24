@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
 import Logo from "/logo.png";
+import Metrics from "./pages/Metrics";
 
 interface LoadingScreenProps {
   message: string;
@@ -67,7 +68,9 @@ const App = () => {
       />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/metrics" element={<Metrics />} />
         <Route path="/settings" element={<Settings />} />
+        
       </Routes>
     </div>
   );

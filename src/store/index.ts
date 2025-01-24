@@ -20,11 +20,6 @@ const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
 };
 
 // Types
-interface DatabaseEntry {
-  seq: string;
-  name: string;
-  file: string | null;
-}
 
 export interface ColumnInfo {
   name: string;
@@ -34,10 +29,14 @@ export interface ColumnInfo {
 
 export interface TableInfo {
   name: string;
-  originalFileName: string;
+  schema: string;
+  rowCount: number;
   createdAt: string;
-  columns: ColumnInfo[];
-  rows: number;
+}
+
+export interface DatabaseInfo {
+  name: string;
+  tables: TableInfo[];
 }
 
 export interface QueryResult {
@@ -66,19 +65,19 @@ export interface EditorTab {
   result?: QueryResult | null;
 }
 
-export interface DatabaseInfo {
-  name: string;
-  size?: number;
+export interface DuckDBConfig {
+  max_memory: number;
 }
+
 export interface DuckStoreState {
   // Database state
   db: duckdb.AsyncDuckDB | null;
   connection: duckdb.AsyncDuckDBConnection | null;
   isInitialized: boolean;
+  currentDatabase: string;
 
-  // Tables management
+  // Data Explorer State
   databases: DatabaseInfo[];
-  tables: TableInfo[];
 
   // Query management
   queryHistory: QueryHistoryItem[];
@@ -92,14 +91,19 @@ export interface DuckStoreState {
   isLoading: boolean;
   error: string | null;
 
+  // DuckDB configurations
+  duckDbConfigState: DuckDBConfig;
+
   // Actions
   initialize: () => Promise<void>;
   executeQuery: (query: string, tabId: string) => Promise<void>;
+  duckDbConfig: (config: DuckDBConfig) => Promise<void>;
   importFile: (
     fileName: string,
     fileContent: ArrayBuffer,
     tableName: string,
-    fileType: string
+    fileType: string,
+    database?: string
   ) => Promise<void>;
   createTab: (
     type?: EditorTabType,
@@ -112,160 +116,83 @@ export interface DuckStoreState {
   updateTabQuery: (tabId: string, query: string) => void;
   moveTab: (oldIndex: number, newIndex: number) => void;
   closeAllTabs: () => void;
-  deleteTable: (tableName: string) => Promise<void>;
+  deleteTable: (tableName: string, database?: string) => Promise<void>;
   clearHistory: () => void;
   cleanup: () => Promise<void>;
+  fetchDatabasesAndTablesInfo: () => Promise<void>;
+  switchDatabase: (databaseName: string) => Promise<void>;
 }
 
-const updateDataLists = async (
-  set: any,
-  connection: duckdb.AsyncDuckDBConnection,
-  tableNameFromImport?: string,
-  ddlQuery?: string
-): Promise<void> => {
-  console.log("updateDataLists: Starting combined data list update", {
-    tableNameFromImport,
-  });
-  try {
-    if (!connection) {
-      console.error("updateDataLists: Database connection not available");
-      throw new Error("Database connection not available");
-    }
-
-    // Fetch Databases
-    const databasesQuery = await connection.query(`PRAGMA database_list;`);
-    const databases: DatabaseEntry[] = databasesQuery.toArray().map((row) => ({
-      seq: row.seq?.toString() ?? "",
-      name: row.name?.toString() ?? "",
-      file: row.file?.toString() ?? null,
-    }));
-    console.log("updateDataLists: Retrieved database names", { databases });
-
-    // First, get all table names
-    let tables: string[] = [];
-    if (tableNameFromImport) {
-      tables = [tableNameFromImport];
-      console.log("updateDataLists: Using the provided table name", { tables });
-    } else if (ddlQuery) {
-      const tableNameFromQuery = ddlQuery;
-      if (tableNameFromQuery) {
-        tables = [tableNameFromQuery];
-        console.log(
-          "updateDataLists: Using the table name extracted from the ddl query",
-          { tables }
-        );
-      } else {
-        const tablesQuery = await connection.query(`
-            SELECT 
-              table_name as name
-            FROM information_schema.tables 
-            WHERE table_schema = 'main' 
-            AND table_type = 'BASE TABLE'
-            AND table_name NOT LIKE 'sqlite_%'
-            AND table_name IS NOT NULL
-          `);
-        tables = tablesQuery.toArray().map((row) => row[0]);
-        console.log("updateDataLists: Retrieved table names", { tables });
-      }
-    } else {
-      const tablesQuery = await connection.query(`
-          SELECT 
-            table_name as name
-          FROM information_schema.tables 
-          WHERE table_schema = 'main' 
-          AND table_type = 'BASE TABLE'
-          AND table_name NOT LIKE 'sqlite_%'
-          AND table_name IS NOT NULL
-        `);
-      tables = tablesQuery.toArray().map((row) => row[0]);
-      console.log("updateDataLists: Retrieved table names", { tables });
-    }
-
-    if (tables.length === 0) {
-      console.log(
-        "updateDataLists: No tables found, setting tables to empty array"
-      );
-      set((state: DuckStoreState) => ({ ...state, tables: [], error: null }));
-    }
-
-    const newTables: TableInfo[] = [];
-
-    for (const tableName of tables) {
-      console.log("updateDataLists: Processing table", { tableName });
-      try {
-        // Get schema information using the same approach as executeQuery
-        const schemaQuery = await connection.query(
-          `SELECT * FROM "${tableName}" LIMIT 0`
-        );
-        const columns = schemaQuery.schema.fields.map((field) => ({
-          name: field.name,
-          type: field.type.toString().toLowerCase(),
-          nullable: !field.nullable,
-        }));
-
-        console.log("updateDataLists: Retrieved columns", {
-          tableName,
-          columns,
-        });
-
-        // Get row count
-        const countResult = await connection.query(`
-            SELECT COUNT(*) as count 
-            FROM "${tableName}"
-          `);
-
-        const rowCount = Number(countResult.toArray()[0][0]);
-        console.log("updateDataLists: Retrieved row count", {
-          tableName,
-          rowCount,
-        });
-
-        if (columns.length > 0) {
-          const tableInfo: TableInfo = {
-            name: tableName,
-            originalFileName: tableNameFromImport || tableName,
-            createdAt: new Date().toISOString(),
-            columns,
-            rows: rowCount,
-          };
-          newTables.push(tableInfo);
-          console.log("updateDataLists: Added table to newTables", {
-            tableInfo,
-          });
-        }
-      } catch (error) {
-        console.error(
-          `updateDataLists: Error processing table ${tableName}:`,
-          error
-        );
-      }
-    }
-    console.log(
-      "updateDataLists: Finished processing tables, setting new table state",
-      { newTables, databases }
-    );
-
-    set((state: DuckStoreState) => ({
-      ...state,
-      databases: databases as DatabaseInfo[],
-      tables: newTables,
-      error: null,
-    }));
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    console.error("updateDataLists: Error updating database list:", error);
-
-    set((state: DuckStoreState) => ({
-      ...state,
-      error: `Error updating data list: ${errorMessage}`,
-      databases: [],
-      tables: [],
-    }));
-    throw error;
+// Utility function for connection validation
+const validateConnection = (
+  connection: duckdb.AsyncDuckDBConnection | null
+) => {
+  if (!connection || typeof connection.query !== "function") {
+    throw new Error("Database connection is not valid");
   }
+  return connection;
 };
 
+const resultToJSON = (result: any): QueryResult => {
+  const columns = result.schema.fields.map((field: any) => ({
+    name: field.name,
+    type: field.type,
+  }));
+
+
+  const data = result.toArray().map((row: any) => {
+    const jsonRow = row.toJSON();
+
+    columns.forEach((col: any) => {
+      try {
+        const rawValue = jsonRow[col.name];
+
+        console.log(col.type.typeId);
+        console.log(rawValue);
+
+        // Only process if value exists
+        if (rawValue === null || rawValue === undefined) return;
+
+        // Handle DATE type (days since epoch)
+        if (col.type.typeId === 8) {
+          // Ensure numeric value
+          const days = Number(rawValue);
+          if (!isNaN(days)) {
+            const date = new Date(days * 86400000);
+            // Validate date before setting
+            if (!isNaN(date.getTime())) {
+              jsonRow[col.name] = date.toISOString().split("T")[0];
+            }
+          }
+        }
+        // Handle TIMESTAMP (microseconds since epoch)
+        else if (col.type.typeId === 9) {
+          // Convert to number and validate
+          const micros = Number(rawValue);
+          if (!isNaN(micros)) {
+            const date = new Date(micros / 1000);
+            if (!isNaN(date.getTime())) {
+              jsonRow[col.name] = date.toISOString();
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`Error processing column ${col.name}:`, error);
+        // Leave original value if conversion fails
+      }
+    });
+
+    return jsonRow;
+  });
+
+  return {
+    columns: columns.map((c) => c.name),
+    columnTypes: columns.map((c) => c.type),
+    data,
+    rowCount: result.numRows,
+    duration: 0,
+  };
+};
 // Create Store
 export const useDuckStore = create<DuckStoreState>()(
   devtools(
@@ -275,15 +202,22 @@ export const useDuckStore = create<DuckStoreState>()(
         db: null,
         connection: null,
         isInitialized: false,
+        currentDatabase: "main",
         databases: [],
-        tables: [],
         queryHistory: [],
+        duckDbConfigState: { max_memory: 3.1 },
         isExecuting: false,
         tabs: [
           {
             id: "home",
             title: "Home",
             type: "home",
+            content: "",
+          },
+          {
+            id: crypto.randomUUID(),
+            title: "Query 1",
+            type: "sql",
             content: "",
           },
         ],
@@ -293,326 +227,270 @@ export const useDuckStore = create<DuckStoreState>()(
 
         // Initialize DuckDB
         initialize: async () => {
-          console.log("initialize: Starting DuckDB initialization");
           const state = get();
-          if (state.isInitialized) {
-            console.log("initialize: DuckDB already initialized, skipping");
-            return;
-          }
-
-          set({ isLoading: true, error: null, tables: [], databases: [] });
-          console.log("initialize: Setting isLoading to true");
+          if (state.isInitialized) return;
 
           try {
+            set({ isLoading: true, error: null });
+
             const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
             const worker = new Worker(bundle.mainWorker!);
             const logger = new duckdb.ConsoleLogger();
             const db = new duckdb.AsyncDuckDB(logger, worker);
 
-            console.log(
-              "initialize: DuckDB bundle selected and workers created"
-            );
-
             await db.instantiate(bundle.mainModule);
-            console.log("initialize: DuckDB instantiated");
             const connection = await db.connect();
-            console.log("initialize: DuckDB connection established");
+
+            // Validate connection immediately
+            validateConnection(connection);
 
             await Promise.all([
-              connection.query(`SET enable_http_metadata_cache=true;`),
-              connection.query(`SET enable_object_cache=true;`),
-              connection.query(`INSTALL arrow;`),
-              connection.query(`INSTALL parquet;`),
+              connection.query(`SET enable_http_metadata_cache=true`),
+              connection.query(`SET enable_object_cache=true`),
+              connection.query(`INSTALL arrow`),
+              connection.query(`INSTALL parquet`),
             ]);
-            console.log(
-              "initialize: DuckDB configurations applied and extensions installed"
-            );
-            await updateDataLists(set, connection);
 
             set({
               db,
               connection,
               isInitialized: true,
               isLoading: false,
+              currentDatabase: "main",
             });
-            console.log("initialize: DuckDB initialization complete");
+
+            await get().fetchDatabasesAndTablesInfo();
           } catch (error) {
             set({
-              error: `Failed to initialize DuckDB: ${
+              error: `Initialization failed: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+              isLoading: false,
+              isInitialized: false,
+              db: null,
+              connection: null,
+            });
+          }
+        },
+
+        // Database configuration
+        duckDbConfig: async (config) => {
+          try {
+            set({ isLoading: true });
+            const connection = validateConnection(get().connection);
+            await connection.query(`SET memory_limit='${config.max_memory}GB'`);
+            set({ duckDbConfigState: config, isLoading: false });
+          } catch (error) {
+            set({
+              error: `Configuration failed: ${
                 error instanceof Error ? error.message : "Unknown error"
               }`,
               isLoading: false,
             });
-            console.error("initialize: Failed to initialize DuckDB:", error);
           }
         },
 
-        // Execute SQL query
-        executeQuery: async (query: string, tabId: string) => {
-          console.log("executeQuery: Starting query execution", {
-            query,
-            tabId,
-          });
-          const { connection } = get();
-          if (!connection) {
-            console.error("executeQuery: Database not initialized");
-            set({
-              error: "Database not initialized",
-              isExecuting: false,
-            });
-            return;
-          }
-
-          set({ isExecuting: true, error: null });
-          console.log("executeQuery: Setting isExecuting to true");
-          const startTime = performance.now();
-
+        // Execute query with proper error handling
+        executeQuery: async (query, tabId) => {
           try {
+            const connection = validateConnection(get().connection);
+            set({ isExecuting: true, error: null });
+
+            const startTime = performance.now();
             const result = await connection.query(query);
-            console.log("executeQuery: Query result:", result);
             const duration = performance.now() - startTime;
 
-            const historyItem: QueryHistoryItem = {
-              id: crypto.randomUUID(),
-              query,
-              timestamp: new Date(),
-              duration,
-            };
+            const queryResult = resultToJSON(result);
+            queryResult.duration = duration;
 
-            const columns = result.schema.fields.map((f) => f.name);
-            const data = result.toArray().map((row: any) => {
-              const obj: Record<string, unknown> = {};
-              Object.values(row).forEach((value, index) => {
-                if (index < columns.length) {
-                  const columnName = columns[index];
-                  if (typeof value === "bigint") {
-                    obj[columnName] = value.toString();
-                  } else if (
-                    columnName.toLowerCase().includes("now") ||
-                    columnName.toLowerCase().includes("timestamp") ||
-                    columnName.toLowerCase().includes("date")
-                  ) {
-                    // Handle timestamp values
-                    const timestamp = Number(value);
-                    if (!isNaN(timestamp)) {
-                      obj[columnName] = new Date(timestamp);
-                    } else {
-                      obj[columnName] = value;
-                    }
-                  } else {
-                    obj[columnName] = value;
-                  }
-                }
-              });
-              return obj;
-            });
+            // Update state
+            set((state) => ({
+              queryHistory: [
+                {
+                  id: crypto.randomUUID(),
+                  query,
+                  timestamp: new Date(),
+                  duration,
+                },
+                ...state.queryHistory.slice(0, 19),
+              ],
+              tabs: state.tabs.map((tab) =>
+                tab.id === tabId ? { ...tab, result: queryResult } : tab
+              ),
+              isExecuting: false,
+            }));
 
-            const queryResult: QueryResult = {
-              columns,
-              data,
-              rowCount: result.numRows,
-              duration,
-            };
-            console.log("executeQuery: Query result processed", {
-              queryResult,
-            });
-            const isDDL =
-              /^(CREATE|ATTACH|DROP|ALTER|INSERT|UPDATE|DELETE)/i.test(
-                query.trim()
-              );
-            console.log("executeQuery: Checking if the query is DDL", {
-              isDDL,
-            });
-
-            if (isDDL) {
-              try {
-                await updateDataLists(set, connection, undefined, query);
-                console.log(
-                  "executeQuery: updateDataLists completed successfully after DDL query"
-                );
-              } catch (e) {
-                console.error(
-                  "executeQuery: Error updating table list after DDL",
-                  e
-                );
-              }
+            // Refresh schema if DDL
+            if (/^(CREATE|ALTER|DROP|ATTACH)/i.test(query.trim())) {
+              await get().fetchDatabasesAndTablesInfo();
             }
-
-            set((state) => {
-              const existingQuery = state.queryHistory.find(
-                (item) => item.query === query
-              );
-              const newHistory = existingQuery
-                ? state.queryHistory
-                : [historyItem, ...state.queryHistory];
-              const uniqueHistory = newHistory.slice(0, 20);
-              return {
-                queryHistory: uniqueHistory,
-                tabs: state.tabs.map((tab) =>
-                  tab.id === tabId ? { ...tab, result: queryResult } : tab
-                ),
-                isExecuting: false,
-              };
-            });
-            console.log("executeQuery: Query execution complete", {
-              query,
-              tabId,
-            });
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : "Unknown error";
 
-            const historyItem: QueryHistoryItem = {
-              id: crypto.randomUUID(),
-              query,
-              timestamp: new Date(),
+            // Prepare error result
+            const errorResult: QueryResult = {
+              columns: [],
+              data: [],
+              rowCount: 0,
+              duration: 0,
               error: errorMessage,
             };
-            console.error("executeQuery: Error during query execution:", error);
+
             set((state) => ({
-              queryHistory: [historyItem, ...state.queryHistory],
-              tabs: state.tabs.map((tab) =>
-                tab.id === tabId
-                  ? {
-                      ...tab,
-                      result: {
-                        columns: [],
-                        data: [],
-                        rowCount: 0,
-                        duration: 0,
-                        error: errorMessage,
-                      },
-                    }
-                  : tab
-              ),
-              error: errorMessage,
               isExecuting: false,
+              error: errorMessage,
+              queryHistory: [
+                {
+                  id: crypto.randomUUID(),
+                  query,
+                  timestamp: new Date(),
+                  error: errorMessage,
+                },
+                ...state.queryHistory,
+              ],
+              tabs: state.tabs.map((tab) =>
+                tab.id === tabId ? { ...tab, result: errorResult } : tab
+              ),
             }));
           }
         },
 
-        // Import File (CSV, JSON, Arrow, Parquet)
+        // Improved file import
         importFile: async (
-          fileName: string,
-          fileContent: ArrayBuffer,
-          tableName: string,
-          fileType: string
+          fileName,
+          fileContent,
+          tableName,
+          fileType,
+          database = "main"
         ) => {
-          console.log("importFile: Starting file import", {
-            fileName,
-            tableName,
-            fileType,
-          });
-          const { db, connection } = get();
-          if (!db || !connection) {
-            console.error("importFile: Database not initialized");
-            throw new Error("Database not initialized");
-          }
-
-          if (!tableName) {
-            console.error("importFile: Table name is required");
-            throw new Error("Table name is required");
-          }
           try {
-            const buffer = new Uint8Array(fileContent);
-            console.log("importFile: File content converted to Uint8Array");
+            const { db, connection } = get();
+            if (!db || !connection) throw new Error("Database not initialized");
 
-            // First unregister if exists (cleanup)
+            const buffer = new Uint8Array(fileContent);
+
+            // Cleanup previous registration
             try {
               await db.dropFile(fileName);
-              console.log("importFile: Previous file dropped", { fileName });
-            } catch (e) {
-              // Ignore errors during cleanup
-              console.warn(
-                "importFile: Error dropping previous file (if any), ignoring error:",
-                e
-              );
-            }
+            } catch {}
 
-            // Register the new file
             await db.registerFileBuffer(fileName, buffer);
-            console.log("importFile: File registered in DuckDB", { fileName });
 
-            // Drop existing table if it exists
-            await connection.query(`DROP TABLE IF EXISTS "${tableName}"`);
-            console.log("importFile: Existing table dropped (if any)", {
-              tableName,
-            });
-            // Construct and execute the appropriate import query based on file type
-            let importQuery = "";
-            switch (fileType.toLowerCase()) {
-              case "csv":
-                importQuery = `
-                    CREATE TABLE "${tableName}" AS 
-                    SELECT * FROM read_csv_auto(
-                      '${fileName}',
-                      header=true,
-                      all_varchar=false,
-                      sample_size=-1
-                    )`;
-                break;
-              case "json":
-                importQuery = `
-                    CREATE TABLE "${tableName}" AS 
-                    SELECT * FROM read_json_auto(
-                      '${fileName}',
-                      format='array'
-                    )`;
-                break;
-              case "parquet":
-                importQuery = `
-                    CREATE TABLE "${tableName}" AS 
-                    SELECT * FROM read_parquet('${fileName}')`;
-                break;
-              case "arrow":
-                importQuery = `
-                    CREATE TABLE "${tableName}" AS 
-                    SELECT * FROM read_arrow('${fileName}')`;
-                break;
-              default:
-                console.error("importFile: Unsupported file type", {
-                  fileType,
-                });
-                throw new Error(`Unsupported file type: ${fileType}`);
-            }
-            console.log("importFile: Constructed import query", {
-              importQuery,
-            });
-            // Execute the import query
-            await connection.query(importQuery);
-            console.log("importFile: Import query executed");
+            // Ensure database exists
+            await connection.query(`CREATE DATABASE IF NOT EXISTS ${database}`);
+            await connection.query(`USE ${database}`);
 
-            // Verify the table was created
-            const verifyResult = await connection.query(`
-                SELECT COUNT(*) 
-                FROM information_schema.tables 
-                WHERE table_name = '${tableName}'
-              `);
-            console.log("importFile: Verifying table creation", {
-              verifyResult,
-            });
+            // Create table
+            await connection.query(`
+              CREATE OR REPLACE TABLE "${tableName}" AS 
+              SELECT * FROM read_${fileType.toLowerCase()}_auto('${fileName}')
+            `);
 
-            if (verifyResult.toArray()[0][0] === 0) {
-              console.error(
-                "importFile: Table creation failed, verification failed"
-              );
-              throw new Error("Table creation failed");
+            // Verify creation
+            const verification = await connection.query(`
+              SELECT COUNT(*) AS count 
+              FROM information_schema.tables 
+              WHERE table_name = '${tableName}'
+                AND table_schema = '${database}'
+            `);
+
+            if (verification.toArray()[0][0] === 0) {
+              throw new Error("Table creation verification failed");
             }
 
-            // Update the combined data lists
-            await updateDataLists(set, connection, tableName);
-            console.log("importFile: Table list updated after file import");
+            await get().fetchDatabasesAndTablesInfo();
           } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : "Unknown error";
-            console.error("importFile: File import failed:", error);
-            throw new Error(`File import failed: ${errorMessage}`);
+            await get().fetchDatabasesAndTablesInfo();
+            throw new Error(
+              `Import failed: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
           }
         },
 
-        // Tab management
+        // Complete data explorer implementation
+        fetchDatabasesAndTablesInfo: async () => {
+          try {
+            const connection = validateConnection(get().connection);
+
+            const databasesResult = await connection.query(
+              `PRAGMA database_list`
+            );
+            const databases = await Promise.all(
+              databasesResult.toArray().map(async (db: any) => {
+                const dbName = db.name.toString();
+                await connection.query(`USE ${dbName}`);
+
+                const tablesResult = await connection.query(`
+                  SELECT table_name as name 
+                  FROM information_schema.tables 
+                  WHERE table_schema = 'main'
+                  AND table_type = 'BASE TABLE'
+                `);
+
+                const tables = await Promise.all(
+                  tablesResult.toArray().map(async (tbl: any) => {
+                    const tableName = tbl.name.toString();
+
+                    const columnsResult = await connection.query(
+                      `DESCRIBE "${tableName}"`
+                    );
+                    const columns = columnsResult.toArray().map((col: any) => ({
+                      name: col.column_name.toString(),
+                      type: col.column_type.toString(),
+                      nullable: col.null === "YES",
+                    }));
+
+                    const countResult = await connection.query(
+                      `SELECT COUNT(*) as count FROM "${tableName}"`
+                    );
+
+                    return {
+                      name: tableName,
+                      schema: dbName,
+                      columns,
+                      rowCount: Number(countResult.toArray()[0][0]),
+                      createdAt: new Date().toISOString(),
+                    };
+                  })
+                );
+
+                return { name: dbName, tables };
+              })
+            );
+
+            set({ databases, error: null });
+          } catch (error) {
+            set({
+              error: `Failed to load schema: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+            });
+          }
+        },
+
+        // Database switching
+        switchDatabase: async (databaseName) => {
+          try {
+            const connection = validateConnection(get().connection);
+            set({ isLoading: true });
+            await connection.query(`USE ${databaseName}`);
+            set({ currentDatabase: databaseName, isLoading: false });
+            await get().fetchDatabasesAndTablesInfo();
+          } catch (error) {
+            set({
+              isLoading: false,
+              error: `Database switch failed: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+            });
+          }
+        },
+
+        // Rest of the tab management functions remain the same
         createTab: (type = "sql", content = "", title) => {
-          console.log("createTab: Creating new tab", { type, content });
           const newTab: EditorTab = {
             id: crypto.randomUUID(),
             title:
@@ -620,19 +498,16 @@ export const useDuckStore = create<DuckStoreState>()(
             type,
             content,
           };
-          console.log("createTab: New tab created", { newTab });
           set((state) => ({
             tabs: [...state.tabs, newTab],
             activeTabId: newTab.id,
           }));
         },
 
-        closeTab: (tabId: string) => {
-          console.log("closeTab: Closing tab", { tabId });
+        closeTab: (tabId) => {
           set((state) => {
             const updatedTabs = state.tabs.filter((tab) => tab.id !== tabId);
-
-            // Don't allow closing the last tab
+            let newActiveTabId = state.activeTabId;
             if (updatedTabs.length === 0) {
               const newTab: EditorTab = {
                 id: crypto.randomUUID(),
@@ -640,25 +515,14 @@ export const useDuckStore = create<DuckStoreState>()(
                 type: "sql",
                 content: "",
               };
-              console.log("closeTab: Last tab closed, creating new tab", {
-                newTab,
-              });
               return {
                 tabs: [newTab],
                 activeTabId: newTab.id,
               };
             }
-
-            // Update active tab if necessary
-            const newActiveTabId =
-              state.activeTabId === tabId
-                ? updatedTabs[0]?.id || null
-                : state.activeTabId;
-
-            console.log("closeTab: Tab closed, new active tab", {
-              tabId,
-              newActiveTabId,
-            });
+            if (state.activeTabId === tabId) {
+              newActiveTabId = updatedTabs[0]?.id || null;
+            }
             return {
               tabs: updatedTabs,
               activeTabId: newActiveTabId,
@@ -666,16 +530,11 @@ export const useDuckStore = create<DuckStoreState>()(
           });
         },
 
-        setActiveTab: (tabId: string) => {
-          console.log("setActiveTab: Setting active tab", { tabId });
+        setActiveTab: (tabId) => {
           set({ activeTabId: tabId });
         },
 
-        updateTabContent: (tabId: string, content: EditorTab["content"]) => {
-          console.log("updateTabContent: Updating tab content", {
-            tabId,
-            content,
-          });
+        updateTabContent: (tabId, content) => {
           set((state) => ({
             tabs: state.tabs.map((tab) =>
               tab.id === tabId ? { ...tab, content } : tab
@@ -683,8 +542,7 @@ export const useDuckStore = create<DuckStoreState>()(
           }));
         },
 
-        updateTabQuery: (tabId: string, query: string) => {
-          console.log("updateTabQuery: Updating tab query", { tabId, query });
+        updateTabQuery: (tabId, query) => {
           set((state) => ({
             tabs: state.tabs.map((tab) =>
               tab.id === tabId && tab.type === "sql"
@@ -693,9 +551,7 @@ export const useDuckStore = create<DuckStoreState>()(
             ),
           }));
         },
-
-        moveTab: (oldIndex: number, newIndex: number) => {
-          console.log("moveTab: Moving tab", { oldIndex, newIndex });
+        moveTab: (oldIndex, newIndex) => {
           set((state) => {
             const newTabs = [...state.tabs];
             const [movedTab] = newTabs.splice(oldIndex, 1);
@@ -705,7 +561,6 @@ export const useDuckStore = create<DuckStoreState>()(
         },
 
         closeAllTabs: () => {
-          console.log("closeAllTabs: Closing all tabs");
           set((state) => {
             const homeTab = state.tabs.find((tab) => tab.id === "home");
             const newTab: EditorTab = {
@@ -715,55 +570,22 @@ export const useDuckStore = create<DuckStoreState>()(
               content: "",
             };
             const newTabs = homeTab ? [homeTab, newTab] : [newTab];
-            console.log("closeAllTabs: Setting new tabs", { newTabs });
             return {
               tabs: newTabs,
               activeTabId: newTabs[0].id,
             };
           });
         },
-
-        deleteTable: async (tableName: string) => {
-          console.log("deleteTable: Starting table deletion", { tableName });
-          const { connection } = get();
-          if (!connection) {
-            console.error("deleteTable: Database not initialized");
-            set({ error: "Database not initialized" });
-            return;
-          }
-
+        deleteTable: async (tableName, database = "main") => {
           try {
-            set({ error: null });
-            console.log("deleteTable: Setting isLoading to true");
-            // Sanitize table name for safety
-
-            console.log("deleteTable: Sanitized table name", {
-              tableName,
-            });
-            // Verify table exists before attempting to drop
-            const verifyResult = await connection.query(`
-              SELECT COUNT(*) 
-              FROM information_schema.tables 
-              WHERE table_name = '${tableName}'
-            `);
-            console.log("deleteTable: Verifying table existence", {
-              verifyResult,
-            });
-            if (verifyResult.toArray()[0][0] === 0) {
-              console.error(`deleteTable: Table ${tableName} does not exist`);
-              throw new Error(`Table ${tableName} does not exist`);
-            }
-            console.log("deleteTable: Table exists, proceeding to drop table", {
-              tableName,
-            });
-            await connection.query(`DROP TABLE IF EXISTS "${tableName}"`);
-            await updateDataLists(set, connection);
-
-            console.log("deleteTable: Table deleted and UI state updated", {
-              tableName,
-            });
+            const connection = validateConnection(get().connection);
+            set({ isLoading: true });
+            await connection.query(
+              `DROP TABLE IF EXISTS "${database}"."${tableName}"`
+            );
+            await get().fetchDatabasesAndTablesInfo();
+            set({ isLoading: false });
           } catch (error) {
-            console.error("deleteTable: Failed to delete table:", error);
             set({
               isLoading: false,
               error: `Failed to delete table: ${
@@ -773,37 +595,23 @@ export const useDuckStore = create<DuckStoreState>()(
             throw error;
           }
         },
-
-        // History management
         clearHistory: () => {
-          console.log("clearHistory: Clearing query history");
           set({ queryHistory: [] });
         },
-
-        // Cleanup
         cleanup: async () => {
-          console.log("cleanup: Starting cleanup");
           const { connection, db } = get();
           try {
-            if (connection) {
-              await connection.close();
-              console.log("cleanup: Database connection closed");
-            }
-            if (db) {
-              await db.terminate();
-              console.log("cleanup: Database terminated");
-            }
-
-            // Reset to initial state
+            if (connection) await connection.close();
+            if (db) await db.terminate();
+          } finally {
             set({
               db: null,
               connection: null,
               isInitialized: false,
               databases: [],
+              currentDatabase: "main",
               error: null,
-              tables: [],
               queryHistory: [],
-              isExecuting: false,
               tabs: [
                 {
                   id: "home",
@@ -811,33 +619,20 @@ export const useDuckStore = create<DuckStoreState>()(
                   type: "home",
                   content: "",
                 },
-                {
-                  id: crypto.randomUUID(),
-                  title: "Query 1",
-                  type: "sql",
-                  content: "",
-                },
               ],
               activeTabId: "home",
             });
-            console.log("cleanup: State reset to initial values");
-          } catch (error) {
-            console.error("cleanup: Cleanup failed:", error);
-            throw error;
           }
         },
       }),
       {
-        name: "duck-studio-storage",
+        name: "duck-ui-storage",
         partialize: (state) => ({
-          databases: state.databases,
-          tables: state.tables,
           queryHistory: state.queryHistory,
-          tabs: state.tabs.map((tab) => ({
-            ...tab,
-            result: undefined, // Don't persist query results
-          })),
-          activeTabId: state.activeTabId,
+          duckDbConfigState: state.duckDbConfigState,
+          databases: state.databases,
+          tabs: state.tabs.map((tab) => ({ ...tab, result: undefined })),
+          currentDatabase: state.currentDatabase,
         }),
       }
     )

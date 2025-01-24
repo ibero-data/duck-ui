@@ -8,56 +8,43 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormDescription,
+  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useDuckStore } from "@/store";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RefreshCw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
 const settingsSchema = z.object({
-  enableHttpMetadataCache: z.boolean(),
-  enableObjectCache: z.boolean(),
-  maxMemory: z.number().min(1).max(64),
-  nullOrder: z.enum(["nulls_first", "nulls_last"]),
-  enableProgress: z.boolean(),
-  enableQueryLog: z.boolean(),
-  maximumExpression: z.number().min(1000).max(1000000),
+  maxMemory: z
+    .number()
+    .min(0.2, "Memory must be at least 0.2 GB")
+    .max(9.3, "Memory cannot exceed 9.3 GB"),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 
-const defaultValues: SettingsFormValues = {
-  enableHttpMetadataCache: false,
-  enableObjectCache: false,
-  maxMemory: 4,
-  nullOrder: "nulls_first",
-  enableProgress: true,
-  enableQueryLog: true,
-  maximumExpression: 250000,
-};
-
 const Settings: React.FC = () => {
-  const { connection, isInitialized } = useDuckStore();
-  const [configStatus, setConfigStatus] = useState<
-    "loading" | "error" | "success" | "idle"
-  >("idle");
+  const {
+    connection,
+    isInitialized,
+    duckDbConfig,
+    isConfiguring,
+    error,
+    duckDbConfigState,
+  } = useDuckStore();
+  
+  const [isFetching, setIsFetching] = useState(false);
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues,
+    defaultValues: {
+      maxMemory: duckDbConfigState?.max_memory ?? 3.1,
+    },
   });
 
   const onSubmit = async (values: SettingsFormValues) => {
@@ -66,88 +53,52 @@ const Settings: React.FC = () => {
       return;
     }
 
-    setConfigStatus("loading");
     try {
-      await Promise.all([
-        connection.query(
-          `SET enable_http_metadata_cache=${values.enableHttpMetadataCache}`
-        ),
-        connection.query(`SET enable_object_cache=${values.enableObjectCache}`),
-        connection.query(`SET memory_limit='${values.maxMemory}GB'`),
-        connection.query(`SET null_order='${values.nullOrder}'`),
-        connection.query(`SET enable_progress_bar=${values.enableProgress}`),
-        connection.query(`SET enable_http_logging=${values.enableQueryLog}`),
-        connection.query(
-          `SET max_expression_depth=${values.maximumExpression}`
-        ),
-      ]);
-
-      setConfigStatus("success");
+      await duckDbConfig({ max_memory: values.maxMemory });
       toast.success("Settings updated successfully");
-    } catch (e: any) {
-      setConfigStatus("error");
-      toast.error(`Failed to update settings: ${e.message}`);
-    }
-  };
-
-  const getSetting = async (settingName: string, defaultValue: any) => {
-    try {
-      const result = await connection?.query(
-        `SELECT current_setting('${settingName}') as value`
-      );
-      const value = result?.toArray()?.[0]?.value;
-      return value !== undefined ? value : defaultValue;
-    } catch (e) {
-      console.warn(`Failed to fetch setting ${settingName}:`, e);
-      return defaultValue;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to update settings: ${message}`);
+      form.setError("maxMemory", { message });
     }
   };
 
   const fetchCurrentConfig = async () => {
     if (!connection || !isInitialized) return;
 
-    setConfigStatus("loading");
     try {
-      const [
-        httpMetadataCache,
-        objectCache,
-        memoryLimit,
-        nullOrder,
-        progressBar,
-        httpLogging,
-        expressionDepth,
-      ] = await Promise.all([
-        getSetting("enable_http_metadata_cache", false),
-        getSetting("enable_object_cache", false),
-        getSetting("memory_limit", "4GB"),
-        getSetting("null_order", "nulls_first"),
-        getSetting("enable_progress_bar", true),
-        getSetting("enable_http_logging", true),
-        getSetting("max_expression_depth", "250000"),
-      ]);
-
-      const config = {
-        enableHttpMetadataCache: httpMetadataCache === "true",
-        enableObjectCache: objectCache === "true",
-        maxMemory: parseInt(memoryLimit.replace("GB", "")) || 4,
-        nullOrder: nullOrder as "nulls_first" | "nulls_last",
-        enableProgress: progressBar === "true",
-        enableQueryLog: httpLogging === "true",
-        maximumExpression: parseInt(expressionDepth) || 250000,
-      };
-
-      form.reset(config);
-      setConfigStatus("success");
-    } catch (e: any) {
-      console.error("Failed to fetch DuckDB configuration:", e);
-      setConfigStatus("error");
+      setIsFetching(true);
+      const result = await connection.query(
+        "SELECT current_setting('memory_limit') as value"
+      );
+      const memoryValue = result.toArray()[0].value;
+      toast.info(`Current memory limit: ${memoryValue}`);
+      const maxMemory = parseFloat(memoryValue.replace("GB", ""));
+      toast.info(`maxMemory: ${maxMemory}`);
+      
+      if (!isNaN(maxMemory)) {
+        form.reset({ maxMemory });
+      }
+    } catch (error) {
+      console.error("Failed to fetch DuckDB configuration:", error);
       toast.error("Failed to load current settings");
+    } finally {
+      setIsFetching(false);
     }
   };
 
   useEffect(() => {
     fetchCurrentConfig();
   }, [connection, isInitialized]);
+
+  // Update form when config changes in store
+  useEffect(() => {
+    if (duckDbConfigState?.max_memory) {
+      form.reset({ maxMemory: duckDbConfigState.max_memory });
+    }
+  }, [duckDbConfigState]);
+
+  const isLoading = isConfiguring || isFetching;
 
   return (
     <ScrollArea className="h-full w-full p-4">
@@ -162,31 +113,26 @@ const Settings: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={fetchCurrentConfig}
-              disabled={configStatus === "loading"}
+              disabled={isLoading}
             >
               <RefreshCw
-                className={`h-4 w-4 mr-2 ${
-                  configStatus === "loading" ? "animate-spin" : ""
-                }`}
+                className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
               />
               Refresh
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          {configStatus === "error" && (
+          {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertTitle>Configuration Error</AlertTitle>
-              <AlertDescription>
-                Failed to load or update DuckDB configuration. Please try again.
-              </AlertDescription>
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="space-y-6">
-                {/* Performance Settings */}
                 <div className="space-y-4">
                   <h3 className="font-medium">Performance Settings</h3>
                   <div className="grid gap-4">
@@ -198,150 +144,12 @@ const Settings: React.FC = () => {
                           <FormLabel>Maximum Memory (GB)</FormLabel>
                           <FormControl>
                             <Input
-                              type="number"
                               {...field}
-                              onChange={(e) =>
-                                field.onChange(Number(e.target.value))
-                              }
+                              onChange={(e) => field.onChange(Number(e.target.value))}
+                              disabled={isLoading}
                             />
                           </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="maximumExpression"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Maximum Expression Depth</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(Number(e.target.value))
-                              }
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                {/* Cache Settings */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Cache Settings</h3>
-                  <div className="grid gap-4">
-                    <FormField
-                      control={form.control}
-                      name="enableHttpMetadataCache"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div>
-                            <FormLabel>HTTP Metadata Cache</FormLabel>
-                            <FormDescription>
-                              Enable HTTP metadata caching
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="enableObjectCache"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div>
-                            <FormLabel>Object Cache</FormLabel>
-                            <FormDescription>
-                              Enable object caching
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                {/* Query Settings */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Query Settings</h3>
-                  <div className="grid gap-4">
-                    <FormField
-                      control={form.control}
-                      name="nullOrder"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Null Order</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="nulls_first">
-                                Nulls First
-                              </SelectItem>
-                              <SelectItem value="nulls_last">
-                                Nulls Last
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="enableProgress"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div>
-                            <FormLabel>Progress Bar</FormLabel>
-                            <FormDescription>
-                              Show query progress
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="enableQueryLog"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div>
-                            <FormLabel>Query Logging</FormLabel>
-                            <FormDescription>
-                              Enable query logging
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -349,12 +157,12 @@ const Settings: React.FC = () => {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={configStatus === "loading"}
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading}
               >
-                {configStatus === "loading" ? "Saving..." : "Save Settings"}
+                {isConfiguring ? "Saving..." : "Save Settings"}
               </Button>
             </form>
           </Form>

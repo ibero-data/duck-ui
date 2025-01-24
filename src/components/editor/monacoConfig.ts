@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import type { editor } from "monaco-editor";
 import { toast } from "sonner";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
-import { useTheme } from "@/components/theme/theme-provider";
 import { format } from "sql-formatter";
+import { TableInfo } from "@/store"; // Import the types
 
 // Types
 export interface EditorInstance {
@@ -226,7 +226,11 @@ monaco.languages.setMonarchTokensProvider("sql", {
 monaco.languages.registerCompletionItemProvider("sql", {
   triggerCharacters: [" ", ".", "(", ","],
   provideCompletionItems: (model, position) => {
-    const { tables } = useDuckStore.getState();
+    const { databases } = useDuckStore.getState(); // Default to empty array
+    const tables =  databases.reduce((acc, db) => {
+      return [...acc, ...db.tables]
+    },[] as TableInfo[]);
+
     const textUntilPosition = model.getValueInRange({
       startLineNumber: 1,
       startColumn: 1,
@@ -373,7 +377,7 @@ monaco.languages.registerCodeActionProvider("sql", {
           {
             resource: model.uri,
             range: model.getFullModelRange(),
-            insertText: model
+            text: model
               .getValue()
               .split("\n")
               .map((s) => s.trim())
@@ -502,20 +506,20 @@ export const createEditor = (
 
 // Hook for editor configuration
 export const useMonacoConfig = (theme: string): EditorConfig => {
-  const { fontSize } = useTheme();
-  return useMemo(
-    () => ({
-      language: "sql",
-      theme: theme === "dark" ? "vs-dark" : "vs",
-      automaticLayout: true,
-      tabSize: 2,
-      minimap: { enabled: false },
-      padding: { top: 10 },
-      suggestOnTriggerCharacters: true,
-      quickSuggestions: true,
-      wordBasedSuggestions: false,
-      fontSize: fontSize,
+
+    return useMemo(
+        () => ({
+        language: "sql",
+        theme: theme === "dark" ? "vs-dark" : "vs",
+        automaticLayout: true,
+        tabSize: 2,
+        minimap: { enabled: false },
+        padding: { top: 10 },
+        suggestOnTriggerCharacters: true,
+        quickSuggestions: true,
+        wordBasedSuggestions: false,
+        fontSize: 12,
     }),
-    [theme, fontSize]
-  );
+    [theme]
+    );
 };
