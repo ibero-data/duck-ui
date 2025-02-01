@@ -79,7 +79,7 @@ const Sidebar = () => {
       isNewWindow: true,
     },
     {
-      to: "https://duck-ui.caioricciuti.com/docs?utm_source=duck-ui&utm_medium=sidebar",
+      to: "https://duckui.com/docs?utm_source=duck-ui&utm_medium=sidebar",
       label: "Documentation",
       icon: BookText,
       isNewWindow: true,

@@ -13,6 +13,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
 import Logo from "/logo.png";
 import Metrics from "./pages/Metrics";
+import NotFound from "./pages/NotFound";
 
 interface LoadingScreenProps {
   message: string;
@@ -25,7 +26,11 @@ interface AppInitializerProps {
 const LoadingScreen = ({ message }: LoadingScreenProps) => (
   <div className="h-screen flex items-center justify-center bg-black/90 text-white">
     <div className="text-center">
-      <img src={Logo} alt="Logo" className="h-18  w-22 m-auto mb-8 pl-24" />
+      <img
+        src={Logo.toString()}
+        alt="Logo"
+        className="h-18 w-22 m-auto mb-8 pl-24"
+      />
       <Loader2 className="animate-spin m-auto mb-12" size={64} />
       <p className="text-lg">{message}</p>
     </div>
@@ -70,7 +75,7 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route path="/metrics" element={<Metrics />} />
         <Route path="/settings" element={<Settings />} />
-        
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
   );

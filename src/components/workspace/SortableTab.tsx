@@ -93,7 +93,7 @@ function SortableTab({ tab, isActive }: SortableTabProps) {
               <Terminal className="h-4 w-4" />
             ) : null}
           </div>
-          <span className="truncate text-sm">{tab.title}</span>
+          <span className="truncate text-xs">{tab.title}</span>
           {tab.type === "sql" && (
             <div className="ml-auto flex items-center space-x-1 text-xs text-gray-500">
               <span

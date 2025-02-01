@@ -1,0 +1,6 @@
+services:
+  ch-ui:
+    image: ghcr.io/caioricciuti/duck-ui:latest
+    restart: always
+    ports:
+      - "${DUCK_UI_PORT:-5522}:5522"

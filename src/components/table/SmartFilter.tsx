@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from "react";
-import { X, Plus, ChevronDown } from "lucide-react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { X, Plus, ChevronDown, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -47,11 +47,13 @@ export function SmartFilter({
 }: SmartFilterProps) {
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState<FilterCondition[]>([]);
-  const [searchValue, setSearchValue] = useState("");
+  const [_, setSearchValue] = useState("");
   const [currentFilter, setCurrentFilter] = useState<Partial<FilterCondition>>({
     id: Math.random().toString(36).substring(7),
   });
 
+  const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
+  const previousFilter = useRef<Partial<FilterCondition>>(currentFilter);
 
   const handleAddFilter = useCallback(() => {
     if (currentFilter.column && currentFilter.operator && currentFilter.value) {
@@ -59,26 +61,88 @@ export function SmartFilter({
         ...currentFilter,
         id: Math.random().toString(36).substring(7),
       } as FilterCondition;
-      
+
       const newFilters = [...filters, newFilter];
       setFilters(newFilters);
       onFilterChange(newFilters);
       setCurrentFilter({ id: Math.random().toString(36).substring(7) });
       setSearchValue("");
+      setOpen(false);
     }
-  }, [currentFilter, filters, onFilterChange]);
+  }, [currentFilter, filters, onFilterChange, setOpen]);
 
-  const handleRemoveFilter = useCallback((id: string) => {
-    const newFilters = filters.filter((f) => f.id !== id);
-    setFilters(newFilters);
-    onFilterChange(newFilters);
-  }, [filters, onFilterChange]);
+  const handleRemoveFilter = useCallback(
+    (id: string) => {
+      const newFilters = filters.filter((f) => f.id !== id);
+      setFilters(newFilters);
+      onFilterChange(newFilters);
+    },
+    [filters, onFilterChange]
+  );
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && currentFilter.value) {
-      handleAddFilter();
+  const handleUpdateFilter = useCallback(() => {
+    if (
+      editingFilterId &&
+      currentFilter.column &&
+      currentFilter.operator &&
+      currentFilter.value
+    ) {
+      const updatedFilters = filters.map((f) => {
+        if (f.id === editingFilterId) {
+          return { ...currentFilter, id: editingFilterId } as FilterCondition;
+        }
+        return f;
+      });
+      setFilters(updatedFilters);
+      onFilterChange(updatedFilters);
+      setEditingFilterId(null);
+      setCurrentFilter({ id: Math.random().toString(36).substring(7) });
+      setOpen(false);
+      previousFilter.current = {};
     }
-  }, [currentFilter.value, handleAddFilter]);
+  }, [currentFilter, filters, onFilterChange, editingFilterId, setOpen]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && currentFilter.value) {
+        if (editingFilterId) {
+          handleUpdateFilter();
+        } else {
+          handleAddFilter();
+        }
+      }
+    },
+    [currentFilter.value, handleAddFilter, editingFilterId, handleUpdateFilter]
+  );
+
+  const handleEditFilter = useCallback(
+    (filterId: string) => {
+      setEditingFilterId(filterId);
+      const filterToEdit = filters.find((f) => f.id === filterId);
+      if (filterToEdit) {
+        previousFilter.current = { ...filterToEdit };
+        setCurrentFilter({ ...filterToEdit });
+        setOpen(true);
+      }
+    },
+    [filters, setOpen]
+  );
+
+  useEffect(() => {
+    if (editingFilterId && !open) {
+      setEditingFilterId(null);
+      setCurrentFilter({ id: Math.random().toString(36).substring(7) });
+      previousFilter.current = {};
+    }
+  }, [editingFilterId, open]);
+
+  useEffect(() => {
+    if (
+      JSON.stringify(previousFilter.current) !== JSON.stringify(currentFilter)
+    ) {
+      previousFilter.current = currentFilter;
+    }
+  }, [currentFilter]);
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -92,10 +156,19 @@ export function SmartFilter({
                 className="flex-none h-4 px-2 flex items-center gap-1 text-xs"
               >
                 <span>
-                  {columns.find((c) => c.id === filter.column)?.header || filter.column}
+                  {columns.find((c) => c.id === filter.column)?.header ||
+                    filter.column}
                 </span>
                 <span className="text-muted-foreground">{filter.operator}</span>
                 <span>{filter.value}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 p-0 hover:bg-transparent"
+                  onClick={() => handleEditFilter(filter.id)}
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -115,7 +188,12 @@ export function SmartFilter({
               variant="outline"
               size="sm"
               className="h-7 px-2 gap-1"
-              onClick={() => setOpen(true)}
+              onClick={() => {
+                setCurrentFilter({
+                  id: Math.random().toString(36).substring(7),
+                });
+                setOpen(true);
+              }}
               aria-label="Add filter"
             >
               <Plus className="h-4 w-4" />
@@ -123,27 +201,41 @@ export function SmartFilter({
               <ChevronDown className="h-3 w-3 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-2" align="start" aria-description="Filter configuration panel">
+          <PopoverContent
+            className="w-[300px] p-2"
+            align="start"
+            aria-description="Filter configuration panel"
+          >
             <div className="space-y-4">
               {/* Column selection */}
               {!currentFilter.column && (
                 <div className="space-y-2">
-                  <label className="text-xs font-medium" htmlFor="column-select">Column</label>
+                  <label
+                    className="text-xs font-medium"
+                    htmlFor="column-select"
+                  >
+                    Column
+                  </label>
                   <Command className="text-xs">
-                    <CommandInput 
+                    <CommandInput
                       placeholder="Search columns..."
                       id="column-select"
                       className="text-xs"
                     />
                     <CommandList>
-                      <CommandEmpty className="text-xs">No columns found.</CommandEmpty>
+                      <CommandEmpty className="text-xs">
+                        No columns found.
+                      </CommandEmpty>
                       <CommandGroup heading="Columns" className="text-xs">
                         {columns.map((column) => (
                           <CommandItem
                             key={column.id}
                             value={column.id}
                             onSelect={(value) => {
-                              setCurrentFilter((prev) => ({ ...prev, column: value }));
+                              setCurrentFilter((prev) => ({
+                                ...prev,
+                                column: value,
+                              }));
                             }}
                             className="text-xs"
                           >
@@ -160,31 +252,46 @@ export function SmartFilter({
               {currentFilter.column && !currentFilter.operator && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium" htmlFor="operator-select">Operator</label>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <label
+                      className="text-xs font-medium"
+                      htmlFor="operator-select"
+                    >
+                      Operator
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-xs h-6 px-2"
-                      onClick={() => setCurrentFilter(prev => ({ ...prev, column: undefined }))}
+                      onClick={() =>
+                        setCurrentFilter((prev) => ({
+                          ...prev,
+                          column: undefined,
+                        }))
+                      }
                     >
                       Back
                     </Button>
                   </div>
                   <Command className="text-xs">
-                    <CommandInput 
+                    <CommandInput
                       placeholder="Search operators..."
                       id="operator-select"
                       className="text-xs"
                     />
                     <CommandList>
-                      <CommandEmpty className="text-xs">No operators found.</CommandEmpty>
+                      <CommandEmpty className="text-xs">
+                        No operators found.
+                      </CommandEmpty>
                       <CommandGroup heading="Operators" className="text-xs">
                         {OPERATORS.map((operator) => (
                           <CommandItem
                             key={operator.value}
                             value={operator.value}
                             onSelect={(value) => {
-                              setCurrentFilter((prev) => ({ ...prev, operator: value }));
+                              setCurrentFilter((prev) => ({
+                                ...prev,
+                                operator: value,
+                              }));
                             }}
                             className="text-xs"
                           >
@@ -201,12 +308,22 @@ export function SmartFilter({
               {currentFilter.column && currentFilter.operator && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium" htmlFor="filter-value">Value</label>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <label
+                      className="text-xs font-medium"
+                      htmlFor="filter-value"
+                    >
+                      Value
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-xs h-6 px-2"
-                      onClick={() => setCurrentFilter(prev => ({ ...prev, operator: undefined }))}
+                      onClick={() =>
+                        setCurrentFilter((prev) => ({
+                          ...prev,
+                          operator: undefined,
+                        }))
+                      }
                     >
                       Back
                     </Button>
@@ -227,12 +344,14 @@ export function SmartFilter({
                       className="text-xs"
                     />
                     <Button
-                      onClick={handleAddFilter}
+                      onClick={
+                        editingFilterId ? handleUpdateFilter : handleAddFilter
+                      }
                       disabled={!currentFilter.value}
                       aria-label="Add filter"
                       className="text-xs"
                     >
-                      Add
+                      {editingFilterId ? "Update" : "Add"}
                     </Button>
                   </div>
                 </div>

@@ -31,7 +31,7 @@ jobs:
             patch=${BASH_REMATCH[3]}
             new_tag="v$major.$minor.$((patch + 1))"
           else
-            new_tag="v1.5.1"
+            new_tag="v0.0.1"
           fi
           
           # Update package.json version (without the 'v' prefix)

@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
     steps:
       - uses: actions/checkout@v3
 
@@ -19,6 +21,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: "20"
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
 
       - name: Install dependencies
         run: |
@@ -30,16 +34,17 @@ jobs:
           cd docs
           npm run build
 
+      # Docusaurus builds to build directory instead of out
       - name: Add .nojekyll file
-        run: touch docs/out/.nojekyll
+        run: touch docs/build/.nojekyll
 
       - name: Create CNAME file
-        run: echo "duckui.com" > docs/out/CNAME
+        run: echo "duckui.com" > docs/build/CNAME
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/out
-          user_name: "github-actions[bot]"
-          user_email: "github-actions[bot]@users.noreply.github.com"
+          github_token: ${{ secrets.GHCR_PAT }}
+          publish_dir: ./docs/build  # Docusaurus outputs to build directory
+          user_name: ${{ secrets.GIT_USER_NAME }}
+          user_email:  ${{ secrets.GIT_USER_EMAIL }}

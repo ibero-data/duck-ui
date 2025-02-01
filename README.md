@@ -2,21 +2,31 @@
 
 Duck-UI is a web-based interface for interacting with DuckDB, a high-performance analytical database system. This project leverages DuckDB's WebAssembly (WASM) capabilities to provide a seamless and efficient user experience directly in the browser.
 
+# [Official Docs](https://duckui.com?utm_source=github&utm_medium=readme) 🚀
+#  [Demo](https://demo.duckui.com?utm_source=github&utm_medium=readme) 💻
+
+
 ## Features
 
 - **SQL Editor**: Write and execute SQL queries with syntax highlighting and auto-completion.
 - **Data Import**: Import data from CSV, JSON, Parquet, and Arrow files.
 - **Data Explorer**: Browse and manage databases and tables.
 - **Query History**: View and manage your recent SQL queries.
-- **Theme Toggle**: Switch between light and dark themes.
-- **Keyboard Shortcuts**: Enhance productivity with keyboard shortcuts for common actions.
-- **Error Handling**: Robust error handling with error boundaries and notifications.
 
 ## Getting Started
 
-### Prerequisites
 
-#### Prerequisites
+### Docker (Recomended)
+
+```bash
+docker run -p 5522:5522 ghcr.io/caioricciuti/duck-ui:latest
+```
+
+Open your browser and navigate to `http://localhost:5522`.
+
+
+
+### Prerequisites
 
 - Node.js >= 20.x
 - npm >= 10.x
@@ -61,6 +71,22 @@ yarn build
 ```
 
 The output will be in the `dist` directory.
+
+### Running with Docker
+
+1. Build the Docker image:
+
+   ```bash
+   docker build -t duck-ui .
+   ```
+
+2. Run the Docker container:
+
+   ```bash
+   docker run -p 5522:5522 duck-ui
+   ```
+
+3. Open your browser and navigate to `http://localhost:5522`.
 
 ## Usage
 
@@ -110,7 +136,7 @@ Contributions are welcome! Please follow these steps to contribute:
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE.md) file for details.
 
 ## Acknowledgements
 
@@ -123,3 +149,16 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Contact
 
 For any inquiries or support, please contact [Caio Ricciuti](https://github.com/caioricciuti).
+
+## Sponsors
+
+This project is sponsored by:
+
+### [Ibero Data](https://iberodata.es/) 
+
+<img src="https://www.iberodata.es/logo.png" alt="Ibero Data Logo" title="Ibero Data Logo" width="50">
+
+
+<br/>
+
+Want to be a sponsor? [Contact us](mailto:caio.ricciuti+sponsorship@outlook.com).

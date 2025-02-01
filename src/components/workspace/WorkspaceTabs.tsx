@@ -103,7 +103,7 @@ export default function WorkspaceTabs() {
                     strategy={horizontalListSortingStrategy}
                   >
                     <div className="flex">
-                      <TabsList className="inline-flex h-12 items-center justify-start rounded-none w-full bg-transparent">
+                      <TabsList className="inline-flex h-9 space-x-1 items-center justify-start rounded-none w-full bg-transparent">
                         {sortedTabs.map((tab) => (
                           <SortableTab
                             key={tab.id}

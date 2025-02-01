@@ -5,7 +5,6 @@ import type { editor } from "monaco-editor";
 import { toast } from "sonner";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { format } from "sql-formatter";
-import { TableInfo } from "@/store"; // Import the types
 
 // Types
 export interface EditorInstance {
@@ -24,17 +23,22 @@ interface EditorConfig {
   quickSuggestions: boolean;
   wordBasedSuggestions: boolean;
   fontSize: number;
+  lineNumbers: "on" | "off" | "relative";
+  scrollBeyondLastLine: boolean;
+  cursorBlinking: "blink" | "smooth" | "phase" | "expand" | "solid";
+  matchBrackets: "always" | "never" | "near";
+  rulers: number[];
 }
 
-// set worker
+// Worker configuration
 self.MonacoEnvironment = {
   getWorker(_workerId: string) {
     return new editorWorker();
   },
 };
 
-// Define SQL keywords, system functions, and user-defined functions
-const sqlKeywords = [
+// SQL Keywords and Functions
+const SQL_KEYWORDS = [
   "SELECT",
   "FROM",
   "WHERE",
@@ -56,6 +60,7 @@ const sqlKeywords = [
   "LEFT",
   "RIGHT",
   "FULL",
+  "OUTER",
   "ON",
   "GROUP",
   "BY",
@@ -78,6 +83,7 @@ const sqlKeywords = [
   "EXISTS",
   "BETWEEN",
   "LIKE",
+  "ILIKE",
   "IS",
   "PRIMARY",
   "FOREIGN",
@@ -101,377 +107,374 @@ const sqlKeywords = [
   "RECURSIVE",
   "GRANT",
   "REVOKE",
+  "TRUE",
+  "FALSE",
+  "USING",
+  "NATURAL",
+  "CROSS",
+  "RETURNING",
+  "REPLACE",
+  "TRUNCATE",
+  "TEMPORARY",
+  "IF",
+  "EXISTS",
+  "MATERIALIZED",
+  "VACUUM",
+  "ANALYZE",
+  "EXPLAIN",
+  "CAST",
+  "TRY_CAST",
+  "SHOW",
+  "DESCRIBE",
+  "PRAGMA",
+  "ATTACH",
+  "DETACH",
+  "USE",
+  "READ_PARQUET",
+  "READ_CSV",
+  "READ_JSON",
+  "COPY",
+  "TO",
+  "FROM",
+  "DELIMITER",
+  "HEADER",
+  "QUOTE",
+  "ESCAPE",
+  "NULL AS",
+  "FORCE_QUOTE",
+  "FORCE_NOT_NULL",
 ];
 
-const sqlSystemFunctions = [
-  "COUNT",
-  "SUM",
+const SQL_FUNCTIONS = [
+  "ABS",
+  "ACOS",
+  "ASIN",
+  "ATAN",
+  "ATAN2",
   "AVG",
-  "MIN",
-  "MAX",
-  "UPPER",
-  "LOWER",
-  "SUBSTRING",
-  "TRIM",
+  "CEIL",
+  "CEILING",
   "COALESCE",
-  "NULLIF",
-  "CAST",
-  "CONVERT",
-  "EXTRACT",
+  "CONCAT",
+  "COS",
+  "COT",
+  "COUNT",
   "DATE_PART",
   "DATE_TRUNC",
+  "DEGREES",
+  "EXP",
+  "EXTRACT",
+  "FLOOR",
+  "GREATEST",
+  "INITCAP",
+  "LEAST",
+  "LENGTH",
+  "LN",
+  "LOG",
+  "LOWER",
+  "LPAD",
+  "LTRIM",
+  "MAX",
+  "MIN",
+  "MOD",
   "NOW",
+  "NULLIF",
+  "PI",
+  "POWER",
+  "RADIANS",
+  "RANDOM",
+  "ROUND",
+  "RPAD",
+  "RTRIM",
+  "SIGN",
+  "SIN",
+  "SQRT",
+  "SUBSTR",
+  "SUBSTRING",
+  "SUM",
+  "TAN",
+  "TRIM",
+  "TRUNC",
+  "UPPER",
   "CURRENT_DATE",
   "CURRENT_TIME",
   "CURRENT_TIMESTAMP",
-  "LENGTH",
-  "ABS",
-  "ROUND",
-  "SQRT",
-  "POWER",
-  "CEIL",
-  "FLOOR",
-  "RANDOM",
+  "CURRENT_USER",
+  "LIST",
+  "STRING_AGG",
+  "FIRST",
+  "LAST",
+  "NTH_VALUE",
+  "LAG",
+  "LEAD",
+  "FIRST_VALUE",
+  "LAST_VALUE",
+  "ROW_NUMBER",
+  "RANK",
+  "DENSE_RANK",
+  "PERCENT_RANK",
+  "CUME_DIST",
+  "NTILE",
+  "LAG",
+  "LEAD",
+  "REGEXP_MATCHES",
+  "REGEXP_REPLACE",
+  "REGEXP_EXTRACT",
+  "UNNEST",
+  "GENERATE_SERIES",
+  "CAST",
+  "TRY_CAST",
 ];
 
-// Register SQL language with custom tokens provider
-monaco.languages.register({ id: "sql" });
-monaco.languages.setMonarchTokensProvider("sql", {
-  tokenizer: {
-    root: [
-      [
-        /([a-zA-Z_][a-zA-Z0-9_]*)(\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*))?/,
-        {
-          cases: {
-            "@sqlKeywords": "keyword",
-            "@sqlSystemFunctions": "predefined",
-            "@default": "identifier",
-          },
-        },
-      ],
-      [/"([^"\\]|\\.)*?"/, "string"],
-      [/'([^'\\]|\\.)*?'/, "string"],
-      { include: "@whitespace" },
-      [/[{}()\[\]]/, "@brackets"],
-      [/[<>](?!@symbols)/, "@brackets"],
-      [
-        /@symbols/,
-        {
-          cases: {
-            "@operators": "operator",
-            "@default": "",
-          },
-        },
-      ],
-      [/0[xX][0-9a-fA-F]+/, "number.hex"],
-      [/0[bB][01]+/, "number.binary"],
-      [/\d*\.\d+([eE][\-+]?\d+)?/, "number.float"],
-      [/\d+/, "number"],
-      [/[;,.]/, "delimiter"],
-      [/"([^"\\]|\\.)*$/, "string.invalid"],
-      [/"/, "string", '@string."'],
-      [/'([^'\\]|\\.)*$/, "string.invalid"],
-      [/'/, "string", "@string.'"],
-    ],
-    whitespace: [
-      [/[ \t\r\n]+/, ""],
-      [/--.*$/, "comment"],
-      [/\/\*/, "comment", "@comment"],
-    ],
-    comment: [
-      [/[^\/*]+/, "comment"],
-      [/\*\//, "comment", "@pop"],
-      [/[\/*]/, "comment"],
-    ],
-    string: [
-      [/[^\\"]+/, "string"],
-      [/\\./, "string.escape.invalid"],
-      [/"/, "string", "@pop"],
-    ],
-  },
-  sqlKeywords,
-  sqlSystemFunctions,
-  symbols: /[=><!~?:&|+\-*\/\^%]+/,
-  operators: [
-    "=",
-    ">",
-    "<",
-    "!",
-    "~",
-    "?",
-    ":",
-    "==",
-    "<=",
-    ">=",
-    "!=",
-    "&&",
-    "||",
-    "++",
-    "--",
-    "+",
-    "-",
-    "*",
-    "/",
-    "&",
-    "|",
-    "^",
-    "%",
-    "<<",
-    ">>",
-    ">>>",
+// Column type mapping for suggestions
+const SQL_TYPE_MAPPINGS: Record<string, string[]> = {
+  VARCHAR: [
+    "LIKE",
+    "ILIKE",
+    "SUBSTR",
+    "UPPER",
+    "LOWER",
+    "TRIM",
+    "LENGTH",
+    "REGEXP_MATCHES",
+    "REGEXP_REPLACE",
   ],
-});
+  BIGINT: ["SUM", "AVG", "MIN", "MAX", "COUNT", "BETWEEN", "ABS", "ROUND"],
+  INTEGER: ["SUM", "AVG", "MIN", "MAX", "COUNT", "BETWEEN", "ABS", "ROUND"],
+  DOUBLE: ["ROUND", "CEIL", "FLOOR", "ABS", "POWER", "SQRT"],
+  DATE: ["EXTRACT", "DATE_TRUNC", "DATE_PART", "AGE"],
+  TIMESTAMP: ["EXTRACT", "DATE_TRUNC", "DATE_PART", "AGE", "NOW"],
+  BOOLEAN: ["AND", "OR", "NOT", "IS TRUE", "IS FALSE", "IS NULL"],
+  JSON: ["JSON_EXTRACT_PATH", "JSON_TYPEOF", "JSON_ARRAY_LENGTH"],
+  ARRAY: ["ARRAY_LENGTH", "UNNEST", "ARRAY_AGG"],
+};
 
-// Dynamic auto-completion provider
-monaco.languages.registerCompletionItemProvider("sql", {
-  triggerCharacters: [" ", ".", "(", ","],
-  provideCompletionItems: (model, position) => {
-    const { databases } = useDuckStore.getState(); // Default to empty array
-    const tables =  databases.reduce((acc, db) => {
-      return [...acc, ...db.tables]
-    },[] as TableInfo[]);
+// Update Monaco configuration
+export const updateMonaco = () => {
+  const { databases } = useDuckStore.getState();
 
-    const textUntilPosition = model.getValueInRange({
-      startLineNumber: 1,
-      startColumn: 1,
-      endLineNumber: position.lineNumber,
-      endColumn: position.column,
-    });
+  // Register SQL language
+  monaco.languages.register({ id: "sql" });
 
-    const word = model.getWordUntilPosition(position);
-    const range = new monaco.Range(
-      position.lineNumber,
-      word.startColumn,
-      position.lineNumber,
-      word.endColumn
-    );
-    const currentWord = model.getWordAtPosition(position)?.word || "";
-
-    // Function suggestions
-    const functionSuggestions = sqlSystemFunctions.map((func) => ({
-      label: func,
-      kind: monaco.languages.CompletionItemKind.Function,
-      insertText: func + "()",
-      range,
-    }));
-
-    // Keyword suggestions
-    const keywordSuggestions = sqlKeywords
-      .map((keyword) => {
-        const insertText = keyword;
-        const item: monaco.languages.CompletionItem = {
-          label: keyword,
-          kind: monaco.languages.CompletionItemKind.Keyword,
-          insertText,
-          range,
-        };
-        if (
-          textUntilPosition.toUpperCase().trimEnd().endsWith("SELECT") ||
-          textUntilPosition.toUpperCase().trimEnd().endsWith("FROM") ||
-          textUntilPosition.toUpperCase().trimEnd().endsWith("WHERE") ||
-          textUntilPosition.toUpperCase().trimEnd().endsWith("ORDER BY") ||
-          textUntilPosition.toUpperCase().trimEnd().endsWith("GROUP BY")
-        ) {
-          return item;
-        }
-
-        if (
-          textUntilPosition.toUpperCase().trimEnd().endsWith("JOIN") ||
-          textUntilPosition.toUpperCase().trimEnd().endsWith("LEFT JOIN") ||
-          textUntilPosition.toUpperCase().trimEnd().endsWith("RIGHT JOIN")
-        ) {
-          if (keyword === "ON") {
-            return item;
-          }
-        }
-        return null;
-      })
-      .filter(Boolean) as monaco.languages.CompletionItem[];
-
-    // Table name suggestions
-    const tableSuggestions = tables.map((table) => ({
-      label: table.name,
-      kind: monaco.languages.CompletionItemKind.Variable,
-      insertText: table.name,
-      range,
-      detail: "Table",
-    }));
-
-    // Column name suggestions
-    const columnSuggestions = tables.reduce((acc, table) => {
-      const fromMatch = textUntilPosition
-        .toUpperCase()
-        .match(new RegExp(`FROM\\s+([\\w."]+)`, "g"));
-      const joinMatch = textUntilPosition
-        .toUpperCase()
-        .match(new RegExp(`JOIN\\s+([\\w."]+)`, "g"));
-      if (fromMatch || joinMatch) {
-        const tablesInQuery = (fromMatch ?? [])
-          .concat(joinMatch ?? [])
-          .map((match) =>
-            match
-              .toUpperCase()
-              .replace(/(FROM|JOIN)\s+/, "")
-              .trim()
-              .replace(/"/g, "")
-          );
-        const tableAliases = tablesInQuery.reduce((tableAcc, tableName) => {
-          const aliasMatch = tableName.match(/(\w+)\s+AS\s+(\w+)/);
-          if (aliasMatch) {
-            tableAcc[aliasMatch[2]] = aliasMatch[1];
-            return tableAcc;
-          }
-          return tableAcc;
-        }, {} as Record<string, string>);
-
-        const tableAliasesKeys = Object.keys(tableAliases);
-        const tableName = tableAliases[currentWord]
-          ? tableAliases[currentWord]
-          : table.name;
-        if (
-          tablesInQuery.includes(tableName) ||
-          tablesInQuery.includes(table.name) ||
-          tableAliasesKeys.includes(currentWord)
-        ) {
-          const colSuggest = table.columns.map((col) => {
-            const insertText =
-              (tableAliasesKeys.includes(currentWord) &&
-                tableAliases[currentWord] === table.name) ||
-              (tableAliasesKeys.includes(currentWord) &&
-                table.name.toUpperCase() === tableName)
-                ? `${currentWord}.${col.name}`
-                : col.name;
-            return {
-              label: col.name,
-              kind: monaco.languages.CompletionItemKind.Field,
-              insertText,
-              range,
-              detail: `${table.name} Column`,
-            };
-          });
-          acc.push(...colSuggest);
-        }
-      }
-      return acc;
-    }, [] as monaco.languages.CompletionItem[]);
-    return {
-      suggestions: [
-        ...keywordSuggestions,
-        ...functionSuggestions,
-        ...tableSuggestions,
-        ...columnSuggestions,
-      ],
-    };
-  },
-});
-
-monaco.languages.registerCodeActionProvider("sql", {
-  provideCodeActions: (model, _range, _context, _token) => {
-    const actions: monaco.languages.CodeAction[] = [];
-
-    // Simple code formatting action
-    actions.push({
-      title: "Format SQL Code",
-      edit: {
-        edits: [
+  // Set tokenizer
+  monaco.languages.setMonarchTokensProvider("sql", {
+    tokenizer: {
+      root: [
+        [
+          /[a-zA-Z_]\w*/,
           {
-            resource: model.uri,
-            range: model.getFullModelRange(),
-            text: model
-              .getValue()
-              .split("\n")
-              .map((s) => s.trim())
-              .join("\n"),
+            cases: {
+              "@SQL_KEYWORDS": "keyword",
+              "@SQL_FUNCTIONS": "predefined",
+              "@default": "identifier",
+            },
           },
         ],
-      },
-      kind: "quickfix",
-      isPreferred: true,
-    });
-
-    return { actions, dispose: () => {} };
-  },
-});
-
-monaco.languages.registerDocumentFormattingEditProvider("sql", {
-  provideDocumentFormattingEdits: (model) => {
-    const formatted = format(model.getValue(), { language: "sql" });
-    return [
-      {
-        range: model.getFullModelRange(),
-        text: formatted,
-      },
-    ];
-  },
-});
-
-// DuckDB-specific commands
-
-const createEditorCommands = (
-  editor: editor.IStandaloneCodeEditor,
-  tabId: string,
-  executeQueryFn: (query: string, tabId: string) => Promise<void>
-) => {
-  // Execute Query Command
-  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, async () => {
-    await executeCurrentQuery(editor, tabId, executeQueryFn);
+        [/--.*$/, "comment"],
+        [/\/\*/, "comment", "@comment"],
+        [/"[^"]*"/, "string"],
+        [/'[^']*'/, "string"],
+        [/\d*\.\d+([eE][-+]?\d+)?/, "number.float"],
+        [/\d+/, "number"],
+        [/[;,.]/, "delimiter"],
+        [/[(){}[\]]/, "@brackets"],
+        [/[<>=!]+/, "operator"],
+      ],
+      comment: [
+        [/[^/*]+/, "comment"],
+        [/\*\//, "comment", "@pop"],
+        [/[/*]/, "comment"],
+      ],
+    },
+    SQL_KEYWORDS,
+    SQL_FUNCTIONS,
   });
 
-  // Save/Execute Alternative Command
-  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, async () => {
-    await executeCurrentQuery(editor, tabId, executeQueryFn);
-  });
+  // Register completion provider
+  monaco.languages.registerCompletionItemProvider("sql", {
+    triggerCharacters: [" ", ".", "(", ","],
+    provideCompletionItems: (model, position) => {
+      const wordUntilPosition = model.getWordUntilPosition(position);
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: wordUntilPosition.startColumn,
+        endColumn: wordUntilPosition.endColumn,
+      };
 
-  // Format Command
-  editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
-    const formatAction = editor.getAction("editor.action.formatDocument");
-    if (formatAction) {
-      formatAction.run();
-    }
-  });
+      const textUntilPosition = model.getValueInRange({
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column,
+      });
 
-  // Add context menu
-  editor.addAction({
-    id: "execute-selection",
-    label: "Execute Selected Query",
-    keybindings: [
-      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter,
-    ],
-    contextMenuGroupId: "navigation",
-    run: async (ed) => {
-      const selection = ed.getSelection();
-      const selectedText = selection
-        ? ed.getModel()?.getValueInRange(selection)
-        : ed.getValue();
+      const suggestions: monaco.languages.CompletionItem[] = [];
 
-      if (selectedText?.trim()) {
-        await executeQueryFn(selectedText.trim(), tabId);
+      // Add table suggestions
+      databases.forEach((db) => {
+        db.tables.forEach((table) => {
+          suggestions.push({
+            label: table.name,
+            kind: monaco.languages.CompletionItemKind.Class,
+            detail: `Table (${table.schema}) - ${table.columns.length} columns`,
+            documentation: {
+              value: [
+                "```sql",
+                `-- Table: ${table.name}`,
+                `-- Schema: ${table.schema}`,
+                "-- Columns:",
+                ...table.columns.map(
+                  (col) =>
+                    `${col.name} ${col.type}${col.nullable ? " NULL" : ""}`
+                ),
+                "```",
+              ].join("\n"),
+            },
+            insertText: table.name,
+            range,
+          });
+
+          // Add column suggestions
+          const tablePattern = new RegExp(`\\b${table.name}\\b`, "i");
+          if (tablePattern.test(textUntilPosition)) {
+            table.columns.forEach((column) => {
+              const compatibleFunctions = SQL_TYPE_MAPPINGS[column.type] || [];
+              suggestions.push({
+                label: column.name,
+                kind: monaco.languages.CompletionItemKind.Field,
+                detail: `${column.type}${column.nullable ? " NULL" : ""}`,
+                documentation: {
+                  value: [
+                    `Column from ${table.name}`,
+                    `Type: ${column.type}`,
+                    column.nullable ? "Nullable: YES" : "Nullable: NO",
+                    "",
+                    "Suggested functions:",
+                    ...compatibleFunctions.map((fn) => `- ${fn}()`),
+                  ].join("\n"),
+                },
+                insertText: column.name,
+                range,
+              });
+            });
+          }
+        });
+      });
+
+      // Add keyword suggestions based on context
+      const lastWord = textUntilPosition
+        .trim()
+        .split(/\s+/)
+        .pop()
+        ?.toUpperCase();
+      if (lastWord) {
+        const contextKeywords = getContextualKeywords(lastWord);
+        contextKeywords.forEach((keyword) => {
+          suggestions.push({
+            label: keyword,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: keyword,
+            range,
+          });
+        });
       }
+
+      // Add function suggestions
+      SQL_FUNCTIONS.forEach((fn) => {
+        suggestions.push({
+          label: fn,
+          kind: monaco.languages.CompletionItemKind.Function,
+          insertText: `${fn}()`,
+          insertTextRules:
+            monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          range,
+        });
+      });
+
+      return { suggestions };
+    },
+  });
+
+  // Register hover provider
+  monaco.languages.registerHoverProvider("sql", {
+    provideHover: (model, position) => {
+      const word = model.getWordAtPosition(position);
+      if (!word) return null;
+
+      // Check for table hover
+      for (const db of databases) {
+        for (const table of db.tables) {
+          if (table.name.toLowerCase() === word.word.toLowerCase()) {
+            return {
+              contents: [
+                { value: `**Table: ${table.name}**` },
+                { value: `Schema: ${table.schema}` },
+                {
+                  value:
+                    "```sql\n" +
+                    table.columns
+                      .map(
+                        (col) =>
+                          `${col.name} ${col.type}${
+                            col.nullable ? " NULL" : ""
+                          }`
+                      )
+                      .join("\n") +
+                    "\n```",
+                },
+              ],
+            };
+          }
+
+          // Check for column hover
+          const column = table.columns.find(
+            (c) => c.name.toLowerCase() === word.word.toLowerCase()
+          );
+          if (column) {
+            const compatibleFunctions = SQL_TYPE_MAPPINGS[column.type] || [];
+            return {
+              contents: [
+                { value: `**Column: ${column.name}**` },
+                {
+                  value: `Type: ${column.type}${
+                    column.nullable ? " NULL" : ""
+                  }`,
+                },
+                { value: `Table: ${table.name}` },
+                {
+                  value:
+                    "\nCompatible functions:\n" +
+                    compatibleFunctions.map((f) => `- ${f}`).join("\n"),
+                },
+              ],
+            };
+          }
+        }
+      }
+
+      return null;
     },
   });
 };
 
-// Helper function to execute queries
-const executeCurrentQuery = async (
-  editor: editor.IStandaloneCodeEditor,
-  tabId: string,
-  executeQueryFn: (query: string, tabId: string) => Promise<void>
-) => {
-  const query = editor.getValue().trim();
-  if (!query) {
-    toast.error("Please enter a query to execute");
-    return;
-  }
+// Helper function to get contextual keywords
+const getContextualKeywords = (lastWord: string): string[] => {
+  const contextMap: Record<string, string[]> = {
+    SELECT: ["DISTINCT", "ALL", "*"],
+    FROM: ["TABLE", "JOIN", "LEFT", "RIGHT", "INNER", "CROSS"],
+    JOIN: ["ON"],
+    WHERE: ["AND", "OR", "NOT", "EXISTS", "IN", "BETWEEN", "LIKE"],
+    GROUP: ["BY"],
+    ORDER: ["BY"],
+    BY: ["ASC", "DESC"],
+    HAVING: ["AND", "OR", "NOT"],
+  };
 
-  try {
-    await executeQueryFn(query, tabId);
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    toast.error(`Query execution failed: ${errorMessage}`);
-  }
+  return contextMap[lastWord] || SQL_KEYWORDS;
 };
 
-// Create new editor instance
+// Create editor instance
 export const createEditor = (
   container: HTMLElement,
   config: EditorConfig,
@@ -483,43 +486,170 @@ export const createEditor = (
     ...config,
     value: initialContent,
     wordBasedSuggestions: config.wordBasedSuggestions ? "allDocuments" : "off",
-    fontSize: config.fontSize,
+    bracketPairColorization: { enabled: true },
+    guides: { bracketPairs: true, indentation: true },
+    renderWhitespace: "selection",
+    smoothScrolling: true,
+    cursorSmoothCaretAnimation: "on",
+    formatOnPaste: true,
+    formatOnType: true,
+    snippetSuggestions: "inline",
+    suggest: {
+      preview: true,
+      showMethods: true,
+      showFunctions: true,
+      showVariables: true,
+      showWords: true,
+      showColors: true,
+    },
   });
 
-  // Register commands and context menu
-  createEditorCommands(editor, tabId, executeQueryFn);
+  // Add commands
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, async () => {
+    const query = editor.getValue().trim();
+    if (!query) {
+      toast.error("Please enter a query to execute");
+      return;
+    }
+    try {
+      await executeQueryFn(query, tabId);
+    } catch (err) {
+      toast.error(
+        `Query execution failed: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+    }
+  });
 
-  // Setup content change listener
+  editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
+    const formatAction = editor.getAction("editor.action.formatDocument");
+    formatAction?.run();
+  });
+
+  // Add context menu actions
+  editor.addAction({
+    id: "execute-selection",
+    label: "Execute Selected Query",
+    keybindings: [
+      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter,
+    ],
+    contextMenuGroupId: "navigation",
+    run: async (ed) => {
+      const selection = ed.getSelection();
+      const selectedText = selection
+        ? ed.getModel()?.getValueInRange(selection)
+        : "";
+
+      if (selectedText?.trim()) {
+        try {
+          await executeQueryFn(selectedText.trim(), tabId);
+        } catch (err) {
+          toast.error(
+            `Query execution failed: ${
+              err instanceof Error ? err.message : "Unknown error"
+            }`
+          );
+        }
+      }
+    },
+  });
+
+  editor.addAction({
+    id: "format-sql",
+    label: "Format SQL",
+    keybindings: [monaco.KeyMod.Alt | monaco.KeyCode.KeyF],
+    contextMenuGroupId: "modification",
+    run: (ed) => {
+      const text = ed.getValue();
+      try {
+        const formatted = format(text, {
+          language: "sql",
+          keywordCase: "upper",
+          indentStyle: "standard",
+          linesBetweenQueries: 2,
+        });
+        ed.setValue(formatted);
+      } catch (err) {
+        toast.error("Failed to format SQL");
+      }
+    },
+  });
+
+  // Setup content change listener with debounce
+  let timeoutId: number;
   const disposable = editor.onDidChangeModelContent(() => {
-    const newValue = editor.getValue();
-    useDuckStore.getState().updateTabQuery(tabId, newValue);
+    clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => {
+      const newValue = editor.getValue();
+      useDuckStore.getState().updateTabQuery(tabId, newValue);
+    }, 300);
   });
 
   return {
     editor,
     dispose: () => {
+      clearTimeout(timeoutId);
       disposable.dispose();
       editor.dispose();
     },
   };
 };
 
-// Hook for editor configuration
+// Enhanced config hook with better defaults
 export const useMonacoConfig = (theme: string): EditorConfig => {
-
-    return useMemo(
-        () => ({
-        language: "sql",
-        theme: theme === "dark" ? "vs-dark" : "vs",
-        automaticLayout: true,
-        tabSize: 2,
-        minimap: { enabled: false },
-        padding: { top: 10 },
-        suggestOnTriggerCharacters: true,
-        quickSuggestions: true,
-        wordBasedSuggestions: false,
-        fontSize: 12,
+  return useMemo(
+    () => ({
+      language: "sql",
+      theme: theme === "dark" ? "vs-dark" : "vs",
+      automaticLayout: true,
+      tabSize: 2,
+      minimap: { enabled: false },
+      padding: { top: 10 },
+      suggestOnTriggerCharacters: true,
+      quickSuggestions: true,
+      wordBasedSuggestions: false,
+      fontSize: 12,
+      lineNumbers: "on",
+      scrollBeyondLastLine: false,
+      cursorBlinking: "blink",
+      matchBrackets: "always",
+      rulers: [],
     }),
     [theme]
-    );
+  );
+};
+
+// Register SQL formatting provider
+monaco.languages.registerDocumentFormattingEditProvider("sql", {
+  provideDocumentFormattingEdits: (model) => {
+    try {
+      const formatted = format(model.getValue(), {
+        language: "sql",
+        keywordCase: "upper",
+        indentStyle: "standard",
+        linesBetweenQueries: 2,
+      });
+
+      return [
+        {
+          range: model.getFullModelRange(),
+          text: formatted,
+        },
+      ];
+    } catch (err) {
+      console.error("SQL formatting failed:", err);
+      return [];
+    }
+  },
+});
+
+// Initialize Monaco configuration
+updateMonaco();
+
+// Export everything needed
+export default {
+  createEditor,
+  useMonacoConfig,
+  updateMonaco,
 };

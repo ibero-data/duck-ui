@@ -14,22 +14,45 @@ import Papa from "papaparse";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useDuckStore } from "@/store";
 
 interface DownloadDialogProps {
   data: any[];
-  onExport?: (format: string) => Promise<Blob>;
+  query?: string;
   filename?: string;
   maxRows?: number;
 }
 
-type ExportFormat = "csv" | "json" | "clipboard";
+type ExportFormat = "csv" | "json" | "parquet" | "clipboard";
 
 const CHUNK_SIZE = 10000; // Number of rows to process at once
 
+// Helper function to safely serialize BigInt values
+const serializeBigInt = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "bigint") {
+    return obj.toString();
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(serializeBigInt);
+  }
+
+  if (typeof obj === "object") {
+    return Object.fromEntries(
+      Object.entries(obj).map(([key, value]) => [key, serializeBigInt(value)])
+    );
+  }
+
+  return obj;
+};
+
 const DownloadDialog: React.FC<DownloadDialogProps> = ({
   data,
-  onExport,
-  filename = "export",
+  query,
   maxRows = 1000000,
 }) => {
   const [downloadOption, setDownloadOption] = useState<ExportFormat>("csv");
@@ -37,6 +60,7 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [open, setOpen] = useState(false);
+  const exportParquet = useDuckStore((state) => state.exportParquet);
 
   const estimateSize = useCallback(async () => {
     if (data.length === 0) {
@@ -45,7 +69,7 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
     }
 
     const sampleSize = Math.min(100, data.length);
-    const sample = data.slice(0, sampleSize);
+    const sample = serializeBigInt(data.slice(0, sampleSize));
     let size: number;
 
     switch (downloadOption) {
@@ -54,6 +78,10 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
           new Blob([Papa.unparse(sample)]).size * (data.length / sampleSize);
         break;
       case "json":
+        size =
+          new Blob([JSON.stringify(sample)]).size * (data.length / sampleSize);
+        break;
+      case "parquet":
         size =
           new Blob([JSON.stringify(sample)]).size * (data.length / sampleSize);
         break;
@@ -90,7 +118,9 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
     let result = "";
 
     for (let i = 0; i < chunks; i++) {
-      const chunk = data.slice(i * chunkSize, (i + 1) * chunkSize);
+      const chunk = serializeBigInt(
+        data.slice(i * chunkSize, (i + 1) * chunkSize)
+      );
 
       switch (format) {
         case "csv":
@@ -103,8 +133,11 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
         case "clipboard":
           result +=
             (i === 0 ? "[" : "") +
-            chunk.map((item) => JSON.stringify(item)).join(",") +
+            chunk.map((item: any) => JSON.stringify(item)).join(",") +
             (i === chunks - 1 ? "]" : "");
+          break;
+        case "parquet":
+          result += "";
           break;
         default:
           throw new Error(`Unsupported format: ${format}`);
@@ -124,22 +157,15 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
         return "text/csv";
       case "json":
         return "application/json";
+      case "parquet":
+        return "application/parquet";
       default:
         return "text/plain";
     }
   };
 
-  type AlertVariant =
-    | "destructive"
-    | "warning"
-    | "info"
-    | "default"
-    | "success"
-    | "neutral";
-
   type SizeWarning = {
     message: string;
-    severity: AlertVariant;
   } | null;
 
   const getSizeWarning = useCallback((): SizeWarning => {
@@ -169,18 +195,15 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
       return {
         message:
           "Warning: The export size is over 100MB. This might take a while and could impact browser performance.",
-        severity: "destructive",
       };
     } else if (sizeInMB >= 50) {
       return {
         message:
           "Warning: The export size is over 50MB. This might take a while.",
-        severity: "warning",
       };
     } else if (sizeInMB >= 20) {
       return {
         message: "The export size is over 20MB.",
-        severity: "default",
       };
     }
     return null;
@@ -198,14 +221,15 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
 
       let blob: Blob;
 
-      if (onExport) {
-        blob = await onExport(downloadOption);
+      if (downloadOption === "parquet") {
+        if (!query) throw new Error("No query provided to export parquet");
+        blob = await exportParquet(query);
       } else {
         blob = await processInChunks(data, downloadOption, CHUNK_SIZE);
       }
 
       const now = new Date().toISOString().split(".")[0].replace(/[:]/g, "-");
-      const exportFilename = `ch_ui_export_${now}`;
+      const exportFilename = `duck_ui_export_${now}`;
 
       if (downloadOption === "clipboard") {
         const text = await blob.text();
@@ -226,9 +250,12 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
       setOpen(false);
     } catch (error) {
       console.error("Export error:", error);
-      toast.error("Failed to export data. Please try again.", {
-        duration: 2000,
-      });
+      toast.error(
+        `Failed to export data: ${
+          error instanceof Error ? error.message : "Unknown Error"
+        }`,
+        { duration: 2000 }
+      );
     } finally {
       setIsProcessing(false);
       setProgress(0);
@@ -249,7 +276,7 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
 
         <div className="space-y-4">
           {getSizeWarning() && (
-            <Alert variant={getSizeWarning()?.severity || "destructive"}>
+            <Alert variant="default">
               <AlertDescription>{getSizeWarning()?.message}</AlertDescription>
             </Alert>
           )}
@@ -265,6 +292,10 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="json" id="json" />
               <Label htmlFor="json">JSON</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="parquet" id="parquet" />
+              <Label htmlFor="parquet">Parquet</Label>
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="clipboard" id="clipboard" />

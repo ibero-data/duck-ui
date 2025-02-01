@@ -128,12 +128,6 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({ isExpanded }) => {
                             <Clock className="w-3 h-3" />
                             {format(item.timestamp, "MMM d, yyyy h:mm a")}
                           </div>
-                          {item.duration && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {item.duration.toFixed(2)} ms
-                            </div>
-                          )}
                         </div>
 
                         {item.error && (

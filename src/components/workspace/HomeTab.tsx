@@ -136,6 +136,9 @@ ATTACH 'https://raw.githubusercontent.com/tobilg/aws-iam-data/main/data/db/iam.d
     return query.length > length ? `${query.slice(0, length)}...` : query;
   };
 
+  //@ts-ignore
+  const duck_ui_version = __DUCK_UI_VERSION__ || "Error loading version";
+
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
       <motion.div
@@ -293,6 +296,9 @@ ATTACH 'https://raw.githubusercontent.com/tobilg/aws-iam-data/main/data/db/iam.d
           </div>
         </TabsContent>
       </Tabs>
+      <p className="text-muted-foreground text-center text-xs">
+        Duck-UI Version: {duck_ui_version}
+      </p>
     </div>
   );
 };

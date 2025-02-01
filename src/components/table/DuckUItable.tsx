@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useEffect,
   useTransition,
-  JSX,
 } from "react";
 import {
   flexRender,
@@ -47,8 +46,7 @@ import {
 } from "lucide-react";
 import DownloadDialog from "@/components/table/DownloadDialog";
 import { debounce } from "lodash";
-import { CHUIFilter } from "./Filter";
-import { SmartFilter } from "./SmartFilter";
+import { SmartFilter } from "@/components/table/SmartFilter";
 
 // Constants
 const DEFAULT_COLUMN_SIZE = 150;
@@ -56,7 +54,7 @@ const MIN_COLUMN_SIZE = 50;
 const OVERSCAN_COUNT = 5;
 const ROW_HEIGHT = 35;
 const FIXED_PAGE_SIZE = 100;
-const DEBOUNCE_DELAY = 500;
+const DEBOUNCE_DELAY = 300;
 
 // Types
 export interface TableMeta {
@@ -66,8 +64,8 @@ export interface TableMeta {
 
 export interface TableResult<T extends RowData> {
   columns?: string[];
+  columnTypes?: string[];
   data?: T[];
-
   message?: string;
   query_id?: string;
 }
@@ -82,6 +80,16 @@ export interface TableProps<T extends RowData> {
   defaultColumnVisibility?: VisibilityState;
   onSortingChange?: (sorting: SortingState) => void;
   className?: string;
+  query?: string;
+}
+
+// Custom Filter Types
+type FilterOperator = "=" | ">" | "<" | ">=" | "<=" | ":" | "~";
+
+interface ParsedFilter {
+  column: string;
+  operator: FilterOperator;
+  value: string;
 }
 
 function DuckUiTable<T extends RowData>({
@@ -94,6 +102,7 @@ function DuckUiTable<T extends RowData>({
   defaultColumnVisibility = {},
   onSortingChange,
   className,
+  query,
 }: TableProps<T>) {
   // State
   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
@@ -103,12 +112,12 @@ function DuckUiTable<T extends RowData>({
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
-  const [filterValue, setFilterValue] = useState("");
+  const [, setFilterValue] = useState("");
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: FIXED_PAGE_SIZE,
   });
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   // Refs
   const sizeCache = useRef<Record<string, number>>({});
@@ -152,154 +161,6 @@ function DuckUiTable<T extends RowData>({
     }, 10);
   }, []);
 
-  // Helper function to format values based on DuckDB types
-  const formatDuckDBValue = (
-    value: any,
-    type?: string
-  ): string | JSX.Element => {
-    // Handle null/undefined
-    if (value === null || value === undefined) {
-      return <span className="text-gray-400 italic text-xs">null</span>;
-    }
-
-    // Handle different types
-    switch (typeof value) {
-      case "bigint":
-        return (
-          <span className="font-mono tabular-nums">{value.toString()}</span>
-        );
-
-      case "number":
-        if (Number.isInteger(value)) {
-          return (
-            <span className="font-mono tabular-nums">
-              {value.toLocaleString()}
-            </span>
-          );
-        }
-        return (
-          <span className="font-mono tabular-nums">
-            {value.toLocaleString(undefined, {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 20,
-            })}
-          </span>
-        );
-
-      case "boolean":
-        return (
-          <span className={value ? "text-green-600" : "text-red-600"}>
-            {value.toString()}
-          </span>
-        );
-
-      case "object":
-        if (value instanceof Date) {
-          return (
-            <span className="font-mono">
-              {value.toLocaleString(undefined, {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                timeZoneName: "short",
-              })}
-            </span>
-          );
-        }
-
-        // Handle BLOB/BINARY data
-        if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
-          const bytes = new Uint8Array(
-            value instanceof ArrayBuffer ? value : (value as Uint8Array).buffer
-          );
-          return (
-            <span className="font-mono text-purple-600">
-              {`0x${Array.from(bytes)
-                .map((b) => b.toString(16).padStart(2, "0"))
-                .join("")}`}
-            </span>
-          );
-        }
-
-        // Handle Arrays
-        if (Array.isArray(value)) {
-          try {
-            const formattedArray = value.map((item) =>
-              typeof item === "bigint" ? item.toString() : item
-            );
-            return (
-              <span className="font-mono text-blue-600">
-                {JSON.stringify(formattedArray)}
-              </span>
-            );
-          } catch (error) {
-            console.warn("Failed to stringify array:", error);
-            return "[Complex Array]";
-          }
-        }
-
-        // Handle other objects (including structs and maps)
-        try {
-          const serializable = JSON.parse(
-            JSON.stringify(value, (_, v) =>
-              typeof v === "bigint" ? v.toString() : v
-            )
-          );
-          return (
-            <span className="font-mono text-blue-600">
-              {JSON.stringify(serializable)}
-            </span>
-          );
-        } catch (error) {
-          console.warn("Failed to stringify object:", error);
-          return "[Complex Object]";
-        }
-
-      case "string":
-        // Handle potential JSON strings
-        if (value.startsWith("{") || value.startsWith("[")) {
-          try {
-            const parsed = JSON.parse(value);
-            return (
-              <span className="font-mono text-blue-600">
-                {JSON.stringify(parsed)}
-              </span>
-            );
-          } catch {
-            // Not valid JSON, treat as regular string
-            return value;
-          }
-        }
-        // Handle potential dates
-        if (value.match(/^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}:\d{2}/)) {
-          const date = new Date(value);
-          if (!isNaN(date.getTime())) {
-            return (
-              <span className="font-mono">
-                {date.toLocaleString(undefined, {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  timeZoneName: "short",
-                })}
-              </span>
-            );
-          }
-        }
-        // Default string handling
-        return value;
-
-      default:
-        return String(value);
-    }
-  };
-
   // Update your memoizedColumns definition
   const memoizedColumns = useMemo<ColumnDef<T>[]>(() => {
     const baseColumns = columns.map((col) => ({
@@ -310,10 +171,7 @@ function DuckUiTable<T extends RowData>({
       size: columnSizing[col] || DEFAULT_COLUMN_SIZE,
       minSize: MIN_COLUMN_SIZE,
       cell: ({ row }: any) => {
-        const value = row.original[col];
-        // Get column type if available from schema
-        const columnType = row.original?.__schema__?.[col]?.type;
-        return formatDuckDBValue(value, columnType);
+        return String(row.original[col] ?? "");
       },
     }));
 
@@ -335,7 +193,7 @@ function DuckUiTable<T extends RowData>({
 
   // Table instance
   const table = useReactTable({
-    data,
+    data: data || [],
     columns: memoizedColumns,
     state: {
       sorting,
@@ -366,7 +224,208 @@ function DuckUiTable<T extends RowData>({
     getFilteredRowModel: getFilteredRowModel(),
     enableColumnResizing: true,
     columnResizeMode: "onChange",
-    globalFilterFn: CHUIFilter,
+    globalFilterFn: (row, filterValue) => {
+      if (!filterValue?.trim()) return true;
+
+      const parseSingleFilter = (filterValue: string): ParsedFilter | null => {
+        const filterRegex =
+          /^([a-zA-Z_][a-zA-Z0-9_]*)\s*(:|=|>|<|>=|<=|~)\s*(.+)$/;
+        const match = filterValue.trim().match(filterRegex);
+
+        if (!match) return null;
+
+        const [, column, operator, value] = match;
+        return {
+          column: column.trim().toLowerCase(),
+          operator: operator as FilterOperator,
+          value: value.trim().replace(/^["'](.*)["']$/, "$1"),
+        };
+      };
+
+      // Recursive function to parse complex filter expressions
+      const parseFilterExpression = (
+        filterString: string
+      ): (ParsedFilter | "AND" | "OR" | string)[] => {
+        const filterParts: (ParsedFilter | "AND" | "OR" | string)[] = [];
+        let currentPart = "";
+        let level = 0; //Track level of parenthesis
+
+        for (let i = 0; i < filterString.length; i++) {
+          const char = filterString[i];
+
+          if (char === "(") {
+            if (currentPart.trim()) {
+              filterParts.push(...parseFilterExpression(currentPart.trim()));
+              currentPart = "";
+            }
+            level++;
+          } else if (char === ")") {
+            if (level > 0 && currentPart.trim()) {
+              filterParts.push(...parseFilterExpression(currentPart.trim()));
+              currentPart = "";
+            }
+            level = Math.max(0, level - 1);
+          } else if (
+            char === "A" &&
+            filterString.slice(i, i + 3) === "AND" &&
+            level === 0
+          ) {
+            if (currentPart.trim()) {
+              filterParts.push(
+                parseSingleFilter(currentPart.trim()) || currentPart.trim()
+              );
+            }
+            filterParts.push("AND");
+            currentPart = "";
+            i += 2;
+          } else if (
+            char === "O" &&
+            filterString.slice(i, i + 2) === "OR" &&
+            level === 0
+          ) {
+            if (currentPart.trim()) {
+              filterParts.push(
+                parseSingleFilter(currentPart.trim()) || currentPart.trim()
+              );
+            }
+            filterParts.push("OR");
+            currentPart = "";
+            i += 1;
+          } else {
+            currentPart += char;
+          }
+        }
+
+        if (currentPart.trim()) {
+          filterParts.push(
+            parseSingleFilter(currentPart.trim()) || currentPart.trim()
+          );
+        }
+
+        return filterParts;
+      };
+
+      const evaluateFilter = (row: Row<any>, filter: ParsedFilter): boolean => {
+        // Find the matching column
+        const matchingCell = row
+          .getAllCells()
+          .find((cell) => cell.column.id.toLowerCase() === filter.column);
+
+        if (!matchingCell) {
+          return false;
+        }
+
+        const cellValue = matchingCell.getValue();
+
+        if (cellValue == null) {
+          return (
+            filter.value.toLowerCase() === "null" ||
+            filter.value.toLowerCase() === "undefined"
+          );
+        }
+
+        const typedCellValue = String(cellValue).trim();
+        const typedFilterValue = filter.value.trim();
+
+        // Numeric comparison
+        const numericCell = !isNaN(Number(typedCellValue));
+        const numericFilter = !isNaN(Number(typedFilterValue));
+
+        if (numericCell && numericFilter) {
+          const numCell = Number(typedCellValue);
+          const numFilter = Number(typedFilterValue);
+
+          switch (filter.operator) {
+            case ":":
+            case "=":
+              return numCell === numFilter;
+            case ">":
+              return numCell > numFilter;
+            case "<":
+              return numCell < numFilter;
+            case ">=":
+              return numCell >= numFilter;
+            case "<=":
+              return numCell <= numFilter;
+            case "~":
+              return String(numCell).includes(String(numFilter));
+            default:
+              return false;
+          }
+        }
+
+        // String comparison with proper case handling
+        const cellValueLower = typedCellValue.toLowerCase();
+        const filterValueLower = typedFilterValue.toLowerCase();
+
+        switch (filter.operator) {
+          case ":":
+          case "=":
+            return cellValueLower === filterValueLower;
+          case "~":
+            return cellValueLower.includes(filterValueLower);
+          case ">":
+            return typedCellValue > typedFilterValue;
+          case "<":
+            return typedCellValue < typedFilterValue;
+          case ">=":
+            return typedCellValue >= typedFilterValue;
+          case "<=":
+            return typedCellValue <= typedFilterValue;
+          default:
+            return false;
+        }
+      };
+
+      const parsedFilters = parseFilterExpression(filterValue);
+
+      if (!parsedFilters || parsedFilters.length === 0) {
+        const searchValue = filterValue.toLowerCase().trim();
+        return row.getAllCells().some((cell) => {
+          const value = cell.getValue();
+          if (value == null) return false;
+          return String(value).toLowerCase().includes(searchValue);
+        });
+      }
+
+      const evaluate = (
+        filters: (ParsedFilter | "AND" | "OR" | string)[],
+        index = 0,
+        currentResult = true
+      ): boolean => {
+        if (index >= filters.length) {
+          return currentResult; // Base case: reached end of filters
+        }
+
+        const currentFilter = filters[index];
+
+        if (currentFilter === "AND") {
+          if (index === 0) return evaluate(filters, index + 1, currentResult);
+          return evaluate(filters, index + 1, currentResult);
+        } else if (currentFilter === "OR") {
+          if (index === 0) return evaluate(filters, index + 1, currentResult);
+          return evaluate(filters, index + 1, currentResult);
+        } else if (typeof currentFilter === "string") {
+          const searchValue = currentFilter.toLowerCase().trim();
+          return (
+            row.getAllCells().some((cell) => {
+              const value = cell.getValue();
+              if (value == null) return false;
+              return String(value).toLowerCase().includes(searchValue);
+            }) && evaluate(filters, index + 1, currentResult)
+          );
+        } else {
+          const filterResult = evaluateFilter(row, currentFilter);
+          if (filters[index - 1] === "AND" || index === 0) {
+            return evaluate(filters, index + 1, currentResult && filterResult);
+          } else if (filters[index - 1] === "OR") {
+            return evaluate(filters, index + 1, currentResult || filterResult);
+          }
+          return evaluate(filters, index + 1, currentResult && filterResult);
+        }
+      };
+      return evaluate(parsedFilters);
+    },
   });
 
   // Virtual scrolling setup
@@ -456,14 +515,14 @@ function DuckUiTable<T extends RowData>({
 
   // Render methods
   const renderCell = useCallback((cell: any) => {
-    const value = cell.getValue();
-    if (value === null)
-      return <span className="text-gray-400 italic text-xs">null</span>;
     return flexRender(cell.column.columnDef.cell, cell.getContext());
   }, []);
 
-  const TableRow = React.memo(({ row }: { row: Row<T> }) => (
-    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-xs">
+  const TableRow = ({ row }: { row: Row<T> }) => (
+    <tr
+      key={row.id}
+      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-xs"
+    >
       {row.getVisibleCells().map((cell) => (
         <td
           key={cell.id}
@@ -474,7 +533,8 @@ function DuckUiTable<T extends RowData>({
         </td>
       ))}
     </tr>
-  ));
+  );
+
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start || 0 : 0;
   const paddingBottom =
     virtualRows.length > 0
@@ -502,9 +562,7 @@ function DuckUiTable<T extends RowData>({
                 const filterString = filters
                   .map((f) => `${f.column}${f.operator}${f.value}`)
                   .join(" AND ");
-                startTransition(() => {
-                  setGlobalFilter(filterString);
-                });
+                debouncedSearch(filterString);
               }}
               className="w-full"
             />
@@ -539,7 +597,7 @@ function DuckUiTable<T extends RowData>({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DownloadDialog data={data} />
+          <DownloadDialog data={data || []} query={query} />
 
           {onRefresh && (
             <Button
@@ -680,10 +738,10 @@ function DuckUiTable<T extends RowData>({
                       key={header.id}
                       style={{ width: header.getSize() }}
                       className={`
-                          relative p-2 text-left font-medium text-gray-600 dark:text-gray-200
-                          border-b dark:border-gray-700 text-xs select-none
-                          ${header.column.getCanSort() ? "cursor-pointer" : ""}
-                      `}
+                        relative p-2 text-left font-medium text-gray-600 dark:text-gray-200
+                        border-b dark:border-gray-700 text-xs select-none
+                        ${header.column.getCanSort() ? "cursor-pointer" : ""}
+                    `}
                       onClick={
                         header.column.getCanSort()
                           ? header.column.getToggleSortingHandler()
@@ -717,17 +775,15 @@ function DuckUiTable<T extends RowData>({
                             handleColumnResize(newSize, header.column.id);
                           }}
                           className={`
-                          absolute right-0 top-0 h-full w-1
-                          cursor-col-resize select-none touch-none
-                          bg-gray-300 dark:bg-gray-600
-                          hover:bg-primary/50
-                           ${
-                             header.column.getIsResizing()
-                               ? "bg-primary w-1"
-                               : ""
-                           }
-                           transition-colors
-                       `}
+                        absolute right-0 top-0 h-full w-1
+                        cursor-col-resize select-none touch-none
+                        bg-gray-300 dark:bg-gray-600
+                        hover:bg-primary/50
+                         ${
+                           header.column.getIsResizing() ? "bg-primary w-1" : ""
+                         }
+                         transition-colors
+                     `}
                         />
                       )}
                     </th>

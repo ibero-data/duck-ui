@@ -30,6 +30,7 @@ export interface ColumnInfo {
 export interface TableInfo {
   name: string;
   schema: string;
+  columns: ColumnInfo[];
   rowCount: number;
   createdAt: string;
 }
@@ -41,9 +42,9 @@ export interface DatabaseInfo {
 
 export interface QueryResult {
   columns: string[];
+  columnTypes: string[];
   data: Record<string, unknown>[];
   rowCount: number;
-  duration: number;
   error?: string;
 }
 
@@ -51,7 +52,6 @@ export interface QueryHistoryItem {
   id: string;
   query: string;
   timestamp: Date;
-  duration?: number;
   error?: string;
 }
 
@@ -121,6 +121,7 @@ export interface DuckStoreState {
   cleanup: () => Promise<void>;
   fetchDatabasesAndTablesInfo: () => Promise<void>;
   switchDatabase: (databaseName: string) => Promise<void>;
+  exportParquet: (query: string) => Promise<Blob>;
 }
 
 // Utility function for connection validation
@@ -134,63 +135,34 @@ const validateConnection = (
 };
 
 const resultToJSON = (result: any): QueryResult => {
-  const columns = result.schema.fields.map((field: any) => ({
-    name: field.name,
-    type: field.type,
-  }));
-
-
   const data = result.toArray().map((row: any) => {
     const jsonRow = row.toJSON();
+    result.schema.fields.forEach((field: any) => {
+      const col = field.name;
+      const type = field.type.toString();
 
-    columns.forEach((col: any) => {
       try {
-        const rawValue = jsonRow[col.name];
+        let value = jsonRow[col];
+        if (value === null || value === undefined) return;
 
-        console.log(col.type.typeId);
-        console.log(rawValue);
-
-        // Only process if value exists
-        if (rawValue === null || rawValue === undefined) return;
-
-        // Handle DATE type (days since epoch)
-        if (col.type.typeId === 8) {
-          // Ensure numeric value
-          const days = Number(rawValue);
-          if (!isNaN(days)) {
-            const date = new Date(days * 86400000);
-            // Validate date before setting
-            if (!isNaN(date.getTime())) {
-              jsonRow[col.name] = date.toISOString().split("T")[0];
-            }
-          }
-        }
-        // Handle TIMESTAMP (microseconds since epoch)
-        else if (col.type.typeId === 9) {
-          // Convert to number and validate
-          const micros = Number(rawValue);
-          if (!isNaN(micros)) {
-            const date = new Date(micros / 1000);
-            if (!isNaN(date.getTime())) {
-              jsonRow[col.name] = date.toISOString();
-            }
-          }
+        if (type == "Date32<DAY>") {
+          value = new Date(value);
+          jsonRow[col] = value;
         }
       } catch (error) {
-        console.warn(`Error processing column ${col.name}:`, error);
-        // Leave original value if conversion fails
+        console.error(`Error processing column ${col}:`, error);
       }
     });
-
     return jsonRow;
   });
 
   return {
-    columns: columns.map((c) => c.name),
-    columnTypes: columns.map((c) => c.type),
+    columns: result.schema.fields.map((field: any) => field.name),
+    columnTypes: result.schema.fields.map((field: any) =>
+      field.type.toString()
+    ),
     data,
     rowCount: result.numRows,
-    duration: 0,
   };
 };
 // Create Store
@@ -202,7 +174,7 @@ export const useDuckStore = create<DuckStoreState>()(
         db: null,
         connection: null,
         isInitialized: false,
-        currentDatabase: "main",
+        currentDatabase: "memory",
         databases: [],
         queryHistory: [],
         duckDbConfigState: { max_memory: 3.1 },
@@ -212,12 +184,6 @@ export const useDuckStore = create<DuckStoreState>()(
             id: "home",
             title: "Home",
             type: "home",
-            content: "",
-          },
-          {
-            id: crypto.randomUUID(),
-            title: "Query 1",
-            type: "sql",
             content: "",
           },
         ],
@@ -235,7 +201,7 @@ export const useDuckStore = create<DuckStoreState>()(
 
             const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
             const worker = new Worker(bundle.mainWorker!);
-            const logger = new duckdb.ConsoleLogger();
+            const logger = new duckdb.VoidLogger();
             const db = new duckdb.AsyncDuckDB(logger, worker);
 
             await db.instantiate(bundle.mainModule);
@@ -256,7 +222,7 @@ export const useDuckStore = create<DuckStoreState>()(
               connection,
               isInitialized: true,
               isLoading: false,
-              currentDatabase: "main",
+              currentDatabase: "memory",
             });
 
             await get().fetchDatabasesAndTablesInfo();
@@ -276,16 +242,14 @@ export const useDuckStore = create<DuckStoreState>()(
         // Database configuration
         duckDbConfig: async (config) => {
           try {
-            set({ isLoading: true });
             const connection = validateConnection(get().connection);
             await connection.query(`SET memory_limit='${config.max_memory}GB'`);
-            set({ duckDbConfigState: config, isLoading: false });
+            set({ duckDbConfigState: config });
           } catch (error) {
             set({
               error: `Configuration failed: ${
                 error instanceof Error ? error.message : "Unknown error"
               }`,
-              isLoading: false,
             });
           }
         },
@@ -296,12 +260,9 @@ export const useDuckStore = create<DuckStoreState>()(
             const connection = validateConnection(get().connection);
             set({ isExecuting: true, error: null });
 
-            const startTime = performance.now();
             const result = await connection.query(query);
-            const duration = performance.now() - startTime;
 
             const queryResult = resultToJSON(result);
-            queryResult.duration = duration;
 
             // Update state
             set((state) => ({
@@ -310,7 +271,6 @@ export const useDuckStore = create<DuckStoreState>()(
                   id: crypto.randomUUID(),
                   query,
                   timestamp: new Date(),
-                  duration,
                 },
                 ...state.queryHistory.slice(0, 19),
               ],
@@ -331,9 +291,9 @@ export const useDuckStore = create<DuckStoreState>()(
             // Prepare error result
             const errorResult: QueryResult = {
               columns: [],
+              columnTypes: [],
               data: [],
               rowCount: 0,
-              duration: 0,
               error: errorMessage,
             };
 
@@ -362,7 +322,7 @@ export const useDuckStore = create<DuckStoreState>()(
           fileContent,
           tableName,
           fileType,
-          database = "main"
+          database = "memory"
         ) => {
           try {
             const { db, connection } = get();
@@ -377,14 +337,18 @@ export const useDuckStore = create<DuckStoreState>()(
 
             await db.registerFileBuffer(fileName, buffer);
 
-            // Ensure database exists
-            await connection.query(`CREATE DATABASE IF NOT EXISTS ${database}`);
-            await connection.query(`USE ${database}`);
+            if (fileType === "duckdb") {
+              await connection.query(
+                `ATTACH DATABASE '${fileName}' AS ${tableName}`
+              );
+              await get().fetchDatabasesAndTablesInfo();
+              return;
+            }
 
             // Create table
             await connection.query(`
               CREATE OR REPLACE TABLE "${tableName}" AS 
-              SELECT * FROM read_${fileType.toLowerCase()}_auto('${fileName}')
+              SELECT * FROM read_${fileType.toLowerCase()}('${fileName}')
             `);
 
             // Verify creation
@@ -415,27 +379,27 @@ export const useDuckStore = create<DuckStoreState>()(
           try {
             const connection = validateConnection(get().connection);
 
+            // Get the list of databases
             const databasesResult = await connection.query(
               `PRAGMA database_list`
             );
+
             const databases = await Promise.all(
               databasesResult.toArray().map(async (db: any) => {
                 const dbName = db.name.toString();
-                await connection.query(`USE ${dbName}`);
-
+                //Get all tables for a specific database
                 const tablesResult = await connection.query(`
-                  SELECT table_name as name 
-                  FROM information_schema.tables 
-                  WHERE table_schema = 'main'
-                  AND table_type = 'BASE TABLE'
+                  SELECT table_name
+                  FROM information_schema.tables
+                  WHERE table_catalog = '${dbName}'
                 `);
 
                 const tables = await Promise.all(
                   tablesResult.toArray().map(async (tbl: any) => {
-                    const tableName = tbl.name.toString();
+                    const tableName = tbl.table_name.toString();
 
                     const columnsResult = await connection.query(
-                      `DESCRIBE "${tableName}"`
+                      `DESCRIBE "${dbName}"."${tableName}"`
                     );
                     const columns = columnsResult.toArray().map((col: any) => ({
                       name: col.column_name.toString(),
@@ -444,14 +408,14 @@ export const useDuckStore = create<DuckStoreState>()(
                     }));
 
                     const countResult = await connection.query(
-                      `SELECT COUNT(*) as count FROM "${tableName}"`
+                      `SELECT COUNT(*) as count FROM "${dbName}"."${tableName}"`
                     );
 
                     return {
                       name: tableName,
                       schema: dbName,
                       columns,
-                      rowCount: Number(countResult.toArray()[0][0]),
+                      rowCount: Number(countResult),
                       createdAt: new Date().toISOString(),
                     };
                   })
@@ -576,7 +540,7 @@ export const useDuckStore = create<DuckStoreState>()(
             };
           });
         },
-        deleteTable: async (tableName, database = "main") => {
+        deleteTable: async (tableName, database = "memory") => {
           try {
             const connection = validateConnection(get().connection);
             set({ isLoading: true });
@@ -598,6 +562,37 @@ export const useDuckStore = create<DuckStoreState>()(
         clearHistory: () => {
           set({ queryHistory: [] });
         },
+
+        exportParquet: async (query: any) => {
+          try {
+            const { connection, db } = get();
+            if (!connection || !db) {
+              throw new Error("Database not initialized");
+            }
+
+            const now = new Date()
+              .toISOString()
+              .split(".")[0]
+              .replace(/[:]/g, "-");
+            const fileName = `result-${now}.parquet`;
+
+            await connection.query(
+              `COPY (${query}) TO '${fileName}' (FORMAT 'parquet')`
+            );
+
+            const parquet_buffer = await db.copyFileToBuffer(fileName);
+            await db.dropFile(fileName);
+            return new Blob([parquet_buffer], { type: "application/parquet" });
+          } catch (error) {
+            console.error("Failed to export to parquet:", error);
+            throw new Error(
+              `Parquet export failed: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
+        },
+
         cleanup: async () => {
           const { connection, db } = get();
           try {
@@ -609,7 +604,7 @@ export const useDuckStore = create<DuckStoreState>()(
               connection: null,
               isInitialized: false,
               databases: [],
-              currentDatabase: "main",
+              currentDatabase: "memory",
               error: null,
               queryHistory: [],
               tabs: [

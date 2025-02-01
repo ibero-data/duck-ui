@@ -28,9 +28,21 @@ import {
   Loader2,
   Search,
   Filter,
+  Copy,
 } from "lucide-react";
 import { useDuckStore } from "@/store";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+
+const handleCopyValue = (value: string) => {
+  if (value === "" || value === null) {
+    toast.warning("Value is empty, nothing to copy");
+    return;
+  }
+  navigator.clipboard.writeText(value).then(() => {
+    toast.info("Copied to clipboard");
+  });
+};
 
 interface DuckDBSetting {
   name: string;
@@ -47,10 +59,14 @@ const MetricCard: React.FC<{
 }> = ({ title, description, value, type }) => (
   <Card className="h-full transition-all hover:shadow-md">
     <CardHeader className="space-y-1">
-      <div className="flex items-center justify-between">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Badge variant={type === 'BOOLEAN' ? 'default' : 'outline'} 
-               className="text-xs">
+      <div className="flex items-center justify-between mb-3">
+        <CardTitle className="text-base font-medium truncate">
+          {title}
+        </CardTitle>
+        <Badge
+          variant={type === "BOOLEAN" ? "default" : "outline"}
+          className="text-xs"
+        >
           {type}
         </Badge>
       </div>
@@ -59,16 +75,24 @@ const MetricCard: React.FC<{
       </CardDescription>
     </CardHeader>
     <CardContent>
-      <div className="text-lg font-bold break-words">
+      <div className=" font-bold flex items-center justify-between">
         {value === null ? (
           <span className="text-muted-foreground">NULL</span>
-        ) : typeof value === 'boolean' ? (
+        ) : typeof value === "boolean" ? (
           <Badge variant={value ? "default" : "destructive"}>
             {value.toString()}
           </Badge>
         ) : (
-          value
+          <p className="truncate">{value}</p>
         )}
+        <Button
+          className="text-left m-2"
+          variant="ghost"
+          size="icon"
+          onClick={handleCopyValue.bind(null, value?.toString() || "")}
+        >
+          <Copy className="h-4 w-4" />
+        </Button>
       </div>
     </CardContent>
   </Card>
@@ -98,11 +122,13 @@ const FilterBar: React.FC<{
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="all">All Types</SelectItem>
-        {types.filter(type => type?.trim()).map((type) => (
-          <SelectItem key={type} value={type}>
-            {type}
-          </SelectItem>
-        ))}
+        {types
+          .filter((type) => type?.trim())
+          .map((type) => (
+            <SelectItem key={type} value={type}>
+              {type}
+            </SelectItem>
+          ))}
       </SelectContent>
     </Select>
   </div>
@@ -114,11 +140,10 @@ export default function Metrics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   const fetchMetrics = async () => {
     if (!connection || !isInitialized) return;
-
     setLoading(true);
     setError(null);
     try {
@@ -134,6 +159,7 @@ export default function Metrics() {
       setError(err.message || "An error occurred while fetching settings.");
     } finally {
       setLoading(false);
+      toast.success("Metrics loaded successfully");
     }
   };
 
@@ -175,13 +201,16 @@ export default function Metrics() {
     ],
   };
 
-  const uniqueTypes = Array.from(new Set(settings.map(s => s.input_type))).sort();
+  const uniqueTypes = Array.from(
+    new Set(settings.map((s) => s.input_type))
+  ).sort();
 
-  const filteredSettings = settings.filter(setting => {
-    const matchesSearch = 
+  const filteredSettings = settings.filter((setting) => {
+    const matchesSearch =
       setting.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       setting.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === 'all' || setting.input_type === typeFilter;
+    const matchesType =
+      typeFilter === "all" || setting.input_type === typeFilter;
     return matchesSearch && matchesType;
   });
 
@@ -195,17 +224,17 @@ export default function Metrics() {
   }
 
   return (
-    <div className="w-full h-screen p-4 space-y-4">
+    <div className="w-full h-screen p-4 space-y-4 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Metrics</h2>
+          <h2 className="text-2xl font-bold">Details & Metrics</h2>
           <p className="text-sm text-muted-foreground">
-            Monitor and analyze your DuckDB settings
+            Get a grasp of the current settings and metrics.
           </p>
         </div>
-        <Button 
-          onClick={fetchMetrics} 
-          variant="outline" 
+        <Button
+          onClick={fetchMetrics}
+          variant="outline"
           disabled={loading}
           className="shrink-0"
         >
@@ -218,31 +247,43 @@ export default function Metrics() {
         </Button>
       </div>
 
-      <Tabs defaultValue="performance" className="w-full">
+      <Tabs defaultValue="all">
         <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="performance" className="flex items-center gap-2">
-            <MemoryStick className="h-4 w-4" />
-            Performance
-          </TabsTrigger>
-          <TabsTrigger value="storage" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            Storage
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Security
-          </TabsTrigger>
-          <TabsTrigger value="system" className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4" />
-            System
-          </TabsTrigger>
-          <TabsTrigger value="all" className="flex items-center gap-2">
+          <TabsTrigger value="all" className="flex  w-full items-center gap-2">
             <CircleOff className="h-4 w-4" />
             All Settings
           </TabsTrigger>
+          <TabsTrigger
+            value="performance"
+            className="flex  w-full items-center gap-2"
+          >
+            <MemoryStick className="h-4 w-4" />
+            Performance
+          </TabsTrigger>
+          <TabsTrigger
+            value="storage"
+            className="flex  w-full items-center gap-2"
+          >
+            <Database className="h-4 w-4" />
+            Storage
+          </TabsTrigger>
+          <TabsTrigger
+            value="security"
+            className="flex  w-full items-center gap-2"
+          >
+            <Shield className="h-4 w-4" />
+            Security
+          </TabsTrigger>
+          <TabsTrigger
+            value="system"
+            className="flex  w-full items-center gap-2"
+          >
+            <Settings2 className="h-4 w-4" />
+            System
+          </TabsTrigger>
         </TabsList>
 
-        <FilterBar 
+        <FilterBar
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           typeFilter={typeFilter}
@@ -271,7 +312,7 @@ export default function Metrics() {
         ))}
 
         <TabsContent value="all" className="m-0">
-          <ScrollArea className="h-[calc(100vh-320px)]">
+          <ScrollArea className="h-[calc(100vh-220px)]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
               {filteredSettings.map((setting) => (
                 <MetricCard
