@@ -1,0 +1,145 @@
+---
+title: Legal
+---
+
+import { Scale, Signature } from "lucide-react";
+import Link from "@docusaurus/Link";
+
+
+<div className="doc-intro">
+  <style>
+    {`
+      .doc-intro {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1.5rem 0;
+      }
+
+      .intro-header {
+        margin-bottom: 3rem;
+      }
+
+      .intro-title {
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        color: #e3e3e3;
+      }
+
+      .intro-description {
+        font-size: 1.1rem;
+        color: #a0a0a0;
+        max-width: 800px;
+        line-height: 1.6;
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.25rem;
+        margin-top: 2rem;
+      }
+
+      .feature-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 1.5rem;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .feature-card:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      /* Subtle, professional colors for each card */
+      .feature-card.getting-started:hover {
+        border-color: rgba(116, 185, 255, 0.4);
+      }
+
+      .feature-card.acknowledgments:hover {
+        border-color: rgba(168, 162, 255, 0.4);
+      }
+
+      .feature-card.contributing:hover {
+        border-color: rgba(120, 217, 187, 0.4);
+      }
+
+      .feature-card.core-concepts:hover {
+        border-color: rgba(255, 171, 124, 0.4);
+      }
+
+      .feature-card.license:hover {
+        border-color: rgba(255, 198, 121, 0.4);
+      }
+
+      .feature-card.security:hover {
+        border-color: rgba(255, 145, 149, 0.4);
+      }
+
+      .feature-icon {
+        opacity: 0.9;
+        transition: opacity 0.2s ease;
+      }
+
+      .getting-started .feature-icon { color: #74B9FF; }
+      .acknowledgments .feature-icon { color: #A8A2FF; }
+      .contributing .feature-icon { color: #78D9BB; }
+      .core-concepts .feature-icon { color: #FFAB7C; }
+      .license .feature-icon { color: #FFC679; }
+      .security .feature-icon { color: #FF9195; }
+
+      .feature-title {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #e3e3e3;
+        margin: 0;
+      }
+
+      .feature-link {
+        color: #888;
+        font-size: 0.95rem;
+      }
+
+      .feature-card:hover .feature-icon {
+        opacity: 1;
+      }
+
+
+      @media (max-width: 768px) {
+        .features-grid {
+          grid-template-columns: 1fr;
+          padding: 0 1rem;
+        }
+      }
+    `}
+
+  </style>
+
+{" "}
+
+<header className="intro-header">
+  <p className="intro-description">
+    This is the legal page, where you can find your terms of service and privacy policy.
+  </p>
+</header>
+
+  <div className="features-grid">
+    <Link href="/docs/legal/privacy-policy" className="feature-card getting-started">
+      <Scale size={24} className="feature-icon" />
+      <h3 className="feature-title">Privacy Policy</h3>
+      <span className="feature-link">Read about our polices!</span>
+    </Link>
+
+     <Link href="/docs/legal/terms-of-service" className="feature-card acknowledgments">
+      <Signature size={24} className="feature-icon" />
+      <h3 className="feature-title">Terms of Service</h3>
+      <span className="feature-link">Duck-UI terms of service</span>
+    </Link>
+
+  </div>
+</div>

@@ -1,0 +1,10 @@
+duck-db:
+  label: Duck-DB
+  permalink: /duck-db
+  description: Let's talk about the open-source database that makes all of this possible!
+
+duck-ui:
+  label: Duck-UI
+  permalink: /duck-ui
+  description: More on the UI topic!
+
