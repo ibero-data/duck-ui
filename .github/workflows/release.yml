@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message, 'no-release') }}
     permissions:
-      contents: write 
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -19,12 +19,15 @@ jobs:
 
       - name: Get latest tag
         id: get_latest_tag
-        run: echo "latest_tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
-
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+          
       - name: Bump version and update package.json
         id: tag_version
         run: |
-          latest_tag=${{ steps.get_latest_tag.outputs.latest_tag }}
+          latest_tag="${{ steps.get_latest_tag.outputs.latest_tag }}"
+          echo "Latest tag: $latest_tag"
           if [[ $latest_tag =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             major=${BASH_REMATCH[1]}
             minor=${BASH_REMATCH[2]}
@@ -33,6 +36,8 @@ jobs:
           else
             new_tag="v0.0.1"
           fi
+          
+          echo "New tag: $new_tag"
           
           # Update package.json version (without the 'v' prefix)
           new_version="${new_tag:1}"
@@ -46,19 +51,22 @@ jobs:
           git push
           
           # Create and push new tag
-          git tag $new_tag
-          git push origin $new_tag
+          git tag "$new_tag"
+          git push origin "$new_tag"
           echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
-
+          
       - name: Generate Release Notes
         id: release_notes
         run: |
           # Get commit messages since last tag
-          COMMITS=$(git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"- %s")
+          if [ "${{ steps.get_latest_tag.outputs.latest_tag }}" = "v0.0.0" ]; then
+            COMMITS="- Initial Release"
+          else
+              COMMITS=$(git log "${{ steps.get_latest_tag.outputs.latest_tag }}"..HEAD --pretty=format:"- %s")
+          fi
           echo "commits<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Create Release
         uses: actions/create-release@v1
         env:

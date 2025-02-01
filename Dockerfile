@@ -25,13 +25,13 @@ FROM node:20-alpine
 # Set the working directory for the second stage
 WORKDIR /app
 
-# Install 'serve' to serve the app on port 5521
+# Install 'serve' to serve the app on port 5522
 RUN npm install -g serve
 
 # Copy the build directory from the first stage to the second stage
 COPY --from=build /app/dist /app
 
-# Expose port 5521 to have it mapped by the Docker daemon
+# Expose port 5522 to have it mapped by the Docker daemon
 EXPOSE 5522
 
 RUN addgroup -S duck-group -g 1001 && adduser -S duck-user -u 1001 -G duck-group

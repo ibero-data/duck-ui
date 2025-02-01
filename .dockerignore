@@ -18,3 +18,5 @@ yarn-error.log
 # Ignore Git-specific files
 .git
 .gitignore
+
+/docs
