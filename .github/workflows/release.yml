@@ -38,6 +38,12 @@ jobs:
           fi
           
           echo "New tag: $new_tag"
+
+          # Check if the new tag and the latest tag are the same. If so, exit.
+          if [[ "$latest_tag" == "$new_tag" ]]; then
+            echo "New tag and latest tag are the same ($new_tag), skipping version bump."
+            exit 0
+          fi
           
           # Update package.json version (without the 'v' prefix)
           new_version="${new_tag:1}"
@@ -70,7 +76,7 @@ jobs:
       - name: Create Release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GHCR_PAT }}
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           release_name: Release ${{ steps.tag_version.outputs.new_tag }}

@@ -6,6 +6,11 @@ const SponsorsList = [
     logo: "https://www.iberodata.es/logo.png",
     url: "https://www.iberodata.es/?utm_source=ch-ui&utm_medium=sponsorship",
   },
+  {
+    name: "qxip",
+    logo: "https://qxip.net/images/qxip.png",
+    url: "https://qxip.net/?utm_source=duck-ui&utm_medium=sponsorship",
+  }
 ];
 
 export const Sponsors = () => {
