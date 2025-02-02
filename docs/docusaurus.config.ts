@@ -4,9 +4,9 @@ import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
   title: "Duck-UI",
-  tagline: "Data is better when we see it!",
-  favicon: "img/favicon.png",
-
+  tagline:
+    "Data is better when we see it! Duck-UI is a data visualization tool that allows you to slice and dice your data with ease.",
+  favicon: "img/logo-padding.png",
   // Set the production url of your site here
   url: "https://duckui.com",
   baseUrl: "/",
@@ -51,34 +51,77 @@ const config: Config = {
     ],
   ],
 
+  headTags: [
+    {
+      tagName: "meta",
+      attributes: {
+        property: "og:image",
+        content: "img/social-card.png", // Use the relative path to your image.
+      },
+    },
+    {
+      tagName: "meta",
+      attributes: {
+        name: "twitter:card",
+        content: "summary_large_image",
+      },
+    },
+    {
+      tagName: "meta",
+      attributes: {
+        name: "twitter:image",
+        content: "img/social-card.png",
+      },
+    },
+
+    // Add Umami tracking code
+  ],
+
+  scripts: [
+    {
+      src: "https://umami.duckui.com/script.js",
+      async: true,
+      defer: true,
+      "data-website-id": "9b538d8e-9ac4-4c80-a88f-4987208f0b85",
+    },
+  ],
+
   themeConfig: {
     // Force dark theme only
     colorMode: {
       defaultMode: "dark",
       disableSwitch: false,
-      respectPrefersColorScheme: true,
+      respectPrefersColorScheme: false,
     },
-
-    image: "img/docusaurus-social-card.jpg",
+    algolia: {
+      appId: "XNIVYIPFRS",
+      apiKey: "5daeb5999d13cfe80b4f1cc20fe01a02",
+      indexName: "main_duck_ui",
+      contextualSearch: true,
+      replaceSearchResultPathname: {
+        from: "/docs/",
+        to: "/",
+      },
+    },
+    image: "img/social-card.png",
     navbar: {
       title: "Duck-UI",
       logo: {
         alt: "Duck-ui Logo",
-        src: "img/logo.png",
+        src: "img/logo-padding.png",
       },
       items: [
         {
           type: "docSidebar",
           sidebarId: "tutorialSidebar",
-          position: "left",
+          position: "right",
           label: "Docs",
         },
-        { to: "/blog", label: "Blog", position: "left" },
+        { to: "/blog", label: "Blog", position: "right" },
         {
           href: "https://buymeacoffee.com/caioricciuti",
           position: "right",
-          className: "header-donate-link",
-          "aria-label": "Donate",
+          label: "Donate",
         },
         {
           href: "https://github.com/caioricciuti/duck-ui",
@@ -89,7 +132,6 @@ const config: Config = {
       ],
     },
     prism: {
-      // Use dark theme for all code blocks
       theme: prismThemes.dracula,
       darkTheme: prismThemes.dracula,
     },

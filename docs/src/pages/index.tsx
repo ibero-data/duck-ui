@@ -11,7 +11,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={`${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />"
+      description="Duck-UI - Get start using your data with Duck-UI on your browser. Duck-UI is a data visualization tool that allows you to slice and dice your data on the go."
     >
       <main>
         <HeroSection />
