@@ -65,7 +65,7 @@ jobs:
         id: release_notes
         run: |
           # Get commit messages since last tag
-          if [ "${{ steps.get_latest_tag.outputs.latest_tag }}" = "v0.0.0" ]; then
+          if [ "${{ steps.get_latest_tag.outputs.latest_tag }}" = "v0.0.2" ]; then
             COMMITS="- Initial Release"
           else
               COMMITS=$(git log "${{ steps.get_latest_tag.outputs.latest_tag }}"..HEAD --pretty=format:"- %s")

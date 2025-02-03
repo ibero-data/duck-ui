@@ -145,7 +145,9 @@ const resultToJSON = (result: any): QueryResult => {
         let value = jsonRow[col];
         if (value === null || value === undefined) return;
 
-        if (type == "Date32<DAY>") {
+        console.log("Processing column", col, "with type", type);
+
+        if (type == "Date32<DAY>" || type == "Date64<MILLISECOND>" || type == "Timestamp<MICROSECOND>") {
           value = new Date(value);
           jsonRow[col] = value;
         }

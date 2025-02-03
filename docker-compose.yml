@@ -1,5 +1,5 @@
 services:
-  ch-ui:
+  duck-ui:
     image: ghcr.io/caioricciuti/duck-ui:latest
     restart: always
     ports:

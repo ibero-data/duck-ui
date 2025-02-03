@@ -18,14 +18,44 @@ Choose your preferred installation method:
 
 <Tabs>
   <TabItem value="docker" label="Docker (Recommended)" default>
-    <div style={{ marginBottom: '1rem' }}>
-      The easiest way to get started with Duck-UI is using Docker. Just run:
+      <div style={{ marginBottom: '1rem' }}>
+      The easiest way to get started with Duck-UI is using Docker. You can use either the simple `docker run` command or Docker Compose.
 
-      ```bash
-      docker run -p 5522:5522 ghcr.io/caioricciuti/duck-ui:latest
-      ```
+      
+      <details>
+        <summary>Using <code>docker run</code></summary>
+      
+        Run this command:
+        ```bash
+        docker run -p 5522:5522 ghcr.io/caioricciuti/duck-ui:latest
+        ```
+        Then open your browser and navigate to `http://localhost:5522`.
+      </details>
 
-      Then open your browser and navigate to `http://localhost:5522`.
+      <details>
+        <summary>Using Docker Compose</summary>
+
+        1. Create a `docker-compose.yml` file with the following content:
+
+        ```yaml
+        version: '3.8'
+        services:
+          duck-ui:
+            image: ghcr.io/caioricciuti/duck-ui:latest
+            restart: always
+            ports:
+              - "${DUCK_UI_PORT:-5522}:5522"
+        ```
+
+        2.  Run docker compose:
+
+        ```bash
+        docker-compose up -d
+        ```
+
+        You can then access Duck-UI in your browser at `http://localhost:5522` (or the port you have set using `DUCK_UI_PORT` environment variable).
+
+      </details>
     </div>
   </TabItem>
   <TabItem value="source" label="From Source">
