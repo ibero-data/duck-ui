@@ -20,34 +20,33 @@ jobs:
       - name: Get latest tag
         id: get_latest_tag
         run: |
-          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Get latest tag without v prefix, defaulting to 0.0.1 if none exists
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.1")
           echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
           
       - name: Bump version and update package.json
         id: tag_version
         run: |
           latest_tag="${{ steps.get_latest_tag.outputs.latest_tag }}"
           echo "Latest tag: $latest_tag"
-          if [[ $latest_tag =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            major=${BASH_REMATCH[1]}
-            minor=${BASH_REMATCH[2]}
-            patch=${BASH_REMATCH[3]}
-            new_tag="v$major.$minor.$((patch + 1))"
-          else
-            new_tag="v0.0.1"
-          fi
           
+          # Split version into components
+          IFS='.' read -r major minor patch <<< "$latest_tag"
+          
+          # Increment patch version
+          new_version="$major.$minor.$((patch + 1))"
+          new_tag="v$new_version"
+          
+          echo "New version: $new_version"
           echo "New tag: $new_tag"
-
-          # Check if the new tag and the latest tag are the same. If so, exit.
-          if [[ "$latest_tag" == "$new_tag" ]]; then
-            echo "New tag and latest tag are the same ($new_tag), skipping version bump."
-            exit 0
-          fi
           
-          # Update package.json version (without the 'v' prefix)
-          new_version="${new_tag:1}"
-          npm version $new_version --no-git-tag-version
+          # Update package.json version
+          npm version $new_version --no-git-tag-version --allow-same-version
           
           # Stage and commit package.json changes
           git config user.name github-actions
@@ -59,20 +58,22 @@ jobs:
           # Create and push new tag
           git tag "$new_tag"
           git push origin "$new_tag"
-          echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
           
+          echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
+
       - name: Generate Release Notes
         id: release_notes
         run: |
-          # Get commit messages since last tag
-          if [ "${{ steps.get_latest_tag.outputs.latest_tag }}" = "v0.0.2" ]; then
+          previous_tag=$(git describe --tags --abbrev=0 HEAD^)
+          if [ -z "$previous_tag" ]; then
             COMMITS="- Initial Release"
           else
-              COMMITS=$(git log "${{ steps.get_latest_tag.outputs.latest_tag }}"..HEAD --pretty=format:"- %s")
+            COMMITS=$(git log $previous_tag..HEAD --pretty=format:"- %s")
           fi
           echo "commits<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: actions/create-release@v1
         env:
