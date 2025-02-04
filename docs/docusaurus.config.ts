@@ -90,18 +90,14 @@ const config: Config = {
     // Force dark theme only
     colorMode: {
       defaultMode: "dark",
-      disableSwitch: false,
+      disableSwitch: true,
       respectPrefersColorScheme: false,
     },
     algolia: {
       appId: "XNIVYIPFRS",
       apiKey: "5daeb5999d13cfe80b4f1cc20fe01a02",
-      indexName: "main_duck_ui",
+      indexName: "DuckUI Crawler",
       contextualSearch: true,
-      replaceSearchResultPathname: {
-        from: "/docs/",
-        to: "/",
-      },
     },
     image: "img/social-card.png",
     navbar: {

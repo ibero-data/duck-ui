@@ -53,6 +53,19 @@ const AppInitializer = ({ children }: AppInitializerProps) => {
 
 const App = () => {
   useEffect(() => {
+    // add umami analytics if the hostname is https://demo.duckui.com
+
+    if (window.location.hostname === "demo.duckui.com") {
+      const script = document.createElement("script");
+      script.src = "https://umami.duckui.com/script.js";
+      script.async = true;
+      script.setAttribute(
+        "data-website-id",
+        "b79701f2-013e-4de6-b59f-8b456175c1da"
+      );
+      document.body.appendChild(script);
+    }
+
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       return (e.returnValue =

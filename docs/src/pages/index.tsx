@@ -5,6 +5,7 @@ import HeroSection from "../components/Hero";
 import Sponsors from "../components/Sponsors";
 import HomepageFeatures from "../components/HomePageFeatures";
 import Footer from "../components/Footer";
+import DemoTeaser from "../components/DemoTeaser";
 
 export default function Home(): ReactNode {
   const { siteConfig } = useDocusaurusContext();
@@ -15,6 +16,7 @@ export default function Home(): ReactNode {
     >
       <main>
         <HeroSection />
+        <DemoTeaser />
         <HomepageFeatures />
         <Sponsors />
         <Footer />
