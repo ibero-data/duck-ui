@@ -572,7 +572,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
                 : "border-gray-300 hover:border-[#ffe814] hover:bg-[#ffe814]/10"
             )}
           >
-            <input
+            <Input
               type="file"
               multiple
               hidden
@@ -591,26 +591,28 @@ const FileImporter: React.FC<FileImporterProps> = ({
                 Drop the files here ...
               </p>
             ) : (
-              <div className="space-y-2">
-                <p className="font-medium">
-                  Drag & drop files here, or
-                  <div>
-                    <Button
-                      variant="outline"
-                      className="mt-2"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Select Files
-                    </Button>
-                  </div>
-                </p>
-                <p className="text-sm text-gray-500">
-                  Supported formats: CSV, JSON, Parquet, Arrow and DuckDB
-                </p>
-                <p className="text-xs text-gray-400">
-                  Maximum file size: {formatFileSize(MAX_FILE_SIZE)}
-                </p>
-              </div>
+              <>
+                <div className="space-y-2">
+                  <p className="font-medium">
+                    Drag & drop files here, or
+                    <div>
+                      <Button
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Select Files
+                      </Button>
+                    </div>
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Supported formats: CSV, JSON, Parquet, Arrow and DuckDB
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Maximum file size: {formatFileSize(MAX_FILE_SIZE)}
+                  </p>
+                </div>
+              </>
             )}
           </div>
 

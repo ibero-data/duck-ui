@@ -80,9 +80,9 @@ const HomeTab = () => {
     }).format(date);
   };
 
-  const handleNewAction = (type: string) => {
+  const handleNewAction = (type: string, query?: string) => {
     if (type === "sql") {
-      createTab("sql", "");
+      createTab("sql", query);
     }
     if (type === "examples") {
       createTab(
@@ -110,7 +110,7 @@ SELECT * FROM read_json('https://api.tvmaze.com/search/shows?q=duck', auto_detec
 -- Attach remote database
 ATTACH 'https://raw.githubusercontent.com/tobilg/aws-iam-data/main/data/db/iam.duckdb' as aws_iam (READ_ONLY);
 `,
-        "Duck UI Explore"
+  "Duck UI Explore"
       );
     }
   };
@@ -233,7 +233,7 @@ ATTACH 'https://raw.githubusercontent.com/tobilg/aws-iam-data/main/data/db/iam.d
                 >
                   <Card
                     className="hover:bg-accent/50 cursor-pointer transition-colors"
-                    onClick={() => handleNewAction("sql")}
+                    onClick={() => handleNewAction("sql", item.cleaned_query)}
                   >
                     <CardHeader>
                       <CardTitle className="text-sm font-medium flex items-center space-x-2">

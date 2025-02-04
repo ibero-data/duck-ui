@@ -147,7 +147,12 @@ const resultToJSON = (result: any): QueryResult => {
 
         console.log("Processing column", col, "with type", type);
 
-        if (type == "Date32<DAY>" || type == "Date64<MILLISECOND>" || type == "Timestamp<MICROSECOND>") {
+        if (type == "Date32<DAY>") {
+          value = new Date(value).toLocaleDateString();
+          jsonRow[col] = value;
+        }
+
+        if (type == "Date64<MILLISECOND>" || type == "Timestamp<MICROSECOND>") {
           value = new Date(value);
           jsonRow[col] = value;
         }
@@ -267,20 +272,47 @@ export const useDuckStore = create<DuckStoreState>()(
             const queryResult = resultToJSON(result);
 
             // Update state
-            set((state) => ({
-              queryHistory: [
-                {
-                  id: crypto.randomUUID(),
-                  query,
-                  timestamp: new Date(),
-                },
-                ...state.queryHistory.slice(0, 19),
-              ],
-              tabs: state.tabs.map((tab) =>
-                tab.id === tabId ? { ...tab, result: queryResult } : tab
-              ),
-              isExecuting: false,
-            }));
+            set((state) => {
+              const existingQueryIndex = state.queryHistory.findIndex(
+                (item) => item.query === query
+              );
+
+              let newQueryHistory = [...state.queryHistory];
+
+              if (existingQueryIndex !== -1) {
+                // Query already exists, move to the top and update timestamp
+                newQueryHistory = [
+                  {
+                    ...state.queryHistory[existingQueryIndex],
+                    timestamp: new Date(),
+                  },
+                  ...state.queryHistory.filter(
+                    (_, index) => index !== existingQueryIndex
+                  ),
+                ];
+              } else {
+                // Query doesn't exist, add a new one
+                newQueryHistory = [
+                  {
+                    id: crypto.randomUUID(),
+                    query,
+                    timestamp: new Date(),
+                  },
+                  ...state.queryHistory,
+                ];
+              }
+
+              // Limit history to 15 entries
+              newQueryHistory = newQueryHistory.slice(0, 15);
+
+              return {
+                queryHistory: newQueryHistory,
+                tabs: state.tabs.map((tab) =>
+                  tab.id === tabId ? { ...tab, result: queryResult } : tab
+                ),
+                isExecuting: false,
+              };
+            });
 
             // Refresh schema if DDL
             if (/^(CREATE|ALTER|DROP|ATTACH)/i.test(query.trim())) {
@@ -299,22 +331,50 @@ export const useDuckStore = create<DuckStoreState>()(
               error: errorMessage,
             };
 
-            set((state) => ({
-              isExecuting: false,
-              error: errorMessage,
-              queryHistory: [
-                {
-                  id: crypto.randomUUID(),
-                  query,
-                  timestamp: new Date(),
-                  error: errorMessage,
-                },
-                ...state.queryHistory,
-              ],
-              tabs: state.tabs.map((tab) =>
-                tab.id === tabId ? { ...tab, result: errorResult } : tab
-              ),
-            }));
+            set((state) => {
+              const existingQueryIndex = state.queryHistory.findIndex(
+                (item) => item.query === query
+              );
+
+              let newQueryHistory = [...state.queryHistory];
+
+              if (existingQueryIndex !== -1) {
+                // Query already exists, move to the top and update timestamp
+                newQueryHistory = [
+                  {
+                    ...state.queryHistory[existingQueryIndex],
+                    timestamp: new Date(),
+                    error: errorMessage,
+                  },
+                  ...state.queryHistory.filter(
+                    (_, index) => index !== existingQueryIndex
+                  ),
+                ];
+              } else {
+                // Query doesn't exist, add a new one
+                newQueryHistory = [
+                  {
+                    id: crypto.randomUUID(),
+                    query,
+                    timestamp: new Date(),
+                    error: errorMessage,
+                  },
+                  ...state.queryHistory,
+                ];
+              }
+
+              // Limit history to 15 entries
+              newQueryHistory = newQueryHistory.slice(0, 15);
+
+              return {
+                isExecuting: false,
+                error: errorMessage,
+                queryHistory: newQueryHistory,
+                tabs: state.tabs.map((tab) =>
+                  tab.id === tabId ? { ...tab, result: errorResult } : tab
+                ),
+              };
+            });
           }
         },
 
