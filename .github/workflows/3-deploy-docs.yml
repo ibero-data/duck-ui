@@ -1,4 +1,3 @@
-# .github/workflows/3-deploy-docs.yml
 name: Deploy Duck-UI Docs to GitHub Pages
 
 on:
@@ -11,11 +10,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    needs: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, 'docs-only') && fromJSON('["release"]') || fromJSON('[]') }}
     if: |
-      (contains(github.event.head_commit.message, 'docs-only') || 
-      (!contains(github.event.head_commit.message, 'release-only') && 
-       !contains(github.event.head_commit.message, 'docker-only')))
+      (!contains(github.event.head_commit.message, 'no-docs') && !contains(github.event.head_commit.message, 'release-only') && !contains(github.event.head_commit.message, 'docker-only')) || 
+      contains(github.event.head_commit.message, 'docs-only')
     permissions:
       contents: write
     concurrency:
