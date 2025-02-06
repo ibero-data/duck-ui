@@ -21,8 +21,6 @@ jobs:
   trigger_build:  # **NO DEPENDENCIES** - Just a starting point
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message, 'docker-false') }}
-    outputs:
-      should_build: ${{ success() }} # Output that the workflow should continue
 
     steps:
       - name: Sleep briefly (or perform a simple check)
@@ -33,7 +31,7 @@ jobs:
   build_and_push: # DEPENDS on trigger_build AND create_release
     runs-on: ubuntu-latest
     needs: [trigger_build, create_release] # Depends on BOTH
-    if: ${{ needs.trigger_build.outputs.should_build == 'true' && !contains(github.event.head_commit.message, 'docker-false') }}
+    if: ${{ needs.trigger_build.result == 'success' && !contains(github.event.head_commit.message, 'docker-false') }} # Use result context
     permissions:
       contents: read
       packages: write
