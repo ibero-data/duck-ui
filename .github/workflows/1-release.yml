@@ -1,20 +1,23 @@
-# release.yml
-
+# .github/workflows/1-release.yml
 name: Create Tag and Release
 
 on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
 
 jobs:
-  create_release:  # Renamed the job
+  release:
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message, 'no-release') }}
     permissions:
       contents: write
     outputs:
-      new_tag: ${{ steps.tag_version.outputs.new_tag }} # Output the new tag
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -24,7 +27,6 @@ jobs:
       - name: Get latest tag
         id: get_latest_tag
         run: |
-          # Get latest tag without v prefix, defaulting to 0.0.1 if none exists
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.1")
           echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
 
@@ -39,27 +41,21 @@ jobs:
           latest_tag="${{ steps.get_latest_tag.outputs.latest_tag }}"
           echo "Latest tag: $latest_tag"
           
-          # Split version into components
           IFS='.' read -r major minor patch <<< "$latest_tag"
-          
-          # Increment patch version
           new_version="$major.$minor.$((patch + 1))"
           new_tag="v$new_version"
           
           echo "New version: $new_version"
           echo "New tag: $new_tag"
           
-          # Update package.json version
           npm version $new_version --no-git-tag-version --allow-same-version
           
-          # Stage and commit package.json changes
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add package.json package-lock.json
           git commit -m "chore: bump version to ${new_tag}"
           git push
           
-          # Create and push new tag
           git tag "$new_tag"
           git push origin "$new_tag"
           
