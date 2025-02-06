@@ -12,13 +12,29 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.head_commit.message, 'no-release') }}
+    # Run if commit doesn't contain no-release AND (contains release-only OR doesn't contain any specific workflow flags)
+    if: |
+      !contains(github.event.head_commit.message, 'no-release') && 
+      (contains(github.event.head_commit.message, 'release-only') || 
+      (!contains(github.event.head_commit.message, 'docker-only') && 
+       !contains(github.event.head_commit.message, 'docs-only')))
     permissions:
       contents: write
     outputs:
       new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      workflow_type: ${{ steps.check_workflow.outputs.type }}
       
     steps:
+      - name: Check workflow type
+        id: check_workflow
+        run: |
+          if [[ "${{ github.event.head_commit.message }}" == *"release-only"* ]]; then
+            echo "type=release-only" >> $GITHUB_OUTPUT
+          else
+            echo "type=full" >> $GITHUB_OUTPUT
+          fi
+
+      # Rest of the release steps remain the same
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
