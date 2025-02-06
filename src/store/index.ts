@@ -96,7 +96,7 @@ export interface DuckStoreState {
 
   // Actions
   initialize: () => Promise<void>;
-  executeQuery: (query: string, tabId: string) => Promise<void>;
+  executeQuery: (query: string, tabId?: string) => Promise<QueryResult | void>;
   duckDbConfig: (config: DuckDBConfig) => Promise<void>;
   importFile: (
     fileName: string,
@@ -112,8 +112,8 @@ export interface DuckStoreState {
   ) => void;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
-  updateTabContent: (tabId: string, content: EditorTab["content"]) => void;
   updateTabQuery: (tabId: string, query: string) => void;
+  updateTabTitle: (tabId: string, title: string) => void;
   moveTab: (oldIndex: number, newIndex: number) => void;
   closeAllTabs: () => void;
   deleteTable: (tableName: string, database?: string) => Promise<void>;
@@ -144,8 +144,6 @@ const resultToJSON = (result: any): QueryResult => {
       try {
         let value = jsonRow[col];
         if (value === null || value === undefined) return;
-
-        console.log("Processing column", col, "with type", type);
 
         if (type == "Date32<DAY>") {
           value = new Date(value).toLocaleDateString();
@@ -262,7 +260,7 @@ export const useDuckStore = create<DuckStoreState>()(
         },
 
         // Execute query with proper error handling
-        executeQuery: async (query, tabId) => {
+        executeQuery: async (query, tabId?) => {
           try {
             const connection = validateConnection(get().connection);
             set({ isExecuting: true, error: null });
@@ -270,6 +268,11 @@ export const useDuckStore = create<DuckStoreState>()(
             const result = await connection.query(query);
 
             const queryResult = resultToJSON(result);
+
+            if (!tabId) {
+              set({ isExecuting: false, error: null });
+              return queryResult;
+            }
 
             // Update state
             set((state) => {
@@ -318,6 +321,8 @@ export const useDuckStore = create<DuckStoreState>()(
             if (/^(CREATE|ALTER|DROP|ATTACH)/i.test(query.trim())) {
               await get().fetchDatabasesAndTablesInfo();
             }
+
+            return;
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : "Unknown error";
@@ -519,8 +524,7 @@ export const useDuckStore = create<DuckStoreState>()(
         createTab: (type = "sql", content = "", title) => {
           const newTab: EditorTab = {
             id: crypto.randomUUID(),
-            title:
-              typeof title === "string" ? title : `Query ${get().tabs.length}`,
+            title: typeof title === "string" ? title : `Untitled Query`,
             type,
             content,
           };
@@ -560,14 +564,6 @@ export const useDuckStore = create<DuckStoreState>()(
           set({ activeTabId: tabId });
         },
 
-        updateTabContent: (tabId, content) => {
-          set((state) => ({
-            tabs: state.tabs.map((tab) =>
-              tab.id === tabId ? { ...tab, content } : tab
-            ),
-          }));
-        },
-
         updateTabQuery: (tabId, query) => {
           set((state) => ({
             tabs: state.tabs.map((tab) =>
@@ -577,6 +573,7 @@ export const useDuckStore = create<DuckStoreState>()(
             ),
           }));
         },
+
         moveTab: (oldIndex, newIndex) => {
           set((state) => {
             const newTabs = [...state.tabs];
@@ -584,6 +581,14 @@ export const useDuckStore = create<DuckStoreState>()(
             newTabs.splice(newIndex, 0, movedTab);
             return { tabs: newTabs };
           });
+        },
+
+        updateTabTitle: (tabId: string, title: string) => {
+          set((state) => ({
+            tabs: state.tabs.map((tab) =>
+              tab.id === tabId ? { ...tab, title } : tab
+            ),
+          }));
         },
 
         closeAllTabs: () => {

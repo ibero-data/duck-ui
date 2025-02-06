@@ -1,3 +1,5 @@
+# release.yml
+
 name: Create Tag and Release
 
 on:
@@ -6,11 +8,13 @@ on:
       - main
 
 jobs:
-  release:
+  create_release:  # Renamed the job
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message, 'no-release') }}
     permissions:
       contents: write
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }} # Output the new tag
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

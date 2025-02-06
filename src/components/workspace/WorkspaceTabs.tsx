@@ -82,7 +82,7 @@ export default function WorkspaceTabs() {
         onValueChange={setActiveTab}
         className="flex flex-col h-full"
       >
-        <div className="flex-shrink-0 flex items-center border-b">
+        <div className="flex-shrink-0 flex items-center border-b bg-muted">
           <Button
             variant="ghost"
             className="rounded-none hover:bg-gray-100 dark:hover:bg-gray-800 h-8 px-2 sticky left-0 z-10"

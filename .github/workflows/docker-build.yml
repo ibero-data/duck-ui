@@ -1,3 +1,5 @@
+# docker-build.yml
+
 name: Build and Push Docker Image
 
 on:
@@ -18,6 +20,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    needs: create_release  # Depends on the release job in the release workflow
     if: ${{ !contains(github.event.head_commit.message, 'docker-false') }}
     permissions:
       contents: read
@@ -45,7 +48,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ needs.create_release.outputs.new_tag }},enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=long
             type=ref,event=pr
             type=semver,pattern={{version}}

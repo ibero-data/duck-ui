@@ -41,6 +41,45 @@ export const HeroSection: FC<HeroSectionProps> = ({ className }) => {
               analyze and visualize your data with using SQL queries.
             </p>
 
+            <div className="flex flex-wrap gap-2 items-center">
+                {/* License */}
+                <img
+                  src="https://img.shields.io/github/license/caioricciuti/duck-ui"
+                  alt="License"
+                  loading="lazy"
+                />
+                
+                {/* Version */}
+                <img
+                  src="https://img.shields.io/github/package-json/v/caioricciuti/duck-ui"
+                  alt="Version"
+                  loading="lazy"
+                />
+
+                {/* Last Commit */}
+                <img
+                  src="https://img.shields.io/github/last-commit/caioricciuti/duck-ui"
+                  alt="Last Commit"
+                  loading="lazy"
+                />
+                
+                {/* Issues */}
+                <img
+                  src="https://img.shields.io/github/issues/caioricciuti/duck-ui"
+                  alt="Issues"
+                  loading="lazy"
+                />
+                
+                {/* Pull Requests */}
+                <img
+                  src="https://img.shields.io/github/issues-pr/caioricciuti/duck-ui"
+                  alt="Pull Requests"
+                  loading="lazy"
+                />
+                
+  
+              </div>
+
             <div className="hero-buttons">
               <Link href="/docs" className="hero-button">
                 Get Started 🚀

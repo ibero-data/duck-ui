@@ -28,7 +28,7 @@ export default function DataExplorer() {
   const treeData = buildTreeData();
 
   return (
-    <Card className="h-full overflow-hidden">
+    <Card className="h-full overflow-hidden border-none">
       <CardHeader className="p-4 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -65,6 +65,12 @@ export default function DataExplorer() {
               className="m-auto w-[calc(100%-2rem)] focus:ring-0
               "
             />
+            <div className="flex items-center justify-between px-2">
+              <p className="text-muted-foreground text-xs">
+                {databases.length}{" "}
+                {databases.length > 1 ? "databases" : "database"}
+              </p>
+            </div>
             <ul className="ml-2">
               {treeData.map((node, index) => (
                 <TreeNode

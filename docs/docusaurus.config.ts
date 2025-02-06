@@ -293,8 +293,8 @@ const config: Config = {
               to: "/docs/getting-started",
             },
             {
-              label: "API Reference",
-              to: "/docs/api",
+              label: "Legal",
+              to: "/docs/legal",
             },
           ],
         },
@@ -304,10 +304,6 @@ const config: Config = {
             {
               label: "GitHub",
               href: "https://github.com/caioricciuti/duck-ui",
-            },
-            {
-              label: "Twitter",
-              href: "https://twitter.com/caioricciuti",
             },
           ],
         },
@@ -325,7 +321,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Duck-UI. Built with Docusaurus.`,
+      copyright: `${new Date().getFullYear()} Duck-ui. All rights reserved.`,
     },
     prism: {
       theme: prismThemes.dracula,

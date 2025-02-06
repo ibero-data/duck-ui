@@ -1,8 +1,30 @@
 import React, { useEffect } from "react";
 import Link from "@docusaurus/Link";
-import { Terminal, ArrowRight } from "lucide-react";
-import clsx from "clsx";
+import { Terminal } from "lucide-react";
 import DotPattern from "./ui/dotpattern";
+import Logo from "@site/static/img/logo-padding.png";
+
+
+const FloatingLogos = () => {
+  return (
+    <div className="logos-container" aria-hidden="true">
+      {[...Array(6)].map((_, i) => (
+        <div
+          key={i}
+          className="floating-logo"
+          style={{
+            left: `${Math.random() * 90}%`,
+            animationDelay: `${Math.random() * 8}s`,
+            animationDuration: `${15 + Math.random() * 15}s`,
+            opacity: 0.1 + Math.random() * 0.2,
+          }}
+        >
+          <img src={Logo} alt="" className="logo-image" />
+        </div>
+      ))}
+    </div>
+  );
+};
 
 interface DemoTeaserProps {
   className?: string;
@@ -25,8 +47,8 @@ const DemoTeaser: React.FC<DemoTeaserProps> = ({ className }) => {
       tableTimeoutId = setTimeout(() => {
         setIsLoading(false);
         setShowTable(true);
-      }, 3000); // Show "Loading..." for 3 seconds
-    }, 5000); // Initial delay of 3 seconds
+      }, 3000);
+    }, 5000);
 
     return () => {
       clearTimeout(loadingTimeoutId);
@@ -71,7 +93,9 @@ const DemoTeaser: React.FC<DemoTeaserProps> = ({ className }) => {
     <>
       <DotPattern />
 
-      <section className={clsx("hero-section", className)}>
+      <section className="demo-teaser">
+        <FloatingLogos />
+
         <div className="hero-container">
           <div className="hero-content">
             <h2 className="hero-title">Try Duck-UI in action!</h2>
@@ -103,8 +127,7 @@ const DemoTeaser: React.FC<DemoTeaserProps> = ({ className }) => {
                 rel="noopener noreferrer"
                 className="hero-button"
               >
-                Try Demo
-                <ArrowRight className="ml-2 w-5 h-5" />
+                Try it now
               </Link>
             </div>
           </div>
@@ -155,118 +178,236 @@ const DemoTeaser: React.FC<DemoTeaserProps> = ({ className }) => {
         </div>
 
         <style>{`
-      .features-preview {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        margin: 2rem 0;
-      }
+          .demo-teaser {
+            position: relative;
+            width: 100%;
+            min-height: calc(100vh - 4rem);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+            padding: clamp(3rem, 5vh, 6rem) 0;
+            border-bottom: 1px solid rgba(255, 232, 20, 0.1);
+            background: linear-gradient(180deg,rgb(20, 20, 20) 0%,rgb(30, 30, 30) 100%);
+          }
 
-      .feature-item {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        color: var(--ifm-color-primary-light);
-        font-size: 1.1rem;
-      }
+          .logos-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            overflow: hidden;
+          }
 
-      .demo-preview {
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 0.75rem;
-        border: 1px solid rgba(255, 232, 20, 0.2);
-        overflow: hidden;
-        width: 100%;
-        max-width: 600px;
-        box-shadow: 0 4px 24px rgba(255, 232, 20, 0.1);
-      }
+          .floating-logo {
+            position: absolute;
+            width: 64px;
+            height: 64px;
+            animation: floatLogo linear infinite;
+            filter: drop-shadow(0 0 10px rgba(255, 232, 20, 0.2));
+          }
 
-      .terminal-header {
-        background: rgba(0, 0, 0, 0.4);
-        padding: 0.75rem 1rem;
-        display: flex;
-        align-items: center;
-        border-bottom: 1px solid rgba(255, 232, 20, 0.1);
-      }
+          .logo-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            animation: rotateLogo linear infinite;
+            animation-duration: inherit;
+          }
 
-      .terminal-dots {
-        display: flex;
-        gap: 0.5rem;
-      }
+          @keyframes floatLogo {
+            0% {
+              transform: translateY(100vh) scale(0.8);
+              filter: brightness(0.5) drop-shadow(0 0 5px rgba(255, 232, 20, 0.1));
+            }
+            20% {
+              transform: translateY(80vh) scale(0.9);
+              filter: brightness(0.7) drop-shadow(0 0 10px rgba(255, 232, 20, 0.2));
+            }
+            80% {
+              transform: translateY(20vh) scale(1.1);
+              filter: brightness(0.7) drop-shadow(0 0 15px rgba(255, 232, 20, 0.2));
+            }
+            100% {
+              transform: translateY(-100px) scale(1);
+              filter: brightness(0.5) drop-shadow(0 0 5px rgba(255, 232, 20, 0.1));
+            }
+          }
 
-      .dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        opacity: 0.7;
-      }
+          @keyframes rotateLogo {
+            from {
+              transform: rotate(0deg);
+            }
+            to {
+              transform: rotate(360deg);
+            }
+          }
 
-      .dot-red {
-        background: #ff5f56;
-      }
-      .dot-yellow {
-        background: #ffbd2e;
-      }
-      .dot-green {
-        background: #27c93f;
-      }
+          .hero-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            position: relative;
+            z-index: 2;
+          }
 
-      .terminal-title {
-        flex: 1;
-        text-align: center;
-        color: #666;
-        font-size: 0.9rem;
-      }
+          .hero-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+          }
 
-      .terminal-content {
-        padding: 1.5rem;
-        font-family: monospace;
-        color: #b4b4b4;
-        min-height: 200px;
-      }
+          .hero-title {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, #FFE814, #FFB800);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+          }
 
-      .typing-effect {
-        white-space: pre-wrap;
-        border-right: 2px solid var(--ifm-color-primary);
-        animation: typing 3s steps(40) infinite;
-      }
+          .hero-description {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            color: #b4b4b4;
+            margin-bottom: 2rem;
+          }
 
-      @keyframes typing {
-        from {
-          width: 0;
-        }
-        to {
-          width: 100%;
-        }
-      }
+          .features-preview {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin: 2rem 0;
+          }
 
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
+          .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--ifm-color-primary-light);
+            font-size: 1.1rem;
+          }
 
-      th,
-      td {
-        border: 1px solid #444;
-        padding: 0.5rem;
-        text-align: left;
-      }
+          .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+          }
 
-      th {
-        background-color: #222;
-        font-weight: bold;
-      }
+          .hero-button {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            background: #FFE814;
+            color: #000;
+            text-decoration: none;
+          }
 
-      @media (max-width: 768px) {
-        .hero-container {
-          grid-template-columns: 1fr;
-          gap: 2rem;
-        }
+          .hero-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 232, 20, 0.3);
+            text-decoration: none;
+          }
 
-        .demo-preview {
-          max-width: 100%;
-        }
-      }
-    `}</style>
+          .demo-preview {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255, 232, 20, 0.2);
+            overflow: hidden;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 4px 24px rgba(255, 232, 20, 0.1);
+          }
+
+          .terminal-header {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 232, 20, 0.1);
+          }
+
+          .terminal-dots {
+            display: flex;
+            gap: 0.5rem;
+          }
+
+          .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            opacity: 0.7;
+          }
+
+          .dot-red { background: #ff5f56; }
+          .dot-yellow { background: #ffbd2e; }
+          .dot-green { background: #27c93f; }
+
+          .terminal-title {
+            flex: 1;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+          }
+
+          .terminal-content {
+            padding: 1.5rem;
+            font-family: monospace;
+            color: #b4b4b4;
+            min-height: 200px;
+          }
+
+          .typing-effect {
+            white-space: pre-wrap;
+            border-right: 2px solid var(--ifm-color-primary);
+            animation: typing 3s steps(40) infinite;
+          }
+
+          @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
+          th, td {
+            border: 1px solid #444;
+            padding: 0.5rem;
+            text-align: left;
+          }
+
+          th {
+            background-color: #222;
+            font-weight: bold;
+          }
+
+          @media (max-width: 768px) {
+            .hero-container {
+              grid-template-columns: 1fr;
+              gap: 2rem;
+            }
+
+            .demo-preview {
+              max-width: 100%;
+            }
+
+            .hero-title {
+              font-size: 2.5rem;
+            }
+          }
+        `}</style>
       </section>
     </>
   );
@@ -275,6 +416,7 @@ const DemoTeaser: React.FC<DemoTeaserProps> = ({ className }) => {
 interface TypingEffectProps {
   text: string;
 }
+
 const TypingEffect: React.FC<TypingEffectProps> = ({ text }) => {
   const [displayedText, setDisplayedText] = React.useState("");
   const [charIndex, setCharIndex] = React.useState(0);
@@ -304,8 +446,7 @@ const TypingEffect: React.FC<TypingEffectProps> = ({ text }) => {
         }
 
         @keyframes blink-caret {
-          from,
-          to {
+          from, to {
             color: transparent;
           }
           50% {

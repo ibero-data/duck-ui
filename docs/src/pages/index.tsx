@@ -4,7 +4,6 @@ import Layout from "@theme/Layout";
 import HeroSection from "../components/Hero";
 import Sponsors from "../components/Sponsors";
 import HomepageFeatures from "../components/HomePageFeatures";
-import Footer from "../components/Footer";
 import DemoTeaser from "../components/DemoTeaser";
 
 export default function Home(): ReactNode {
@@ -19,7 +18,6 @@ export default function Home(): ReactNode {
         <DemoTeaser />
         <HomepageFeatures />
         <Sponsors />
-        <Footer />
       </main>
     </Layout>
   );

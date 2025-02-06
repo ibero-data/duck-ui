@@ -1,5 +1,7 @@
-import React, { useRef, useEffect } from "react";
-import { Play, Loader2, Lightbulb, Command } from "lucide-react";
+// Input to Update Query Title with Icon and Execute Button
+// @ts-nocheck
+import React, { useRef, useEffect, useState } from "react";
+import { Play, Loader2, Lightbulb, Command, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDuckStore } from "@/store";
 import { useTheme } from "../theme/theme-provider";
@@ -9,12 +11,15 @@ import {
   useMonacoConfig,
   type EditorInstance,
 } from "./monacoConfig";
+import useDuckDBMonaco from "./useDuckDBMonaco"; // Import the hook
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 
@@ -28,14 +33,18 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
   const { theme } = useTheme();
-  const { tabs, executeQuery, isExecuting } = useDuckStore();
+  const { tabs, executeQuery, isExecuting, updateTabTitle } = useDuckStore();
   const monacoConfig = useMonacoConfig(theme);
+  useDuckDBMonaco(); // Call the hook
 
   const currentTab = tabs.find((tab) => tab.id === tabId);
   const currentContent =
     currentTab?.type === "sql" && typeof currentTab.content === "string"
       ? currentTab.content
       : "";
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [currentTitle, setCurrentTitle] = useState(title);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -51,7 +60,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     return () => {
       editorInstanceRef.current?.dispose();
     };
-  }, [tabId, monacoConfig]);
+  }, [tabId, monacoConfig, executeQuery]);
 
   useEffect(() => {
     if (
@@ -76,10 +85,48 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     }
   };
 
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentTitle(e.target.value);
+  };
+
+  const handleTitleSubmit = () => {
+    updateTabTitle(tabId, currentTitle);
+    setIsEditingTitle(false);
+    toast.success(`Tab title updated to ${currentTitle}`);
+  };
+
+  const handleTitleEdit = () => {
+    setIsEditingTitle(true);
+  };
+
   return (
     <div className={cn("flex flex-col h-full", className)}>
       <div className="flex items-center justify-between px-4 py-2 border-b">
-        <h2 className="text-lg font-medium truncate">{title}</h2>
+        <div className="flex items-center gap-2">
+          {isEditingTitle ? (
+            <Input
+              className="text-sm font-medium truncate"
+              value={currentTitle}
+              onChange={handleTitleChange}
+              onBlur={handleTitleSubmit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleTitleSubmit();
+                }
+              }}
+              autoFocus
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-medium truncate text-sm">
+                {currentTitle}
+              </span>
+              <Button variant="ghost" size="icon" onClick={handleTitleEdit}>
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-4">
           <div className="flex gap-2 text-sm text-muted-foreground">
             <TooltipProvider>

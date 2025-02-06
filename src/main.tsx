@@ -15,6 +15,7 @@ import Logo from "/logo.png";
 import Metrics from "./pages/Metrics";
 import NotFound from "./pages/NotFound";
 
+
 interface LoadingScreenProps {
   message: string;
 }
