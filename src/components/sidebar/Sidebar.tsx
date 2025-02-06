@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   LineChart,
   BookText,
-  CogIcon,
   ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -71,7 +70,6 @@ const Sidebar = () => {
   ];
 
   const bottomNavLinks = [
-    { to: "/settings", label: "Settings", icon: CogIcon, isNewWindow: false },
     {
       to: "https://github.com/caioricciuti/duck-ui?utm_source=duck-ui&utm_medium=sidebar",
       label: "GitHub",

@@ -8,7 +8,6 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Routes, Route } from "react-router";
 import { useDuckStore } from "./store";
 import Home from "@/pages/Home";
-import Settings from "./pages/Settings";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
 import Logo from "/logo.png";
@@ -88,7 +87,6 @@ const App = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/metrics" element={<Metrics />} />
-        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
