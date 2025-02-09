@@ -1,3 +1,4 @@
+// monacoConfig.ts
 import * as monaco from "monaco-editor";
 import { useDuckStore } from "@/store";
 import { useMemo } from "react";
@@ -37,6 +38,10 @@ self.MonacoEnvironment = {
   },
 };
 
+// Helper function to escape single quotes for SQL queries
+const escape = (str: string): string => {
+    return str.replace(/'/g, "''");
+};
 
 // Create editor instance
 export const createEditor = (
@@ -208,8 +213,60 @@ monaco.languages.registerDocumentFormattingEditProvider("sql", {
   },
 });
 
-// Initialize Monaco configuration
-// updateMonaco(); Remove this line.  It should be called inside the `useDuckDBMonaco` hook.
+
+// Adapt to use the WASM autocompletion
+interface AutocompleteItem { suggestion: string; }
+const queryNative = async <T>(connection: any, query: string): Promise<T[]> => {
+    const results = await connection.query(query);
+    return results.toArray().map((row: any) => row as T);
+};
+
+monaco.languages.registerCompletionItemProvider('sql', {
+    triggerCharacters: [' ', '.', '(', ','],
+    async provideCompletionItems(model, position) {
+        const word = model.getWordUntilPosition(position);
+        const range = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: word.startColumn,
+            endColumn: word.endColumn,
+        };
+        const textInRange = model.getValueInRange({
+            startColumn: 0,
+            endColumn: position.column,
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+        });
+
+        // Get the connection and ensure it's valid
+        const { connection } = useDuckStore.getState();
+        if (!connection) {
+            console.warn("No database connection available for autocompletion.");
+            return { suggestions: [] };
+        }
+        try {
+
+            const escapedText = escape(textInRange);
+            const query = `select suggestion from sql_auto_complete('${escapedText}')`;
+            const items: AutocompleteItem[] = await queryNative<AutocompleteItem>(connection, query);
+
+            const suggestions = items.map((item) => {
+                return {
+                    label: String(item.suggestion),
+                    kind: monaco.languages.CompletionItemKind.Field,
+                    insertText: String(item.suggestion),
+                    range,
+                };
+            });
+
+            return { suggestions };
+
+        } catch (error) {
+            console.error("Autocompletion query failed:", error);
+            return { suggestions: [] };
+        }
+    },
+});
 
 // Export everything needed
 export default {

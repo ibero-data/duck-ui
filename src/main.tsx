@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import Logo from "/logo.png";
 import Metrics from "./pages/Metrics";
 import NotFound from "./pages/NotFound";
+import Connections from "./pages/Connections";
 
 
 interface LoadingScreenProps {
@@ -86,6 +87,7 @@ const App = () => {
       />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/connections" element={<Connections />} />
         <Route path="/metrics" element={<Metrics />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

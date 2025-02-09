@@ -1,6 +1,4 @@
-// Input to Update Query Title with Icon and Execute Button
-// @ts-nocheck
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Play, Loader2, Lightbulb, Command, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDuckStore } from "@/store";
@@ -11,7 +9,6 @@ import {
   useMonacoConfig,
   type EditorInstance,
 } from "./monacoConfig";
-import useDuckDBMonaco from "./useDuckDBMonaco"; // Import the hook
 import {
   Tooltip,
   TooltipContent,
@@ -20,7 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-
+import ConnectionPill from "@/components/common/ConnectionPill";
 import { Badge } from "@/components/ui/badge";
 
 interface SqlEditorProps {
@@ -33,9 +30,9 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
   const { theme } = useTheme();
-  const { tabs, executeQuery, isExecuting, updateTabTitle } = useDuckStore();
+  const { tabs, executeQuery, isExecuting, updateTabTitle, currentConnection } =
+    useDuckStore();
   const monacoConfig = useMonacoConfig(theme);
-  useDuckDBMonaco(); // Call the hook
 
   const currentTab = tabs.find((tab) => tab.id === tabId);
   const currentContent =
@@ -46,34 +43,51 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(title);
 
+  // Stable callback for query execution
+  const stableExecuteCallback = useCallback(
+    async (query: string, queryTabId: string) => {
+      await executeQuery(query, queryTabId);
+    },
+    [executeQuery]  // Add executeQuery as a dependency
+  );
+
+  // Editor initialization effect
   useEffect(() => {
     if (!editorRef.current) return;
 
+    // Initialize editor with stable configuration
     editorInstanceRef.current = createEditor(
       editorRef.current,
       monacoConfig,
       currentContent,
       tabId,
-      executeQuery
+      stableExecuteCallback
     );
 
+    // Cleanup function
     return () => {
-      editorInstanceRef.current?.dispose();
+      if (editorInstanceRef.current) {
+        editorInstanceRef.current.dispose();
+        editorInstanceRef.current = null;
+      }
     };
-  }, [tabId, monacoConfig, executeQuery]);
+  }, [tabId, monacoConfig, stableExecuteCallback]); // Keep stableExecuteCallback
 
+  // Content sync effect
   useEffect(() => {
-    if (
-      editorInstanceRef.current?.editor &&
-      currentContent !== editorInstanceRef.current.editor.getValue()
-    ) {
-      editorInstanceRef.current.editor.setValue(currentContent);
+    const editor = editorInstanceRef.current?.editor;
+    if (editor && currentContent !== editor.getValue()) {
+      const position = editor.getPosition();
+      editor.setValue(currentContent);
+      if (position) {
+        editor.setPosition(position);
+      }
     }
-  }, [currentContent]);
+  }, [currentContent]);  // Only depend on currentContent
 
   const handleExecuteQuery = async () => {
     const editor = editorInstanceRef.current?.editor;
-    if (!editor) return;
+    if (!editor || isExecuting) return;
 
     const query = editor.getValue().trim();
     if (!query) return;
@@ -82,6 +96,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
       await executeQuery(query, tabId);
     } catch (error) {
       console.error("Query execution failed:", error);
+      toast.error("Query execution failed");
     }
   };
 
@@ -90,9 +105,15 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   };
 
   const handleTitleSubmit = () => {
-    updateTabTitle(tabId, currentTitle);
-    setIsEditingTitle(false);
-    toast.success(`Tab title updated to ${currentTitle}`);
+    if (currentTitle.trim()) {
+      updateTabTitle(tabId, currentTitle);
+      setIsEditingTitle(false);
+      toast.success(`Tab title updated to ${currentTitle}`);
+    } else {
+      setCurrentTitle(title);
+      setIsEditingTitle(false);
+      toast.error("Title cannot be empty");
+    }
   };
 
   const handleTitleEdit = () => {
@@ -112,6 +133,9 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleTitleSubmit();
+                } else if (e.key === "Escape") {
+                  setCurrentTitle(title);
+                  setIsEditingTitle(false);
                 }
               }}
               autoFocus
@@ -121,7 +145,12 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
               <span className="text-lg font-medium truncate text-sm">
                 {currentTitle}
               </span>
-              <Button variant="ghost" size="icon" onClick={handleTitleEdit}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleTitleEdit}
+                className="group-hover:opacity-100 transition-opacity"
+              >
                 <Edit className="h-4 w-4" />
               </Button>
             </div>
@@ -129,6 +158,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
         </div>
         <div className="flex items-center gap-4">
           <div className="flex gap-2 text-sm text-muted-foreground">
+            <ConnectionPill connection={currentConnection} />
             <TooltipProvider>
               <Tooltip delayDuration={200}>
                 <TooltipTrigger className="hover:bg-muted/50 p-2 rounded-md transition-colors">

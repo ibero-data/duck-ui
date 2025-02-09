@@ -7,6 +7,7 @@ import duckdb_wasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
 import mvp_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url";
 import duckdb_wasm_eh from "@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url";
 import eh_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url";
+import { toast } from "sonner";
 
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
   mvp: {
@@ -19,7 +20,37 @@ const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
   },
 };
 
-// Types
+//
+// TYPES
+//
+
+export interface CurrentConnection {
+  id: string;
+  name: string;
+  scope: "WASM" | "External";
+  host?: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  database?: string;
+  authMode?: "none" | "password" | "api_key";
+}
+
+export interface ConnectionProvider {
+  id: string;
+  name: string;
+  scope: "WASM" | "External";
+  host?: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  database?: string;
+  authMode?: "none" | "password" | "api_key";
+}
+
+export interface ConnectionList {
+  connections: ConnectionProvider[];
+}
 
 export interface ColumnInfo {
   name: string;
@@ -65,16 +96,14 @@ export interface EditorTab {
   result?: QueryResult | null;
 }
 
-export interface DuckDBConfig {
-  max_memory: number;
-}
-
 export interface DuckStoreState {
   // Database state
   db: duckdb.AsyncDuckDB | null;
   connection: duckdb.AsyncDuckDBConnection | null;
   isInitialized: boolean;
   currentDatabase: string;
+  currentConnection: CurrentConnection | null;
+  connectionList: ConnectionList;
 
   // Data Explorer State
   databases: DatabaseInfo[];
@@ -91,13 +120,14 @@ export interface DuckStoreState {
   isLoading: boolean;
   error: string | null;
 
-  // DuckDB configurations
-  duckDbConfigState: DuckDBConfig;
+  // Data Explorer State (renamed to fix typo)
+  isLoadingDbTablesFetch: boolean;
+
+  isLoadingExternalConnection: boolean;
 
   // Actions
   initialize: () => Promise<void>;
   executeQuery: (query: string, tabId?: string) => Promise<QueryResult | void>;
-  duckDbConfig: (config: DuckDBConfig) => Promise<void>;
   importFile: (
     fileName: string,
     fileContent: ArrayBuffer,
@@ -120,37 +150,87 @@ export interface DuckStoreState {
   clearHistory: () => void;
   cleanup: () => Promise<void>;
   fetchDatabasesAndTablesInfo: () => Promise<void>;
-  switchDatabase: (databaseName: string) => Promise<void>;
   exportParquet: (query: string) => Promise<Blob>;
+
+  // Connection Management Actions
+  addConnection: (connection: ConnectionProvider) => Promise<void>;
+  updateConnection: (connection: ConnectionProvider) => void;
+  deleteConnection: (id: string) => void;
+  setCurrentConnection: (connectionId: string) => Promise<void>;
+  getConnection: (connectionId: string) => ConnectionProvider | undefined;
 }
 
-// Utility function for connection validation
+//
+// HELPER FUNCTIONS
+//
+
+// Validate a DuckDB connection.
 const validateConnection = (
   connection: duckdb.AsyncDuckDBConnection | null
-) => {
+): duckdb.AsyncDuckDBConnection => {
   if (!connection || typeof connection.query !== "function") {
     throw new Error("Database connection is not valid");
   }
   return connection;
 };
 
+// Converts a raw result (from an external HTTP endpoint) into a QueryResult.
+const rawResultToJSON = (rawResult: any): QueryResult => {
+  try {
+    const parsed = JSON.parse(rawResult);
+    if (
+      !parsed.meta ||
+      !parsed.data ||
+      !Array.isArray(parsed.meta) ||
+      !Array.isArray(parsed.data)
+    ) {
+      throw new Error(
+        "Invalid raw result format: meta or data are missing or have the wrong format"
+      );
+    }
+    const columns = parsed.meta.map((m: any) => m.name);
+    const columnTypes = parsed.meta.map((m: any) => m.type);
+    const data = parsed.data.map((row: any) => {
+      const rowObject: Record<string, any> = {};
+      columns.forEach((col: any, index: number) => {
+        rowObject[col] = row[index];
+      });
+      return rowObject;
+    });
+    return {
+      columns,
+      columnTypes,
+      data,
+      rowCount: parsed.rows || data.length,
+    };
+  } catch (error) {
+    console.error("Failed to parse raw result:", error);
+    throw new Error(
+      `Failed to parse raw result: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+};
+
+// Converts a WASM query result into a QueryResult.
 const resultToJSON = (result: any): QueryResult => {
   const data = result.toArray().map((row: any) => {
     const jsonRow = row.toJSON();
     result.schema.fields.forEach((field: any) => {
       const col = field.name;
       const type = field.type.toString();
-
       try {
         let value = jsonRow[col];
         if (value === null || value === undefined) return;
-
-        if (type == "Date32<DAY>") {
+        if (type === "Date32<DAY>") {
           value = new Date(value).toLocaleDateString();
           jsonRow[col] = value;
         }
-
-        if (type == "Date64<MILLISECOND>" || type == "Timestamp<MICROSECOND>") {
+        if (
+          type === "Date64<MILLISECOND>" ||
+          type === "Timestamp<MICROSECOND>"
+        ) {
           value = new Date(value);
           jsonRow[col] = value;
         }
@@ -160,7 +240,6 @@ const resultToJSON = (result: any): QueryResult => {
     });
     return jsonRow;
   });
-
   return {
     columns: result.schema.fields.map((field: any) => field.name),
     columnTypes: result.schema.fields.map((field: any) =>
@@ -170,7 +249,165 @@ const resultToJSON = (result: any): QueryResult => {
     rowCount: result.numRows,
   };
 };
-// Create Store
+
+/**
+ * Executes a query against an external connection.
+ * @param query The query string.
+ * @param connection The external connection details.
+ */
+
+const executeExternalQuery = async (
+  query: string,
+  connection: CurrentConnection
+): Promise<QueryResult> => {
+  if (!connection.host || !connection.port) {
+    throw new Error("Host and port must be defined for external connections.");
+  }
+  const url = `${connection.host}:${connection.port}/`;
+  const authHeader = btoa(`${connection.user}:${connection.password}`);
+  const body = query;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${authHeader}`,
+    },
+    body,
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `HTTP error! Status: ${response.status}, Message: ${errorText}`
+    );
+  }
+  const rawResult = await response.text();
+  return rawResultToJSON(rawResult);
+};
+
+/**
+ * Initializes a new DuckDB WASM connection.
+ */
+const initializeWasmConnection = async (): Promise<{
+  db: duckdb.AsyncDuckDB;
+  connection: duckdb.AsyncDuckDBConnection;
+}> => {
+  const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
+  const worker = new Worker(bundle.mainWorker!);
+  const logger = new duckdb.VoidLogger();
+  const db = new duckdb.AsyncDuckDB(logger, worker);
+  await db.instantiate(bundle.mainModule);
+  const connection = await db.connect();
+  // Validate immediately
+  validateConnection(connection);
+  await Promise.all([
+    connection.query(`INSTALL excel`),
+    connection.query(`LOAD excel`),
+  ]);
+  return { db, connection };
+};
+
+/**
+ * Tests an external connection by executing a basic query.
+ */
+const testExternalConnection = async (
+  connection: ConnectionProvider
+): Promise<void> => {
+  const url = `${connection.host}:${connection.port}/`;
+  const authHeader = btoa(`${connection.user}:${connection.password}`);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${authHeader}`,
+    },
+    body: `SELECT 1`,
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Connection test failed! Status: ${response.status}, Message: ${errorText}`
+    );
+  }
+};
+
+/**
+ * Helper to update query history.
+ */
+
+const updateHistory = (
+  currentHistory: QueryHistoryItem[],
+  query: string,
+  errorMsg?: string
+): QueryHistoryItem[] => {
+  const newItem: QueryHistoryItem = {
+    id: crypto.randomUUID(),
+    query,
+    timestamp: new Date(),
+    ...(errorMsg ? { error: errorMsg } : {}),
+  };
+  const existingIndex = currentHistory.findIndex(
+    (item) => item.query === query
+  );
+  let newHistory =
+    existingIndex !== -1
+      ? [newItem, ...currentHistory.filter((_, idx) => idx !== existingIndex)]
+      : [newItem, ...currentHistory];
+  return newHistory.slice(0, 15);
+};
+
+/**
+ * Fetches databases and tables for an external connection. TODO
+ */
+
+/**
+ * Fetches databases and tables using the WASM connection.
+ */
+const fetchWasmDatabases = async (
+  connection: duckdb.AsyncDuckDBConnection
+): Promise<DatabaseInfo[]> => {
+  const dbListResult = await connection.query(`PRAGMA database_list`);
+  return Promise.all(
+    dbListResult.toArray().map(async (db: any) => {
+      const dbName = db.name.toString();
+      const tablesResult = await connection.query(
+        `SELECT table_name FROM information_schema.tables WHERE table_catalog = '${dbName}'`
+      );
+      const tables: TableInfo[] = await Promise.all(
+        tablesResult.toArray().map(async (tbl: any) => {
+          const tableName = tbl.table_name.toString();
+          const columnsResult = await connection.query(
+            `DESCRIBE "${dbName}"."${tableName}"`
+          );
+          const columns: ColumnInfo[] = columnsResult
+            .toArray()
+            .map((col: any) => ({
+              name: col.column_name.toString(),
+              type: col.column_type.toString(),
+              nullable: col.null === "YES",
+            }));
+          const countResult = await connection.query(
+            `SELECT COUNT(*) as count FROM "${dbName}"."${tableName}"`
+          );
+          // Assumes countResult.toArray() returns a 2D array where the first element is the count.
+          const countValue = Number(countResult.toArray()[0][0]);
+          return {
+            name: tableName,
+            schema: dbName,
+            columns,
+            rowCount: countValue,
+            createdAt: new Date().toISOString(),
+          };
+        })
+      );
+      return { name: dbName, tables };
+    })
+  );
+};
+
+//
+// STORE DEFINITION
+//
+
 export const useDuckStore = create<DuckStoreState>()(
   devtools(
     persist(
@@ -182,7 +419,6 @@ export const useDuckStore = create<DuckStoreState>()(
         currentDatabase: "memory",
         databases: [],
         queryHistory: [],
-        duckDbConfigState: { max_memory: 3.1 },
         isExecuting: false,
         tabs: [
           {
@@ -194,42 +430,40 @@ export const useDuckStore = create<DuckStoreState>()(
         ],
         activeTabId: "home",
         isLoading: false,
+        isLoadingDbTablesFetch: true,
+        isLoadingExternalConnection: false,
         error: null,
+        currentConnection: null,
+        connectionList: {
+          connections: [
+            {
+              id: "WASM",
+              name: "WASM",
+              scope: "WASM",
+            },
+          ],
+        },
 
-        // Initialize DuckDB
+        // Initialize DuckDB using WASM.
         initialize: async () => {
           const state = get();
           if (state.isInitialized) return;
-
           try {
             set({ isLoading: true, error: null });
-
-            const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-            const worker = new Worker(bundle.mainWorker!);
-            const logger = new duckdb.VoidLogger();
-            const db = new duckdb.AsyncDuckDB(logger, worker);
-
-            await db.instantiate(bundle.mainModule);
-            const connection = await db.connect();
-
-            // Validate connection immediately
-            validateConnection(connection);
-
-            await Promise.all([
-              connection.query(`SET enable_http_metadata_cache=true`),
-              connection.query(`SET enable_object_cache=true`),
-              connection.query(`INSTALL arrow`),
-              connection.query(`INSTALL parquet`),
-            ]);
-
+            const { db, connection } = await initializeWasmConnection();
+            // Set initial state
             set({
               db,
               connection,
               isInitialized: true,
               isLoading: false,
               currentDatabase: "memory",
+              currentConnection: {
+                id: "WASM",
+                name: "WASM",
+                scope: "WASM",
+              },
             });
-
             await get().fetchDatabasesAndTablesInfo();
           } catch (error) {
             set({
@@ -244,90 +478,38 @@ export const useDuckStore = create<DuckStoreState>()(
           }
         },
 
-        // Database configuration
-        duckDbConfig: async (config) => {
-          try {
-            const connection = validateConnection(get().connection);
-            await connection.query(`SET memory_limit='${config.max_memory}GB'`);
-            set({ duckDbConfigState: config });
-          } catch (error) {
-            set({
-              error: `Configuration failed: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
-            });
-          }
-        },
-
-        // Execute query with proper error handling
+        // Execute a query with proper error handling.
         executeQuery: async (query, tabId?) => {
+          const { currentConnection, connection } = get();
           try {
-            const connection = validateConnection(get().connection);
             set({ isExecuting: true, error: null });
-
-            const result = await connection.query(query);
-
-            const queryResult = resultToJSON(result);
-
-            if (!tabId) {
-              set({ isExecuting: false, error: null });
-              return queryResult;
-            }
-
-            // Update state
-            set((state) => {
-              const existingQueryIndex = state.queryHistory.findIndex(
-                (item) => item.query === query
+            let queryResult: QueryResult;
+            if (currentConnection?.scope === "External") {
+              queryResult = await executeExternalQuery(
+                query,
+                currentConnection
               );
-
-              let newQueryHistory = [...state.queryHistory];
-
-              if (existingQueryIndex !== -1) {
-                // Query already exists, move to the top and update timestamp
-                newQueryHistory = [
-                  {
-                    ...state.queryHistory[existingQueryIndex],
-                    timestamp: new Date(),
-                  },
-                  ...state.queryHistory.filter(
-                    (_, index) => index !== existingQueryIndex
-                  ),
-                ];
-              } else {
-                // Query doesn't exist, add a new one
-                newQueryHistory = [
-                  {
-                    id: crypto.randomUUID(),
-                    query,
-                    timestamp: new Date(),
-                  },
-                  ...state.queryHistory,
-                ];
-              }
-
-              // Limit history to 15 entries
-              newQueryHistory = newQueryHistory.slice(0, 15);
-
-              return {
-                queryHistory: newQueryHistory,
-                tabs: state.tabs.map((tab) =>
-                  tab.id === tabId ? { ...tab, result: queryResult } : tab
-                ),
-                isExecuting: false,
-              };
-            });
-
-            // Refresh schema if DDL
+            } else {
+              const wasmConnection = validateConnection(connection);
+              const result = await wasmConnection.query(query);
+              queryResult = resultToJSON(result);
+            }
+            // Update query history and update tab result if applicable.
+            set((state) => ({
+              queryHistory: updateHistory(state.queryHistory, query),
+              tabs: state.tabs.map((tab) =>
+                tab.id === tabId ? { ...tab, result: queryResult } : tab
+              ),
+              isExecuting: false,
+            }));
+            // If the query is DDL, refresh schema.
             if (/^(CREATE|ALTER|DROP|ATTACH)/i.test(query.trim())) {
               await get().fetchDatabasesAndTablesInfo();
             }
-
-            return;
+            return tabId ? undefined : queryResult;
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : "Unknown error";
-
-            // Prepare error result
             const errorResult: QueryResult = {
               columns: [],
               columnTypes: [],
@@ -335,55 +517,22 @@ export const useDuckStore = create<DuckStoreState>()(
               rowCount: 0,
               error: errorMessage,
             };
-
-            set((state) => {
-              const existingQueryIndex = state.queryHistory.findIndex(
-                (item) => item.query === query
-              );
-
-              let newQueryHistory = [...state.queryHistory];
-
-              if (existingQueryIndex !== -1) {
-                // Query already exists, move to the top and update timestamp
-                newQueryHistory = [
-                  {
-                    ...state.queryHistory[existingQueryIndex],
-                    timestamp: new Date(),
-                    error: errorMessage,
-                  },
-                  ...state.queryHistory.filter(
-                    (_, index) => index !== existingQueryIndex
-                  ),
-                ];
-              } else {
-                // Query doesn't exist, add a new one
-                newQueryHistory = [
-                  {
-                    id: crypto.randomUUID(),
-                    query,
-                    timestamp: new Date(),
-                    error: errorMessage,
-                  },
-                  ...state.queryHistory,
-                ];
-              }
-
-              // Limit history to 15 entries
-              newQueryHistory = newQueryHistory.slice(0, 15);
-
-              return {
-                isExecuting: false,
-                error: errorMessage,
-                queryHistory: newQueryHistory,
-                tabs: state.tabs.map((tab) =>
-                  tab.id === tabId ? { ...tab, result: errorResult } : tab
-                ),
-              };
-            });
+            set((state) => ({
+              queryHistory: updateHistory(
+                state.queryHistory,
+                query,
+                errorMessage
+              ),
+              tabs: state.tabs.map((tab) =>
+                tab.id === tabId ? { ...tab, result: errorResult } : tab
+              ),
+              isExecuting: false,
+              error: errorMessage,
+            }));
           }
         },
 
-        // Improved file import
+        // Import a file and create a table.
         importFile: async (
           fileName,
           fileContent,
@@ -394,16 +543,12 @@ export const useDuckStore = create<DuckStoreState>()(
           try {
             const { db, connection } = get();
             if (!db || !connection) throw new Error("Database not initialized");
-
             const buffer = new Uint8Array(fileContent);
-
-            // Cleanup previous registration
+            // Try to drop any previously registered file.
             try {
               await db.dropFile(fileName);
             } catch {}
-
             await db.registerFileBuffer(fileName, buffer);
-
             if (fileType === "duckdb") {
               await connection.query(
                 `ATTACH DATABASE '${fileName}' AS ${tableName}`
@@ -411,25 +556,19 @@ export const useDuckStore = create<DuckStoreState>()(
               await get().fetchDatabasesAndTablesInfo();
               return;
             }
-
-            // Create table
             await connection.query(`
               CREATE OR REPLACE TABLE "${tableName}" AS 
               SELECT * FROM read_${fileType.toLowerCase()}('${fileName}')
             `);
-
-            // Verify creation
             const verification = await connection.query(`
               SELECT COUNT(*) AS count 
               FROM information_schema.tables 
               WHERE table_name = '${tableName}'
                 AND table_schema = '${database}'
             `);
-
             if (verification.toArray()[0][0] === 0) {
               throw new Error("Table creation verification failed");
             }
-
             await get().fetchDatabasesAndTablesInfo();
           } catch (error) {
             await get().fetchDatabasesAndTablesInfo();
@@ -441,57 +580,18 @@ export const useDuckStore = create<DuckStoreState>()(
           }
         },
 
-        // Complete data explorer implementation
+        // Fetch database and tables info.
         fetchDatabasesAndTablesInfo: async () => {
+          const { currentConnection, connection } = get();
           try {
-            const connection = validateConnection(get().connection);
-
-            // Get the list of databases
-            const databasesResult = await connection.query(
-              `PRAGMA database_list`
-            );
-
-            const databases = await Promise.all(
-              databasesResult.toArray().map(async (db: any) => {
-                const dbName = db.name.toString();
-                //Get all tables for a specific database
-                const tablesResult = await connection.query(`
-                  SELECT table_name
-                  FROM information_schema.tables
-                  WHERE table_catalog = '${dbName}'
-                `);
-
-                const tables = await Promise.all(
-                  tablesResult.toArray().map(async (tbl: any) => {
-                    const tableName = tbl.table_name.toString();
-
-                    const columnsResult = await connection.query(
-                      `DESCRIBE "${dbName}"."${tableName}"`
-                    );
-                    const columns = columnsResult.toArray().map((col: any) => ({
-                      name: col.column_name.toString(),
-                      type: col.column_type.toString(),
-                      nullable: col.null === "YES",
-                    }));
-
-                    const countResult = await connection.query(
-                      `SELECT COUNT(*) as count FROM "${dbName}"."${tableName}"`
-                    );
-
-                    return {
-                      name: tableName,
-                      schema: dbName,
-                      columns,
-                      rowCount: Number(countResult),
-                      createdAt: new Date().toISOString(),
-                    };
-                  })
-                );
-
-                return { name: dbName, tables };
-              })
-            );
-
+            set({ isLoadingDbTablesFetch: true, error: null });
+            let databases: DatabaseInfo[] = [];
+            if (currentConnection?.scope === "External") {
+              databases = [];
+            } else {
+              const wasmConnection = validateConnection(connection);
+              databases = await fetchWasmDatabases(wasmConnection);
+            }
             set({ databases, error: null });
           } catch (error) {
             set({
@@ -499,32 +599,16 @@ export const useDuckStore = create<DuckStoreState>()(
                 error instanceof Error ? error.message : "Unknown error"
               }`,
             });
+          } finally {
+            set({ isLoadingDbTablesFetch: false });
           }
         },
 
-        // Database switching
-        switchDatabase: async (databaseName) => {
-          try {
-            const connection = validateConnection(get().connection);
-            set({ isLoading: true });
-            await connection.query(`USE ${databaseName}`);
-            set({ currentDatabase: databaseName, isLoading: false });
-            await get().fetchDatabasesAndTablesInfo();
-          } catch (error) {
-            set({
-              isLoading: false,
-              error: `Database switch failed: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
-            });
-          }
-        },
-
-        // Rest of the tab management functions remain the same
+        // Tab management actions.
         createTab: (type = "sql", content = "", title) => {
           const newTab: EditorTab = {
             id: crypto.randomUUID(),
-            title: typeof title === "string" ? title : `Untitled Query`,
+            title: typeof title === "string" ? title : "Untitled Query",
             type,
             content,
           };
@@ -574,6 +658,14 @@ export const useDuckStore = create<DuckStoreState>()(
           }));
         },
 
+        updateTabTitle: (tabId, title) => {
+          set((state) => ({
+            tabs: state.tabs.map((tab) =>
+              tab.id === tabId ? { ...tab, title } : tab
+            ),
+          }));
+        },
+
         moveTab: (oldIndex, newIndex) => {
           set((state) => {
             const newTabs = [...state.tabs];
@@ -583,30 +675,19 @@ export const useDuckStore = create<DuckStoreState>()(
           });
         },
 
-        updateTabTitle: (tabId: string, title: string) => {
-          set((state) => ({
-            tabs: state.tabs.map((tab) =>
-              tab.id === tabId ? { ...tab, title } : tab
-            ),
-          }));
+        closeAllTabs: () => {
+          // Close all tabs except the home tab.
+          try {
+            set((state) => ({
+              tabs: state.tabs.filter((tab) => tab.type === "home"),
+              activeTabId: "home",
+            }));
+            toast.success("All tabs closed successfully!");
+          } catch (error: any) {
+            toast.error(`Failed to close tabs: ${error.message}`);
+          }
         },
 
-        closeAllTabs: () => {
-          set((state) => {
-            const homeTab = state.tabs.find((tab) => tab.id === "home");
-            const newTab: EditorTab = {
-              id: crypto.randomUUID(),
-              title: "Query 1",
-              type: "sql",
-              content: "",
-            };
-            const newTabs = homeTab ? [homeTab, newTab] : [newTab];
-            return {
-              tabs: newTabs,
-              activeTabId: newTabs[0].id,
-            };
-          });
-        },
         deleteTable: async (tableName, database = "memory") => {
           try {
             const connection = validateConnection(get().connection);
@@ -626,27 +707,25 @@ export const useDuckStore = create<DuckStoreState>()(
             throw error;
           }
         },
+
         clearHistory: () => {
           set({ queryHistory: [] });
         },
 
-        exportParquet: async (query: any) => {
+        exportParquet: async (query: string) => {
           try {
             const { connection, db } = get();
             if (!connection || !db) {
               throw new Error("Database not initialized");
             }
-
             const now = new Date()
               .toISOString()
               .split(".")[0]
               .replace(/[:]/g, "-");
             const fileName = `result-${now}.parquet`;
-
             await connection.query(
               `COPY (${query}) TO '${fileName}' (FORMAT 'parquet')`
             );
-
             const parquet_buffer = await db.copyFileToBuffer(fileName);
             await db.dropFile(fileName);
             return new Blob([parquet_buffer], { type: "application/parquet" });
@@ -683,18 +762,151 @@ export const useDuckStore = create<DuckStoreState>()(
                 },
               ],
               activeTabId: "home",
+              currentConnection: null,
             });
           }
+        },
+
+        // Connection Management Actions
+        addConnection: async (connection) => {
+          try {
+            if (
+              get().connectionList.connections.find(
+                (c) => c.name === connection.name
+              )
+            ) {
+              throw new Error(
+                `A connection with the name "${connection.name}" already exists.`
+              );
+            }
+            if (connection.scope === "External") {
+              await testExternalConnection(connection);
+            }
+            set((state) => ({
+              connectionList: {
+                connections: [...state.connectionList.connections, connection],
+              },
+            }));
+            toast.success(
+              `Connection "${connection.name}" added successfully!`
+            );
+          } catch (error) {
+            set({
+              error: `Failed to add connection: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+            });
+            toast.error(
+              `Failed to add connection: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
+        },
+
+        updateConnection: (connection) => {
+          set((state) => ({
+            connectionList: {
+              connections: state.connectionList.connections.map((c) =>
+                c.id === connection.id ? connection : c
+              ),
+            },
+          }));
+        },
+
+        deleteConnection: (id) => {
+          set((state) => ({
+            connectionList: {
+              connections: state.connectionList.connections.filter(
+                (c) => c.id !== id
+              ),
+            },
+          }));
+        },
+
+        setCurrentConnection: async (connectionId) => {
+          try {
+            set({ isLoading: true });
+            const connectionProvider = get().connectionList.connections.find(
+              (c) => c.id === connectionId
+            );
+            if (!connectionProvider) {
+              throw new Error(`Connection with ID ${connectionId} not found.`);
+            }
+            let newConnection: duckdb.AsyncDuckDBConnection | null = null;
+            if (connectionProvider.scope === "WASM") {
+              if (!get().isInitialized) {
+                const { db, connection } = await initializeWasmConnection();
+                newConnection = connection;
+                set({
+                  db,
+                  connection: newConnection,
+                  isInitialized: true,
+                  currentDatabase: "memory",
+                });
+                await Promise.all([
+                  newConnection.query(`SET enable_http_metadata_cache=true`),
+                  newConnection.query(`INSTALL arrow`),
+                  newConnection.query(`INSTALL parquet`),
+                ]);
+              } else {
+                newConnection = get().connection;
+              }
+            } else {
+              set({ isLoading: true });
+              // For External connections, you might create a new connection here.
+              // In this example we continue using the existing WASM connection.
+              newConnection = get().connection;
+            }
+            if (newConnection) {
+              set({
+                connection: newConnection,
+                currentConnection: {
+                  id: connectionProvider.id,
+                  name: connectionProvider.name,
+                  scope: connectionProvider.scope,
+                  host: connectionProvider.host,
+                  port: connectionProvider.port,
+                  user: connectionProvider.user,
+                  password: connectionProvider.password,
+                  database: connectionProvider.database,
+                  authMode: connectionProvider.authMode,
+                },
+                isLoading: false,
+              });
+              await get().fetchDatabasesAndTablesInfo();
+              toast.success(`Connected to ${connectionProvider.name}`);
+            } else {
+              throw new Error("Failed to establish a new connection.");
+            }
+          } catch (error) {
+            set({
+              error: `Failed to set current connection: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+              isLoading: false,
+            });
+          } finally {
+            set({ isLoading: false });
+          }
+        },
+
+        getConnection: (connectionId) => {
+          return get().connectionList.connections.find(
+            (c) => c.id === connectionId
+          );
         },
       }),
       {
         name: "duck-ui-storage",
+        // Persist only selected parts of the state.
         partialize: (state) => ({
           queryHistory: state.queryHistory,
-          duckDbConfigState: state.duckDbConfigState,
           databases: state.databases,
           tabs: state.tabs.map((tab) => ({ ...tab, result: undefined })),
           currentDatabase: state.currentDatabase,
+          currentConnection: state.currentConnection,
+          connectionList: state.connectionList,
         }),
       }
     )

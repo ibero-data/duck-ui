@@ -4,7 +4,6 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
-  useTransition,
 } from "react";
 import {
   flexRender,
@@ -43,18 +42,27 @@ import {
   ChevronsRight,
   Columns,
   RefreshCw,
+  Loader2, // Import Loader2 for loading state
 } from "lucide-react";
 import DownloadDialog from "@/components/table/DownloadDialog";
-import { debounce } from "lodash";
-import { SmartFilter } from "@/components/table/SmartFilter";
+import { SimpleFilter } from "@/components/table/SimpleFilter"; // Import SimpleFilter
+import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Import Select components
+import { Label } from "@/components/ui/label";
 
 // Constants
 const DEFAULT_COLUMN_SIZE = 150;
 const MIN_COLUMN_SIZE = 50;
 const OVERSCAN_COUNT = 5;
 const ROW_HEIGHT = 35;
-const FIXED_PAGE_SIZE = 100;
-const DEBOUNCE_DELAY = 300;
+const DEFAULT_PAGE_SIZE = 50; // Changed to 50
+const PAGE_SIZE_OPTIONS = [50, 100, 200, 400]; // Available page size options
 
 // Types
 export interface TableMeta {
@@ -83,15 +91,6 @@ export interface TableProps<T extends RowData> {
   query?: string;
 }
 
-// Custom Filter Types
-type FilterOperator = "=" | ">" | "<" | ">=" | "<=" | ":" | "~";
-
-interface ParsedFilter {
-  column: string;
-  operator: FilterOperator;
-  value: string;
-}
-
 function DuckUiTable<T extends RowData>({
   result,
   onLoadMore,
@@ -111,24 +110,28 @@ function DuckUiTable<T extends RowData>({
   );
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [globalFilter, setGlobalFilter] = useState(""); // Use globalFilter
   const [, setFilterValue] = useState("");
   const [pagination, setPagination] = useState({
     pageIndex: 0,
-    pageSize: FIXED_PAGE_SIZE,
+    pageSize: DEFAULT_PAGE_SIZE, // Use default page size
   });
-  const [, startTransition] = useTransition();
 
   // Refs
   const sizeCache = useRef<Record<string, number>>({});
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLTableRowElement>(null);
   const resizeTimeout = useRef<NodeJS.Timeout | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null); // Add observer ref
 
   const { columns, data, message, query_id } = result;
 
   // Error handling
   if (message) {
+    useEffect(() => {
+      toast.error(`Error: ${message}`);
+    }, [message]); // Display toast on message change
+
     return (
       <div className="w-full mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
         <p className="text-sm text-red-600 dark:text-red-400">{message}</p>
@@ -182,7 +185,7 @@ function DuckUiTable<T extends RowData>({
         size: 70,
         minSize: 50,
         maxSize: 70,
-        enableResizing: true,
+        enableResizing: false, // Disable resizing of index column.  Consider making this configurable
         cell: (info) => (
           <span className="font-mono tabular-nums">{info.row.index + 1}</span>
         ),
@@ -199,7 +202,7 @@ function DuckUiTable<T extends RowData>({
       sorting,
       columnVisibility,
       columnFilters,
-      globalFilter,
+      globalFilter, // Use globalFilter state
       pagination,
       columnSizing,
     },
@@ -211,8 +214,12 @@ function DuckUiTable<T extends RowData>({
     },
     onColumnVisibilityChange: setColumnVisibility,
     onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: setPagination,
+    onGlobalFilterChange: setGlobalFilter, // Use setGlobalFilter
+    onPaginationChange: (updater) => {
+      const newPagination =
+        typeof updater === "function" ? updater(pagination) : updater;
+      setPagination(newPagination);
+    },
     onColumnSizingChange: (updater) => {
       const newSizing =
         typeof updater === "function" ? updater(columnSizing) : updater;
@@ -224,207 +231,14 @@ function DuckUiTable<T extends RowData>({
     getFilteredRowModel: getFilteredRowModel(),
     enableColumnResizing: true,
     columnResizeMode: "onChange",
-    globalFilterFn: (row, filterValue) => {
-      if (!filterValue?.trim()) return true;
+    globalFilterFn: (row, columnId, filterValue) => {
+      const searchValue = String(filterValue).toLowerCase().trim();
+      if (!searchValue) return true;
 
-      const parseSingleFilter = (filterValue: string): ParsedFilter | null => {
-        const filterRegex =
-          /^([a-zA-Z_][a-zA-Z0-9_]*)\s*(:|=|>|<|>=|<=|~)\s*(.+)$/;
-        const match = filterValue.trim().match(filterRegex);
+      const cellValue = row.getValue(columnId);
+      if (cellValue == null) return false;
 
-        if (!match) return null;
-
-        const [, column, operator, value] = match;
-        return {
-          column: column.trim().toLowerCase(),
-          operator: operator as FilterOperator,
-          value: value.trim().replace(/^["'](.*)["']$/, "$1"),
-        };
-      };
-
-      // Recursive function to parse complex filter expressions
-      const parseFilterExpression = (
-        filterString: string
-      ): (ParsedFilter | "AND" | "OR" | string)[] => {
-        const filterParts: (ParsedFilter | "AND" | "OR" | string)[] = [];
-        let currentPart = "";
-        let level = 0; //Track level of parenthesis
-
-        for (let i = 0; i < filterString.length; i++) {
-          const char = filterString[i];
-
-          if (char === "(") {
-            if (currentPart.trim()) {
-              filterParts.push(...parseFilterExpression(currentPart.trim()));
-              currentPart = "";
-            }
-            level++;
-          } else if (char === ")") {
-            if (level > 0 && currentPart.trim()) {
-              filterParts.push(...parseFilterExpression(currentPart.trim()));
-              currentPart = "";
-            }
-            level = Math.max(0, level - 1);
-          } else if (
-            char === "A" &&
-            filterString.slice(i, i + 3) === "AND" &&
-            level === 0
-          ) {
-            if (currentPart.trim()) {
-              filterParts.push(
-                parseSingleFilter(currentPart.trim()) || currentPart.trim()
-              );
-            }
-            filterParts.push("AND");
-            currentPart = "";
-            i += 2;
-          } else if (
-            char === "O" &&
-            filterString.slice(i, i + 2) === "OR" &&
-            level === 0
-          ) {
-            if (currentPart.trim()) {
-              filterParts.push(
-                parseSingleFilter(currentPart.trim()) || currentPart.trim()
-              );
-            }
-            filterParts.push("OR");
-            currentPart = "";
-            i += 1;
-          } else {
-            currentPart += char;
-          }
-        }
-
-        if (currentPart.trim()) {
-          filterParts.push(
-            parseSingleFilter(currentPart.trim()) || currentPart.trim()
-          );
-        }
-
-        return filterParts;
-      };
-
-      const evaluateFilter = (row: Row<any>, filter: ParsedFilter): boolean => {
-        // Find the matching column
-        const matchingCell = row
-          .getAllCells()
-          .find((cell) => cell.column.id.toLowerCase() === filter.column);
-
-        if (!matchingCell) {
-          return false;
-        }
-
-        const cellValue = matchingCell.getValue();
-
-        if (cellValue == null) {
-          return (
-            filter.value.toLowerCase() === "null" ||
-            filter.value.toLowerCase() === "undefined"
-          );
-        }
-
-        const typedCellValue = String(cellValue).trim();
-        const typedFilterValue = filter.value.trim();
-
-        // Numeric comparison
-        const numericCell = !isNaN(Number(typedCellValue));
-        const numericFilter = !isNaN(Number(typedFilterValue));
-
-        if (numericCell && numericFilter) {
-          const numCell = Number(typedCellValue);
-          const numFilter = Number(typedFilterValue);
-
-          switch (filter.operator) {
-            case ":":
-            case "=":
-              return numCell === numFilter;
-            case ">":
-              return numCell > numFilter;
-            case "<":
-              return numCell < numFilter;
-            case ">=":
-              return numCell >= numFilter;
-            case "<=":
-              return numCell <= numFilter;
-            case "~":
-              return String(numCell).includes(String(numFilter));
-            default:
-              return false;
-          }
-        }
-
-        // String comparison with proper case handling
-        const cellValueLower = typedCellValue.toLowerCase();
-        const filterValueLower = typedFilterValue.toLowerCase();
-
-        switch (filter.operator) {
-          case ":":
-          case "=":
-            return cellValueLower === filterValueLower;
-          case "~":
-            return cellValueLower.includes(filterValueLower);
-          case ">":
-            return typedCellValue > typedFilterValue;
-          case "<":
-            return typedCellValue < typedFilterValue;
-          case ">=":
-            return typedCellValue >= typedFilterValue;
-          case "<=":
-            return typedCellValue <= typedFilterValue;
-          default:
-            return false;
-        }
-      };
-
-      const parsedFilters = parseFilterExpression(filterValue);
-
-      if (!parsedFilters || parsedFilters.length === 0) {
-        const searchValue = filterValue.toLowerCase().trim();
-        return row.getAllCells().some((cell) => {
-          const value = cell.getValue();
-          if (value == null) return false;
-          return String(value).toLowerCase().includes(searchValue);
-        });
-      }
-
-      const evaluate = (
-        filters: (ParsedFilter | "AND" | "OR" | string)[],
-        index = 0,
-        currentResult = true
-      ): boolean => {
-        if (index >= filters.length) {
-          return currentResult; // Base case: reached end of filters
-        }
-
-        const currentFilter = filters[index];
-
-        if (currentFilter === "AND") {
-          if (index === 0) return evaluate(filters, index + 1, currentResult);
-          return evaluate(filters, index + 1, currentResult);
-        } else if (currentFilter === "OR") {
-          if (index === 0) return evaluate(filters, index + 1, currentResult);
-          return evaluate(filters, index + 1, currentResult);
-        } else if (typeof currentFilter === "string") {
-          const searchValue = currentFilter.toLowerCase().trim();
-          return (
-            row.getAllCells().some((cell) => {
-              const value = cell.getValue();
-              if (value == null) return false;
-              return String(value).toLowerCase().includes(searchValue);
-            }) && evaluate(filters, index + 1, currentResult)
-          );
-        } else {
-          const filterResult = evaluateFilter(row, currentFilter);
-          if (filters[index - 1] === "AND" || index === 0) {
-            return evaluate(filters, index + 1, currentResult && filterResult);
-          } else if (filters[index - 1] === "OR") {
-            return evaluate(filters, index + 1, currentResult || filterResult);
-          }
-          return evaluate(filters, index + 1, currentResult && filterResult);
-        }
-      };
-      return evaluate(parsedFilters);
+      return String(cellValue).toLowerCase().includes(searchValue);
     },
   });
 
@@ -472,46 +286,50 @@ function DuckUiTable<T extends RowData>({
     [rows]
   );
 
-  // Handle filter changes
-  const handleFilterChange = useCallback((value: string) => {
-    setFilterValue(value);
-    startTransition(() => {
-      setGlobalFilter(value.trim());
-    });
-  }, []);
-
-  const debouncedSearch = useMemo(
-    () => debounce(handleFilterChange, DEBOUNCE_DELAY),
-    [handleFilterChange]
+  const handleFilterChange = useCallback(
+    (value: string) => {
+      setFilterValue(value); // Update the filterValue state (optional, for debugging)
+      setGlobalFilter(value); // Update globalFilter state, which triggers filtering
+    },
+    [setGlobalFilter]
   );
 
-  // Effects
+  // Load more effect (Corrected)
   useEffect(() => {
-    table.setPageSize(FIXED_PAGE_SIZE);
-  }, [table]);
+    // Disconnect previous observer if it exists
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
 
-  useEffect(() => {
     if (!onLoadMore || !loadMoreRef.current || isLoading) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !isLoading) onLoadMore();
+        if (entries[0].isIntersecting && !isLoading) {
+          onLoadMore();
+        }
       },
       { threshold: 0.8 }
     );
 
+    observerRef.current = observer; // Store the observer in the ref
     observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [onLoadMore, isLoading]);
 
-  useEffect(() => {
     return () => {
-      debouncedSearch.cancel();
-      if (resizeTimeout.current) {
-        clearTimeout(resizeTimeout.current);
-      }
+      observer.disconnect(); // Disconnect observer on unmount
+      observerRef.current = null;
     };
-  }, [debouncedSearch]);
+  }, [
+    onLoadMore,
+    isLoading,
+    globalFilter,
+    table.getState().pagination.pageSize,
+  ]);
+
+  // Effects
+  useEffect(() => {
+    table.setPageSize(DEFAULT_PAGE_SIZE);
+  }, [table]);
 
   // Render methods
   const renderCell = useCallback((cell: any) => {
@@ -548,22 +366,10 @@ function DuckUiTable<T extends RowData>({
       {/* Controls */}
       <div className="flex items-center justify-between p-2 border-b dark:border-gray-700">
         <div className="flex items-center space-x-2 flex-1">
-          {/* Smart Filter */}
+          {/* Simple Filter */}
           <div className="flex-1">
-            <SmartFilter
-              columns={table
-                .getAllColumns()
-                .filter((col) => col.id !== "__index")
-                .map((col) => ({
-                  id: col.id,
-                  header: String(col.columnDef.header || col.id),
-                }))}
-              onFilterChange={(filters) => {
-                const filterString = filters
-                  .map((f) => `${f.column}${f.operator}${f.value}`)
-                  .join(" AND ");
-                debouncedSearch(filterString);
-              }}
+            <SimpleFilter
+              onFilterChange={handleFilterChange}
               className="w-full"
             />
           </div>
@@ -607,22 +413,23 @@ function DuckUiTable<T extends RowData>({
               disabled={isLoading}
               className="h-8"
             >
-              <RefreshCw
-                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-              />
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" /> // Show loader when refreshing
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
             </Button>
           )}
         </div>
 
         {/* Pagination controls */}
         <div className="flex items-center space-x-2">
+          {/* First Page Button */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  onClick={() =>
-                    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
-                  }
+                  onClick={() => table.setPageIndex(0)}
                   disabled={!table.getCanPreviousPage()}
                   variant="outline"
                   size="icon"
@@ -635,16 +442,12 @@ function DuckUiTable<T extends RowData>({
             </Tooltip>
           </TooltipProvider>
 
+          {/* Previous Page Button */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  onClick={() =>
-                    setPagination((prev) => ({
-                      ...prev,
-                      pageIndex: Math.max(0, prev.pageIndex - 1),
-                    }))
-                  }
+                  onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
                   variant="outline"
                   size="icon"
@@ -657,24 +460,18 @@ function DuckUiTable<T extends RowData>({
             </Tooltip>
           </TooltipProvider>
 
+          {/* Page Number Display */}
           <span className="text-gray-600 dark:text-gray-300 min-w-[100px] text-center text-xs">
             Page {table.getState().pagination.pageIndex + 1} of{" "}
             {table.getPageCount()}
           </span>
 
+          {/* Next Page Button */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  onClick={() =>
-                    setPagination((prev) => ({
-                      ...prev,
-                      pageIndex: Math.min(
-                        table.getPageCount() - 1,
-                        prev.pageIndex + 1
-                      ),
-                    }))
-                  }
+                  onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
                   variant="outline"
                   size="icon"
@@ -687,16 +484,12 @@ function DuckUiTable<T extends RowData>({
             </Tooltip>
           </TooltipProvider>
 
+          {/* Last Page Button */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  onClick={() =>
-                    setPagination((prev) => ({
-                      ...prev,
-                      pageIndex: table.getPageCount() - 1,
-                    }))
-                  }
+                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                   disabled={!table.getCanNextPage()}
                   variant="outline"
                   size="icon"
@@ -708,6 +501,27 @@ function DuckUiTable<T extends RowData>({
               <TooltipContent>Last Page</TooltipContent>
             </Tooltip>
           </TooltipProvider>
+
+          {/* Page Size Selector */}
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="page-size" className="text-xs text-gray-500">
+              Rows:
+            </Label>
+            <Select onValueChange={(value) => table.setPageSize(Number(value))}>
+              <SelectTrigger className="w-[70px] h-8 text-xs">
+                <SelectValue
+                  placeholder={String(table.getState().pagination.pageSize)}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -822,7 +636,7 @@ function DuckUiTable<T extends RowData>({
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center gap-2">
-                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         <span>Loading more...</span>
                       </div>
                     ) : (

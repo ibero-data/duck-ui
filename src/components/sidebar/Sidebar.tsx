@@ -35,6 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import Logo from "/logo.png";
 import LogoLight from "/logo-light.png";
 import QueryHistory from "../workspace/QueryHistory";
+import ConnectionSwitcher from "./ConnectionSwitcher";
 
 const Sidebar = () => {
   const { theme, setTheme } = useTheme();
@@ -87,7 +88,7 @@ const Sidebar = () => {
   return (
     <div
       ref={sidebarRef}
-      className={`flex flex-col h-screen bg-background border-r transition-all duration-300 ${
+      className={`flex flex-col h-screen bg-background border-r transition-all duration-300 bg-muted ${
         isExpanded ? "w-64" : "w-16"
       }`}
     >
@@ -111,6 +112,11 @@ const Sidebar = () => {
             <ChevronLeft className="h-4 w-4 mr-2" />
           </Button>
         )}
+      </div>
+
+      <Separator className="w-full" />
+      <div className="p-3">
+        <ConnectionSwitcher expanded={isExpanded} />
       </div>
 
       <ScrollArea className="flex-grow">

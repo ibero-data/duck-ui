@@ -1,14 +1,23 @@
 import React, { useState } from "react";
-import { useDuckStore } from "@/store/index";
+import { useDuckStore } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Database, FileUp, Plus } from "lucide-react";
+import { Database, EllipsisVertical, FileUp, Plus } from "lucide-react";
 import FileImporter from "./FileImporter";
 import TreeNode, { TreeNodeData } from "./TreeNode";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 export default function DataExplorer() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const { databases } = useDuckStore();
+  const { databases, isLoading, currentConnection } = useDuckStore();
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,30 +36,69 @@ export default function DataExplorer() {
   };
   const treeData = buildTreeData();
 
+  if (databases.length === 0 && currentConnection?.scope === "External") {
+    return (
+      <Card className="h-full overflow-hidden border-none">
+        <CardHeader className="p-4 border-b">
+          <div className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg font-semibold">
+              External Connection
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 mt-12">
+          <div className="flex flex-col items-center justify-center gap-4 text-center">
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-muted-foreground text-sm">
+                You are connected to an external server. The data explorer is
+                disabled for external connections. The external connection is
+                yet in alpha stage and will be improved in future updates.
+              </p>
+              <p>You can still work normally with the query editor.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="h-full overflow-hidden border-none">
+      {isLoading && (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Loading databases...</p>
+        </div>
+      )}
+
       <CardHeader className="p-4 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Database className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg font-semibold">
-              Data Explorer
-            </CardTitle>
+            <CardTitle className="text-lg font-semibold">Explorer</CardTitle>
           </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger className="cursor-pointer p-2 border hover:bg-secondary rounded-md focus:outline-none">
+              <EllipsisVertical className="h-5 w-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuContent>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={() => setIsSheetOpen(true)}>
+                    <FileUp className="h-4 w-4" />
+                    Import Data
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenuPortal>
+          </DropdownMenu>
+
           <FileImporter
             isSheetOpen={isSheetOpen}
             setIsSheetOpen={setIsSheetOpen}
             context={"notEmpty"}
           />
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => setIsSheetOpen(true)}
-          >
-            <FileUp className="h-4 w-4" />
-            Import Data
-          </Button>
         </div>
       </CardHeader>
 

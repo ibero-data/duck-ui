@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { z } from "zod";
+import { toast } from "sonner";
 
 // Constants
 const ACCEPTED_FILE_TYPES = {
@@ -47,6 +48,9 @@ const ACCEPTED_FILE_TYPES = {
   "application/json": [".json"],
   "application/octet-stream": [".parquet", ".arrow"],
   "application/vnd.duckdb": [".duckdb"],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+    ".xlsx",
+  ],
 } as const;
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
@@ -56,6 +60,7 @@ const SUPPORTED_FILE_EXTENSIONS = [
   "parquet",
   "arrow",
   "duckdb",
+  "xlsx",
 ] as const;
 const MAX_CONCURRENT_UPLOADS = 3;
 
@@ -117,6 +122,8 @@ const getFileIcon = (fileType: string) => {
       return <FileIcon {...iconProps} color="#805AD5" />;
     case "duckdb":
       return <FileIcon {...iconProps} color="#ED8936" />;
+    case "xlsx":
+      return <FileIcon {...iconProps} color="#4299E1" />;
     default:
       return <FileIcon {...iconProps} color="#718096" />;
   }
@@ -300,6 +307,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
         message: `Unsupported file type: .${extension}`,
         severity: "error",
       });
+      toast.error(`Unsupported file type: .${extension}`);
     }
 
     if (file.size > MAX_FILE_SIZE) {
@@ -311,6 +319,9 @@ const FileImporter: React.FC<FileImporterProps> = ({
         )}`,
         severity: "error",
       });
+      toast.warning(
+        `File exceeds maximum size of ${formatFileSize(MAX_FILE_SIZE)}`
+      );
     }
 
     return errors;
@@ -329,55 +340,58 @@ const FileImporter: React.FC<FileImporterProps> = ({
     }));
   };
 
-  const onFileChange = useCallback((newFiles: File[]) => {
-    setErrors([]);
-    const newErrors: UploadError[] = [];
-    const validFiles: FileWithPreview[] = [];
+  const onFileChange = useCallback(
+    (newFiles: File[]) => {
+      setErrors([]);
+      const newErrors: UploadError[] = [];
+      const validFiles: FileWithPreview[] = [];
 
-    newFiles.forEach((file) => {
-      const fileErrors = validateFile(file);
-      if (fileErrors.length > 0) {
-        newErrors.push(...fileErrors);
-      } else {
-        validFiles.push(
-          Object.assign(file, {
-            preview: URL.createObjectURL(file),
-          })
-        );
+      newFiles.forEach((file) => {
+        const fileErrors = validateFile(file);
+        if (fileErrors.length > 0) {
+          newErrors.push(...fileErrors);
+        } else {
+          validFiles.push(
+            Object.assign(file, {
+              preview: URL.createObjectURL(file),
+            })
+          );
+        }
+      });
+
+      if (newErrors.length > 0) {
+        setErrors(newErrors);
       }
-    });
 
-    if (newErrors.length > 0) {
-      setErrors(newErrors);
-    }
+      setFiles((prevFiles) => [...prevFiles, ...validFiles]);
 
-    setFiles((prevFiles) => [...prevFiles, ...validFiles]);
+      const newTableNames = validFiles.reduce<Record<string, string>>(
+        (acc, file) => ({
+          ...acc,
+          [file.name]: file.name
+            .replace(/\.[^/.]+$/, "")
+            .replace(/[^a-zA-Z0-9_]/g, "_")
+            .toLowerCase(),
+        }),
+        {}
+      );
 
-    const newTableNames = validFiles.reduce<Record<string, string>>(
-      (acc, file) => ({
-        ...acc,
-        [file.name]: file.name
-          .replace(/\.[^/.]+$/, "")
-          .replace(/[^a-zA-Z0-9_]/g, "_")
-          .toLowerCase(),
-      }),
-      {}
-    );
+      setTableNames((prev) => ({ ...prev, ...newTableNames }));
 
-    setTableNames((prev) => ({ ...prev, ...newTableNames }));
+      const initialImportStates = validFiles.reduce<
+        Record<string, FileImportState>
+      >((acc, file) => {
+        acc[file.name] = {
+          fileName: file.name,
+          status: "pending",
+        };
+        return acc;
+      }, {});
 
-    const initialImportStates = validFiles.reduce<
-      Record<string, FileImportState>
-    >((acc, file) => {
-      acc[file.name] = {
-        fileName: file.name,
-        status: "pending",
-      };
-      return acc;
-    }, {});
-
-    setImportStates((prev) => ({ ...prev, ...initialImportStates }));
-  }, []);
+      setImportStates((prev) => ({ ...prev, ...initialImportStates }));
+    },
+    [toast]
+  );
 
   const handleDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
@@ -448,6 +462,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
             status: "error",
             error: errorMessage,
           });
+          toast.error(`Invalid table name for ${file.name}`);
           return;
         }
 
@@ -461,6 +476,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
           const arrayBuffer = await file.arrayBuffer();
           await importFile(file.name, arrayBuffer, cleanTableName, fileType);
           updateImportState(file.name, { status: "success" });
+          toast.success(`Successfully imported ${file.name}`);
         } catch (e) {
           const errorMessage = e instanceof Error ? e.message : "Unknown error";
           updateImportState(file.name, {
@@ -479,6 +495,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
               severity: "error",
             },
           ]);
+          toast.error(`Error importing ${file.name}`);
         }
       });
 
@@ -495,9 +512,12 @@ const FileImporter: React.FC<FileImporterProps> = ({
         setIsSheetOpen(false);
         setFiles([]);
         setTableNames({});
+        setImportStates({});
+        toast.success("All files imported successfully");
       }
     } catch (e) {
       console.error("Error uploading: ", e);
+      toast.error("Error uploading files");
     } finally {
       setIsUploading(false);
     }
@@ -506,7 +526,8 @@ const FileImporter: React.FC<FileImporterProps> = ({
   const handleCancelUpload = useCallback(() => {
     abortControllerRef.current?.abort();
     setIsUploading(false);
-  }, []);
+    toast.warning("Upload cancelled");
+  }, [toast]);
 
   const removeFile = useCallback(
     (fileName: string) => {
@@ -527,20 +548,26 @@ const FileImporter: React.FC<FileImporterProps> = ({
       if (file?.preview) {
         URL.revokeObjectURL(file.preview);
       }
+
+      toast.info(`Removed ${fileName}`);
     },
-    [files]
+    [files, toast]
   );
 
-  const retryFileUpload = useCallback((fileName: string) => {
-    setImportStates((prev) => ({
-      ...prev,
-      [fileName]: {
-        ...prev[fileName],
-        status: "pending",
-        error: undefined,
-      },
-    }));
-  }, []);
+  const retryFileUpload = useCallback(
+    (fileName: string) => {
+      setImportStates((prev) => ({
+        ...prev,
+        [fileName]: {
+          ...prev[fileName],
+          status: "pending",
+          error: undefined,
+        },
+      }));
+      toast.info(`Retrying upload for ${fileName}`);
+    },
+    [toast]
+  );
 
   useEffect(() => {
     return () => {
@@ -582,7 +609,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
             />
             <Upload
               className={cn(
-                "w-12 h-12 mb-4",
+                "w-12 h-12 mb-4 mt-4",
                 isDragActive ? "text-[#ffe814]" : "text-[#a0aec0]"
               )}
             />
