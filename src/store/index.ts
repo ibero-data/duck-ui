@@ -770,6 +770,9 @@ export const useDuckStore = create<DuckStoreState>()(
         // Connection Management Actions
         addConnection: async (connection) => {
           try {
+            // set loading state
+            set({ isLoadingExternalConnection: true, error: null });
+
             if (
               get().connectionList.connections.find(
                 (c) => c.name === connection.name

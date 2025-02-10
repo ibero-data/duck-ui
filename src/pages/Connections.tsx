@@ -1,14 +1,6 @@
-import { useState, useEffect } from "react"; // Import useEffect
+import { useState } from "react";
 import { useDuckStore, ConnectionProvider } from "@/store";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -37,28 +29,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Plus, Edit2, Trash2, Database, ExternalLink } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-
+import { DialogFooter } from "@/components/ui/dialog"; // Import DialogFooter
 import { ConnectionDisclaimer } from "@/components/connection/Disclaimer";
+import ConnectionManager from "@/components/connection/ConnectionsModal";
 
+// Define ConnectionFormValues type here for use in Connections component
+import * as z from "zod";
 const connectionSchema = z.object({
   name: z
     .string()
@@ -88,239 +64,6 @@ const connectionSchema = z.object({
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
-interface ConnectionFormProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void; // Use onOpenChange for Dialog
-  onSubmit: (values: ConnectionFormValues) => void;
-  initialValues?: ConnectionFormValues;
-}
-
-const ConnectionForm: React.FC<ConnectionFormProps> = ({
-  open,
-  onOpenChange,
-  onSubmit,
-  initialValues,
-}) => {
-  const form = useForm<ConnectionFormValues>({
-    resolver: zodResolver(connectionSchema),
-    defaultValues: initialValues || {
-      name: "",
-      scope: "External",
-      host: "",
-      port: "",
-      database: "",
-      user: "",
-      password: "",
-      authMode: "none",
-      apiKey: "",
-    },
-    mode: "onChange",
-  });
-
-  const { isLoadingExternalConnection } = useDuckStore(); // Get loading state
-
-  const handleSubmit = async (values: ConnectionFormValues) => { // Make handleSubmit async
-    await onSubmit(values); // Await the submission
-    form.reset(); // Reset the form after submission
-    onOpenChange(false); // Close the dialog
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Add New Connection</DialogTitle>
-          <DialogDescription>
-            Create a new database connection.
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="h-[500px]">
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleSubmit)}
-              className="space-y-4 p-2"
-            >
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Connection Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="My Database Connection" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="scope"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Connection Scope</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Scope" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="External">External</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {form.watch("scope") === "External" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="host"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Host</FormLabel>
-                        <FormControl>
-                          <Input placeholder="localhost" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="port"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Port</FormLabel>
-                        <FormControl>
-                          <Input placeholder="8123" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="database"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Database</FormLabel>
-                        <FormControl>
-                          <Input placeholder="my_database" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authMode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Authentication Mode</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select auth mode" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="password">Password</SelectItem>
-                            <SelectItem value="api_key">API Key</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {form.watch("authMode") === "password" && (
-                    <>
-                      <FormField
-                        control={form.control}
-                        name="user"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Username</FormLabel>
-                            <FormControl>
-                              <Input placeholder="database_user" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="password"
-                                placeholder="••••••••"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </>
-                  )}
-
-                  {form.watch("authMode") === "api_key" && (
-                    <FormField
-                      control={form.control}
-                      name="apiKey"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>API Key</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="password"
-                              placeholder="Enter your API key"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </>
-              )}
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => onOpenChange(false)}
-                  disabled={isLoadingExternalConnection} // Disable during loading
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoadingExternalConnection}>
-                  Create Connection
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 const Connections = () => {
   const {
     connectionList,
@@ -347,16 +90,16 @@ const Connections = () => {
     ConnectionFormValues | undefined
   >(undefined);
 
-  const handleAddConnection = async (values: ConnectionFormValues) => { // Make async
+  const handleAddConnection = async (values: ConnectionFormValues) => {
     const connectionData: ConnectionProvider = {
       ...values,
       id: crypto.randomUUID(),
       port: values.port ? parseInt(values.port, 10) : undefined,
     };
-    await addConnection(connectionData); // Await addConnection
+    await addConnection(connectionData);
   };
 
-  const handleUpdateConnection = (values: ConnectionFormValues) => {
+  const handleUpdateConnection = async (values: ConnectionFormValues): Promise<void> => {
     if (!editingConnectionId) return;
 
     const connectionData: ConnectionProvider = {
@@ -397,34 +140,32 @@ const Connections = () => {
     setEditingConnection(undefined);
   };
 
-  // Add a useEffect to close the dialog when adding the connection is finish
-  useEffect(() => {
-    if (!isLoadingExternalConnection && isAddConnectionDialogOpen) {
-      setIsAddConnectionDialogOpen(false);
-    }
-  }, [isLoadingExternalConnection]);
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <div className="container mx-auto p-4 space-y-6 overflow-auto">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Connections </h1>
+        <h1 className="text-2xl font-bold">Connections</h1>
         <Button
           onClick={() => setIsAddConnectionDialogOpen(true)}
           className="flex items-center gap-2"
           variant="outline"
-          disabled={isLoadingExternalConnection} // Disable during loading
+          disabled={isLoadingExternalConnection}
         >
           <Plus />
           Add Connection
         </Button>
-        <ConnectionForm
+
+        {/* Use ConnectionManager for adding connections */}
+        <ConnectionManager
           open={isAddConnectionDialogOpen}
           onOpenChange={setIsAddConnectionDialogOpen}
           onSubmit={handleAddConnection}
+          isEditMode={false} // Ensure it's in add mode
         />
       </div>
       <ConnectionDisclaimer />
 
+      {/* Editing Connection Card - using ConnectionManager */}
       {isEditing && editingConnection ? (
         <Card className="w-full max-w-2xl mx-auto mb-8">
           <CardHeader>
@@ -434,11 +175,13 @@ const Connections = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ConnectionForm
+            {/* Use ConnectionManager for editing connections */}
+            <ConnectionManager
               open={isEditing}
               onOpenChange={setIsEditing}
               onSubmit={handleUpdateConnection}
               initialValues={editingConnection}
+              isEditMode={true} // Set to edit mode
             />
           </CardContent>
           <DialogFooter>
@@ -457,7 +200,7 @@ const Connections = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[500px]">
+          <ScrollArea className="h-[calc(100vh-400px)]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -501,7 +244,9 @@ const Connections = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={connection.id === currentConnection?.id || isLoading}
+                          disabled={
+                            connection.id === currentConnection?.id || isLoading
+                          }
                           onClick={() => handleConnect(connection.id)}
                         >
                           {connection.id === currentConnection?.id

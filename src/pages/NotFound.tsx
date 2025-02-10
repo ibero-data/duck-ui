@@ -18,13 +18,13 @@ const NotFound: React.FC = () => {
           <img
             src={LogoLight.toString()}
             alt="Logo"
-            className="h-18 w-22 m-auto mb-8 pl-24"
+            className="h-18 w-22 m-auto mb-8 pl-24 hidden sm:block"
           />
         ) : (
           <img
             src={Logo.toString()}
             alt="Logo"
-            className="h-18 w-22 m-auto mb-8 pl-24"
+            className="h-18 w-22 m-auto mb-8 pl-24 hidden sm:block"
           />
         )}
         <Separator orientation="vertical" className="p-0.5 h-32 mr-6 ml-4" />

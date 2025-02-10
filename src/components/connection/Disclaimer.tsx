@@ -61,7 +61,7 @@ export const ConnectionDisclaimer = () => {
                   You can use the following connection string to connect to a
                   server (Quackpy) that has the HTTP Server Extension enabled:
                   <pre className="text-sm bg-secondary rounded-md p-2 mt-2">
-                    <code>Host: https://quackpy.fly.dev</code> 
+                    <code>Host: https://quackpy.fly.dev</code>
                     <br />
                     <code>Port: 443</code>
                     <br />
@@ -186,8 +186,7 @@ export const ConnectionDisclaimer = () => {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="mt-4">
-            <Button onClick={() => setOpen(false)}>I Understand</Button>
+          <DialogFooter className="gap-2">
             <Button
               onClick={() => {
                 // open issue link
@@ -200,6 +199,7 @@ export const ConnectionDisclaimer = () => {
               <GithubIcon className="h-4 w-4" />
               Report Issue
             </Button>
+            <Button onClick={() => setOpen(false)}>I Understand</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

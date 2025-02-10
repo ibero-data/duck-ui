@@ -9,44 +9,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
-import { useDuckStore } from "@/store"; // Adjust path
+import { useDuckStore } from "@/store";
 
 interface ConnectionSwitcherProps {
   expanded: boolean;
   className?: string;
 }
 
-// Reusable button component with proper types
-interface SidebarMenuButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  children: React.ReactNode;
-  className?: string;
-  isLoading?: boolean;
-}
+const SidebarButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { isLoading?: boolean }
+>(({ children, className, isLoading, ...props }, ref) => (
+  <Button
+    ref={ref}
+    className={cn(
+      "flex items-center justify-between w-full gap-3 p-3",
+      "bg-sidebar-primary text-sidebar-primary-foreground",
+      "hover:bg-sidebar-primary/90 hover:text-sidebar-accent-foreground",
+      "transition-colors duration-200",
+      "focus:ring-2 focus:ring-purple-500/20",
+      isLoading && "opacity-70 cursor-not-allowed",
+      className
+    )}
+    disabled={isLoading}
+    {...props}
+  >
+    {children}
+  </Button>
+));
 
-const SidebarMenuButton: React.FC<SidebarMenuButtonProps> = ({
-  children,
-  className,
-  isLoading,
-  ...props
-}) => {
-  return (
-    <Button
-      className={cn(
-        "flex items-center justify-between w-full text-left",
-        isLoading && "opacity-70 cursor-not-allowed",
-        className,
-        "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/30 hover:text-sidebar-accent-foreground gap-3 p-3"
-      )}
-      disabled={isLoading}
-      {...props}
-    >
-      {children}
-    </Button>
-  );
-};
+SidebarButton.displayName = "SidebarButton";
 
 export default function ConnectionSwitcher({
   expanded,
@@ -62,34 +57,43 @@ export default function ConnectionSwitcher({
   } = useDuckStore();
   const [isOpen, setIsOpen] = React.useState(false);
 
-  const handleConnectionChange = async (connectionId: string) => {
-    setCurrentConnection(connectionId);
-    await fetchDatabasesAndTablesInfo();
+  const activeConnection = currentConnection || connectionList.connections[0];
 
-    setIsOpen(false);
+  const handleConnectionChange = async (connectionId: string) => {
+    try {
+      await setCurrentConnection(connectionId);
+      await fetchDatabasesAndTablesInfo();
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Failed to switch connection:", error);
+    }
   };
 
-  // Use a fallback in case currentConnection is null/undefined during initialization
-  const activeConnection =
-    currentConnection || connectionList.connections[0] || null;
+  const renderConnectionIcon = () => (
+    <div
+      className="flex aspect-square size-6 items-center justify-center rounded-lg 
+                  bg-sidebar-primary text-sidebar-primary-foreground
+                  transition-transform duration-200 group-hover:scale-105"
+    >
+      {isLoading ? (
+        <Loader2 className="size-4 animate-spin text-purple-500" />
+      ) : (
+        <ServerCog className="size-4" />
+      )}
+    </div>
+  );
 
   return (
-    <div className={cn("w-full ", className)}>
+    <div className={cn("w-full", className)}>
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger asChild>
           {expanded ? (
-            <SidebarMenuButton
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            <SidebarButton
+              className="group data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               isLoading={isLoading}
             >
-              <div className="flex aspect-square size-6 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                {isLoading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <ServerCog className="size-4" />
-                )}
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight ml-3">
+              {renderConnectionIcon()}
+              <div className="text-left text-sm leading-tight ml-3 flex items-center justify-between w-full">
                 <span className="truncate font-semibold">
                   {activeConnection?.name}
                 </span>
@@ -97,73 +101,71 @@ export default function ConnectionSwitcher({
                   {activeConnection?.scope}
                 </span>
               </div>
-              <ChevronsUpDown className="ml-auto size-4" />
-            </SidebarMenuButton>
+              <ChevronsUpDown
+                className="ml-auto size-4 opacity-60 transition-transform duration-200 
+                                     group-hover:opacity-100 group-data-[state=open]:rotate-180"
+              />
+            </SidebarButton>
           ) : (
             <Button
               size="icon"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground bg-sidebar-primary text-sidebar-primary-foreground hover:bg-muted-foreground/10"
+              className="group data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground 
+                       bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90
+                       transition-all duration-200"
               disabled={isLoading}
             >
-              <div className="flex aspect-square size-6 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                {isLoading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <ServerCog className="size-4" />
-                )}
-              </div>
+              {renderConnectionIcon()}
             </Button>
           )}
         </DropdownMenuTrigger>
+
         <DropdownMenuContent
-          className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+          className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg border-purple-500/20"
           align="start"
           sideOffset={4}
         >
-          <DropdownMenuLabel className="text-xs text-muted-foreground mb-2">
-            Connections{" "}
-            <span
-              className="
-            text-xs text-purple-500 px-1 py-0.5 rounded-md bg-purple-100/20 ml-1 text-xs font-medium 
-            border border-purple-500 rounded-md
-            
-            "
+          <DropdownMenuLabel className="flex items-center text-xs text-muted-foreground mb-2">
+            Connections
+            <Badge
+              variant="outline"
+              className="ml-2 bg-purple-100/10 text-purple-500 border-purple-500"
             >
               Alpha
-            </span>
+            </Badge>
           </DropdownMenuLabel>
+
           {connectionList.connections.map((connection) => (
             <DropdownMenuItem
               key={connection.id}
               onClick={() => handleConnectionChange(connection.id)}
               className={cn(
-                "gap-2 p-2 cursor-pointer gap-2 mb-1",
-                activeConnection?.id === connection.id &&
-                  "bg-muted-foreground/10"
+                "gap-2 p-2 cursor-pointer mb-1 transition-colors duration-150",
+                "hover:bg-purple-500/10",
+                activeConnection?.id === connection.id && "bg-purple-500/30"
               )}
             >
-              <div className="flex items-center">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{connection.name}</span>
-                  <span className="text-xs font-thin text-muted-foreground">
-                    {connection.scope}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between w-full">
+                <span className="font-medium">{connection.name}</span>
+                <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-purple-500/20">
+                  {connection.scope}
+                </span>
               </div>
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator />
+
+          <DropdownMenuSeparator className="bg-purple-500/20" />
+
           <DropdownMenuItem
-            className="gap-2 p-2 cursor-pointer"
+            className="gap-2 p-2 cursor-pointer hover:bg-purple-500/10 transition-colors duration-150"
             onClick={() => {
               navigate("/connections");
               setIsOpen(false);
             }}
           >
-            <div className="flex size-6 items-center justify-center">
-              <Cable className="" />
+            <div className="flex items-center gap-2">
+              <Cable className="size-4 text-purple-500" />
+              <span className="font-semibold text-sm">Manage Connections</span>
             </div>
-            <div className="font-semibold text-sm">Manage Connections</div>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
