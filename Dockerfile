@@ -31,12 +31,24 @@ RUN npm install -g serve
 # Copy the build directory from the first stage to the second stage
 COPY --from=build /app/dist /app
 
-# Expose port 5522 to have it mapped by the Docker daemon
+# Copy the injection script
+COPY inject-env.js /app/
+
+# Expose port 5522
 EXPOSE 5522
 
-RUN addgroup -S duck-group -g 1001 && adduser -S duck-user -u 1001 -G duck-group
+# Define environment variables
+ENV DUCK_UI_EXTERNAL_CONNECTION_NAME=""
+ENV DUCK_UI_EXTERNAL_HOST=""
+ENV DUCK_UI_EXTERNAL_PORT=""
+ENV DUCK_UI_EXTERNAL_USER=""
+ENV DUCK_UI_EXTERNAL_PASS=""
+ENV DUCK_UI_EXTERNAL_DATABASE_NAME=""
 
+RUN addgroup -S duck-group -g 1001 && adduser -S duck-user -u 1001 -G duck-group
 RUN chown -R duck-user:duck-group /app
 
-# Use a shell script to inject environment variables and then serve the app
-CMD ["/bin/sh", "-c", "serve -s -l 5522"]
+USER duck-user
+
+# Run the injection script then serve
+CMD node inject-env.js && serve -s -l 5522

@@ -15,7 +15,6 @@ import Metrics from "./pages/Metrics";
 import NotFound from "./pages/NotFound";
 import Connections from "./pages/Connections";
 
-
 interface LoadingScreenProps {
   message: string;
 }
@@ -98,49 +97,17 @@ const App = () => {
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Failed to find root element");
 
-// Development render
-if (import.meta.env.DEV) {
-  const existingRoot = (rootElement as any)._reactRootContainer;
-  const renderApp = (root: ReturnType<typeof createRoot>) => {
-    root.render(
-      <StrictMode>
-        <AppInitializer>
-          <BrowserRouter>
-            <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-              <Suspense
-                fallback={<LoadingScreen message="Loading application" />}
-              >
-                <App />
-              </Suspense>
-            </ThemeProvider>
-          </BrowserRouter>
-        </AppInitializer>
-      </StrictMode>
-    );
-  };
-
-  if (existingRoot) {
-    renderApp(existingRoot);
-  } else {
-    const root = createRoot(rootElement);
-    (rootElement as any)._reactRootContainer = root;
-    renderApp(root);
-  }
-} else {
-  // Production render
-  createRoot(rootElement).render(
-    <StrictMode>
-      <AppInitializer>
-        <BrowserRouter>
-          <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-            <Suspense
-              fallback={<LoadingScreen message="Loading application" />}
-            >
-              <App />
-            </Suspense>
-          </ThemeProvider>
-        </BrowserRouter>
-      </AppInitializer>
-    </StrictMode>
-  );
-}
+// Production render
+createRoot(rootElement).render(
+  <StrictMode>
+    <AppInitializer>
+      <BrowserRouter>
+        <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+          <Suspense fallback={<LoadingScreen message="Loading application" />}>
+            <App />
+          </Suspense>
+        </ThemeProvider>
+      </BrowserRouter>
+    </AppInitializer>
+  </StrictMode>
+);

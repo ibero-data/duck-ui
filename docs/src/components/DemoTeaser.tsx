@@ -4,7 +4,6 @@ import { Terminal } from "lucide-react";
 import DotPattern from "./ui/dotpattern";
 import Logo from "@site/static/img/logo-padding.png";
 
-
 const FloatingLogos = () => {
   return (
     <div className="logos-container" aria-hidden="true">
@@ -30,7 +29,7 @@ interface DemoTeaserProps {
   className?: string;
 }
 
-const DemoTeaser: React.FC<DemoTeaserProps> = ({ className }) => {
+const DemoTeaser: React.FC<DemoTeaserProps> = ({}) => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [showTable, setShowTable] = React.useState(false);
   const demoUrl =

@@ -28,13 +28,27 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Edit2, Trash2, Database, ExternalLink } from "lucide-react";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Database,
+  ExternalLink,
+  InfoIcon,
+} from "lucide-react";
 import { DialogFooter } from "@/components/ui/dialog"; // Import DialogFooter
 import { ConnectionDisclaimer } from "@/components/connection/Disclaimer";
 import ConnectionManager from "@/components/connection/ConnectionsModal";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Define ConnectionFormValues type here for use in Connections component
 import * as z from "zod";
+
 const connectionSchema = z.object({
   name: z
     .string()
@@ -95,17 +109,21 @@ const Connections = () => {
       ...values,
       id: crypto.randomUUID(),
       port: values.port ? parseInt(values.port, 10) : undefined,
+      environment: "APP",
     };
     await addConnection(connectionData);
   };
 
-  const handleUpdateConnection = async (values: ConnectionFormValues): Promise<void> => {
+  const handleUpdateConnection = async (
+    values: ConnectionFormValues
+  ): Promise<void> => {
     if (!editingConnectionId) return;
 
     const connectionData: ConnectionProvider = {
       ...values,
       id: editingConnectionId,
       port: values.port ? parseInt(values.port, 10) : undefined,
+      environment: "APP",
     };
     updateConnection(connectionData);
     setEditingConnectionId(null);
@@ -139,7 +157,6 @@ const Connections = () => {
     setEditingConnectionId(null);
     setEditingConnection(undefined);
   };
-
 
   return (
     <div className="container mx-auto p-4 space-y-6 overflow-auto">
@@ -208,6 +225,7 @@ const Connections = () => {
                   <TableHead>Scope</TableHead>
                   <TableHead>Host</TableHead>
                   <TableHead>Database</TableHead>
+                  <TableHead>Enviorment</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -237,73 +255,100 @@ const Connections = () => {
                     </TableCell>
                     <TableCell>
                       {connection.database ||
-                        (connection.scope === "WASM" ? "memory" : "-")}
+                        (connection.scope === "WASM"
+                          ? "memory"
+                          : connection.database)}
                     </TableCell>
+                    <TableCell>{connection.environment}</TableCell>
+
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={
-                            connection.id === currentConnection?.id || isLoading
-                          }
-                          onClick={() => handleConnect(connection.id)}
-                        >
-                          {connection.id === currentConnection?.id
-                            ? "Connected"
-                            : "Connect"}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEdit(connection.id)}
-                          disabled={connection.id === "WASM"}
-                        >
-                          <Edit2 size={16} />
-                        </Button>
-                        <AlertDialog
-                          open={deleteConfirmationId === connection.id}
-                          onOpenChange={(isOpen) =>
-                            setDeleteConfirmationId(
-                              isOpen ? connection.id : null
-                            )
-                          }
-                        >
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={connection.id === "WASM"}
-                            >
-                              <Trash2 size={16} className="text-destructive" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Delete Connection
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete the connection "
-                                {connection.name}"? This action cannot be
-                                undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => {
-                                  deleteConnection(connection.id);
-                                  setDeleteConfirmationId(null);
-                                }}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      {connection.environment === "BUILT_IN" || "ENV" ? (
+                        <div className="justify-end flex gap-2 p-2 rounded-md">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <InfoIcon size={20} />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-sm max-w-[200px] !text-center">
+                                  This connection is built-in or was set via
+                                  docker environment variables and cannot be
+                                  modified or deleted.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              connection.id === currentConnection?.id ||
+                              isLoading
+                            }
+                            onClick={() => handleConnect(connection.id)}
+                          >
+                            {connection.id === currentConnection?.id
+                              ? "Connected"
+                              : "Connect"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEdit(connection.id)}
+                            disabled={connection.id === "WASM"}
+                          >
+                            <Edit2 size={16} />
+                          </Button>
+                          <AlertDialog
+                            open={deleteConfirmationId === connection.id}
+                            onOpenChange={(isOpen) =>
+                              setDeleteConfirmationId(
+                                isOpen ? connection.id : null
+                              )
+                            }
+                          >
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={isLoading}
                               >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                                <Trash2
+                                  size={16}
+                                  className="text-destructive"
+                                />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Delete Connection
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete the connection
+                                  "{connection.name}"? This action cannot be
+                                  undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    deleteConnection(connection.id);
+                                    setDeleteConfirmationId(null);
+                                  }}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

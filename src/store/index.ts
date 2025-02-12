@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import * as duckdb from "@duckdb/duckdb-wasm";
+import { toast } from "sonner";
 
 // Import WASM bundles
 import duckdb_wasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
 import mvp_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url";
 import duckdb_wasm_eh from "@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url";
 import eh_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url";
-import { toast } from "sonner";
 
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
   mvp: {
@@ -24,7 +24,21 @@ const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
 // TYPES
 //
 
+declare global {
+  interface Window {
+    env?: {
+      DUCK_UI_EXTERNAL_CONNECTION_NAME: string;
+      DUCK_UI_EXTERNAL_HOST: string;
+      DUCK_UI_EXTERNAL_PORT: string;
+      DUCK_UI_EXTERNAL_USER: string;
+      DUCK_UI_EXTERNAL_PASS: string;
+      DUCK_UI_EXTERNAL_DATABASE_NAME: string
+    };
+  }
+}
+
 export interface CurrentConnection {
+  environment: "APP" | "ENV" | "BUILT_IN";
   id: string;
   name: string;
   scope: "WASM" | "External";
@@ -37,6 +51,7 @@ export interface CurrentConnection {
 }
 
 export interface ConnectionProvider {
+  environment: "APP" | "ENV" | "BUILT_IN";
   id: string;
   name: string;
   scope: "WASM" | "External";
@@ -312,6 +327,9 @@ const initializeWasmConnection = async (): Promise<{
 const testExternalConnection = async (
   connection: ConnectionProvider
 ): Promise<void> => {
+  if (!connection.host || !connection.port) {
+    throw new Error("Host and port must be defined for external connections.");
+  }
   const url = `${connection.host}:${connection.port}/`;
   const authHeader = btoa(`${connection.user}:${connection.password}`);
   const response = await fetch(url, {
@@ -435,46 +453,87 @@ export const useDuckStore = create<DuckStoreState>()(
         error: null,
         currentConnection: null,
         connectionList: {
-          connections: [
-            {
-              id: "WASM",
-              name: "WASM",
-              scope: "WASM",
-            },
-          ],
+          connections: [],
         },
 
-        // Initialize DuckDB using WASM.
+        // Initialize DuckDB using WASM or External.
         initialize: async () => {
-          const state = get();
-          if (state.isInitialized) return;
-          try {
-            set({ isLoading: true, error: null });
+          let initialConnections: ConnectionProvider[] = [];
+
+          // // check if there's window.env existis on window object
+
+          // let externalConnectionName;
+          // let externalHost;
+          // let externalPort;
+          // let externalUser;
+          // let externalPass;
+          // let externalDatabaseName;
+
+          // if (window.env) {
+          //   externalConnectionName =
+          //     window.env.DUCK_UI_EXTERNAL_CONNECTION_NAME;
+          //   externalHost = window.env.DUCK_UI_EXTERNAL_HOST;
+          //   externalPort = window.env.DUCK_UI_EXTERNAL_PORT;
+          //   externalUser = window.env.DUCK_UI_EXTERNAL_USER;
+          //   externalPass = window.env.DUCK_UI_EXTERNAL_PASS;
+          //   externalDatabaseName = window.env.DUCK_UI_EXTERNAL_DATABASE_NAME;
+          // }
+
+          const externalConnectionName = import.meta.env.DUCK_UI_EXTERNAL_CONNECTION_NAME;
+          const externalHost = import.meta.env.DUCK_UI_EXTERNAL_HOST;
+          const externalPort = import.meta.env.DUCK_UI_EXTERNAL_PORT;
+          const externalUser = import.meta.env.DUCK_UI_EXTERNAL_USER;
+          const externalPass = import.meta.env.DUCK_UI_EXTERNAL_PASS;
+          const externalDatabaseName = import.meta.env.DUCK_UI_EXTERNAL_DATABASE_NAME;
+
+
+          const wasmConnection: ConnectionProvider = {
+            environment: "APP",
+            id: "WASM",
+            name: "WASM",
+            scope: "WASM",
+          };
+
+          initialConnections.push(wasmConnection);
+
+          if (externalConnectionName && externalHost && externalPort) {
+            initialConnections.push({
+              environment: "ENV",
+              id: externalConnectionName,
+              name: externalConnectionName,
+              scope: "External",
+              host: externalHost,
+              port: Number(externalPort),
+              user: externalUser,
+              password: externalPass,
+              database: externalDatabaseName,
+              authMode: "password", // Assuming password auth
+            });
+          }
+
+          set({
+            connectionList: { connections: initialConnections },
+          });
+
+          if (initialConnections.length > 0) {
+            // Initialize WASM and set "memory" as default
             const { db, connection } = await initializeWasmConnection();
-            // Set initial state
             set({
               db,
               connection,
               isInitialized: true,
-              isLoading: false,
               currentDatabase: "memory",
-              currentConnection: {
-                id: "WASM",
-                name: "WASM",
-                scope: "WASM",
-              },
             });
-            await get().fetchDatabasesAndTablesInfo();
-          } catch (error) {
-            set({
-              error: `Initialization failed: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
-              isLoading: false,
-              isInitialized: false,
-              db: null,
-              connection: null,
-            });
+            await Promise.all([
+              connection.query(`SET enable_http_metadata_cache=true`),
+              connection.query(`INSTALL arrow`),
+              connection.query(`INSTALL parquet`),
+            ]);
+
+            //Then automatically connect to the first connection.
+            await get().setCurrentConnection(initialConnections[0].id);
+          } else {
+            set({ isLoading: false, isInitialized: true }); // Set as initialized if no connections are configured.
           }
         },
 
@@ -490,6 +549,8 @@ export const useDuckStore = create<DuckStoreState>()(
                 currentConnection
               );
             } else {
+              if (!connection)
+                throw new Error("WASM connection not initialized");
               const wasmConnection = validateConnection(connection);
               const result = await wasmConnection.query(query);
               queryResult = resultToJSON(result);
@@ -541,7 +602,14 @@ export const useDuckStore = create<DuckStoreState>()(
           database = "memory"
         ) => {
           try {
-            const { db, connection } = get();
+            const { db, connection, currentConnection } = get();
+
+            if (currentConnection?.scope === "External") {
+              throw new Error(
+                "File import is not supported for external connections."
+              );
+            }
+
             if (!db || !connection) throw new Error("Database not initialized");
             const buffer = new Uint8Array(fileContent);
             // Try to drop any previously registered file.
@@ -587,8 +655,13 @@ export const useDuckStore = create<DuckStoreState>()(
             set({ isLoadingDbTablesFetch: true, error: null });
             let databases: DatabaseInfo[] = [];
             if (currentConnection?.scope === "External") {
+              // TODO: Implement fetch database logic for external connection.
               databases = [];
             } else {
+              if (!connection) {
+                set({ databases: [], error: null });
+                return;
+              }
               const wasmConnection = validateConnection(connection);
               databases = await fetchWasmDatabases(wasmConnection);
             }
@@ -690,9 +763,15 @@ export const useDuckStore = create<DuckStoreState>()(
 
         deleteTable: async (tableName, database = "memory") => {
           try {
-            const connection = validateConnection(get().connection);
+            const { connection, currentConnection } = get();
+            if (currentConnection?.scope === "External") {
+              throw new Error(
+                "Table deletion is not supported for external connections."
+              );
+            }
+            const wasmConnection = validateConnection(connection);
             set({ isLoading: true });
-            await connection.query(
+            await wasmConnection.query(
               `DROP TABLE IF EXISTS "${database}"."${tableName}"`
             );
             await get().fetchDatabasesAndTablesInfo();
@@ -714,7 +793,12 @@ export const useDuckStore = create<DuckStoreState>()(
 
         exportParquet: async (query: string) => {
           try {
-            const { connection, db } = get();
+            const { connection, db, currentConnection } = get();
+            if (currentConnection?.scope === "External") {
+              throw new Error(
+                "Exporting to parquet is not supported for external connections."
+              );
+            }
             if (!connection || !db) {
               throw new Error("Database not initialized");
             }
@@ -804,6 +888,8 @@ export const useDuckStore = create<DuckStoreState>()(
                 error instanceof Error ? error.message : "Unknown error"
               }`
             );
+          } finally {
+            set({ isLoadingExternalConnection: false });
           }
         },
 
@@ -836,52 +922,24 @@ export const useDuckStore = create<DuckStoreState>()(
             if (!connectionProvider) {
               throw new Error(`Connection with ID ${connectionId} not found.`);
             }
-            let newConnection: duckdb.AsyncDuckDBConnection | null = null;
-            if (connectionProvider.scope === "WASM") {
-              if (!get().isInitialized) {
-                const { db, connection } = await initializeWasmConnection();
-                newConnection = connection;
-                set({
-                  db,
-                  connection: newConnection,
-                  isInitialized: true,
-                  currentDatabase: "memory",
-                });
-                await Promise.all([
-                  newConnection.query(`SET enable_http_metadata_cache=true`),
-                  newConnection.query(`INSTALL arrow`),
-                  newConnection.query(`INSTALL parquet`),
-                ]);
-              } else {
-                newConnection = get().connection;
-              }
-            } else {
-              set({ isLoading: true });
-              // For External connections, you might create a new connection here.
-              // In this example we continue using the existing WASM connection.
-              newConnection = get().connection;
-            }
-            if (newConnection) {
-              set({
-                connection: newConnection,
-                currentConnection: {
-                  id: connectionProvider.id,
-                  name: connectionProvider.name,
-                  scope: connectionProvider.scope,
-                  host: connectionProvider.host,
-                  port: connectionProvider.port,
-                  user: connectionProvider.user,
-                  password: connectionProvider.password,
-                  database: connectionProvider.database,
-                  authMode: connectionProvider.authMode,
-                },
-                isLoading: false,
-              });
-              await get().fetchDatabasesAndTablesInfo();
-              toast.success(`Connected to ${connectionProvider.name}`);
-            } else {
-              throw new Error("Failed to establish a new connection.");
-            }
+
+            set({
+              currentConnection: {
+                environment: connectionProvider.environment,
+                id: connectionProvider.id,
+                name: connectionProvider.name,
+                scope: connectionProvider.scope,
+                host: connectionProvider.host,
+                port: connectionProvider.port,
+                user: connectionProvider.user,
+                password: connectionProvider.password,
+                database: connectionProvider.database,
+                authMode: connectionProvider.authMode,
+              },
+              isLoading: false,
+            });
+            await get().fetchDatabasesAndTablesInfo();
+            toast.success(`Connected to ${connectionProvider.name}`);
           } catch (error) {
             set({
               error: `Failed to set current connection: ${

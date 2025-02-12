@@ -1,0 +1,101 @@
+---
+title: External Connections (Alpha)
+description: Connect to external servers for querying and managing databases - Alpha Feature
+sidebar_position: 3
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import { Terminal, AlertTriangle } from 'lucide-react';
+
+:::warning Alpha Feature
+This external connection feature is currently in **alpha stage** and is provided as a proof of concept. It is still under active development and may undergo significant changes. Not recommended for production use.
+:::
+
+## Quick Start
+
+The fastest way to test experiment with external connections is to use the provided demo credentials:
+
+You can create your own connection @ https://demo.duckui.com/connections
+
+```bash
+Name: EXAMPLE (Or any name you prefer)
+Host: https://quackpy.fly.dev
+Port: 443
+Database: - (leave empty)
+User: duckui
+Password: duckui
+```
+
+## Connection Methods
+
+### Method 1: Docker Environment Variables
+
+```bash
+docker run -p 5522:5522 \
+    -e DUCK_UI_EXTERNAL_CONNECTION_NAME="EXAMPLE" \
+    -e DUCK_UI_EXTERNAL_HOST="https://quackpy.fly.dev" \
+    -e DUCK_UI_EXTERNAL_PORT=443 \
+    -e DUCK_UI_EXTERNAL_USER="" \
+    -e DUCK_UI_EXTERNAL_PASS="" \
+    -e DUCK_UI_EXTERNAL_DATABASE_NAME=""
+```
+
+:::note
+- DUCK_UI_EXTERNAL_HOST: Currently, only Quackpy - That's running http_server extension under the hood is available as a provider
+- USER/PASS: Any values can be used to create credentials
+- DATABASE_NAME: Not required for this implementation (leave empty)
+:::
+
+### Method 2: User Interface
+
+You can create connections directly through the Duck-UI interface:
+
+1. Navigate to Connections page
+2. Click "Add Connection"
+3. Fill in the connection details
+4. Test and save your connection
+
+## Important Disclaimers
+
+### Production Use Warning
+This feature is not intended for production use or storing sensitive data. Use at your own risk and only with non-sensitive, test data.
+
+### Security Considerations
+- Connection credentials are stored in local storage
+- Communication may not be encrypted depending on server configuration
+- No built-in protection against SQL injection
+- Basic authentication implementation
+- Use in trusted environments only
+
+### Technical Requirements
+The external server must support:
+- HTTP Basic Authentication
+- CORS for cross-origin requests
+- POST requests with query parameters
+- ClickHouse JSON/JSONCompact response format
+
+### Current Limitations
+- Limited error handling
+- Basic authentication only
+- Network-dependent performance
+- Incomplete schema information
+- Limited DuckDB feature support
+- No built-in security protections
+
+## External Resources
+
+- [DuckDB HTTP Server Extension](https://github.com/duckdb/duckdb/tree/master/extension/httpfs)
+- [Duck-UI GitHub Repository](https://github.com/caioricciuti/duck-ui)
+- [Quackpy GitHub Repository](https://github.com/Quackscience/quackpy)
+
+## Testing the Connection
+
+1. Use the provided demo credentials
+2. Test basic queries to verify connectivity
+3. Explore available databases and tables
+4. Note any performance or functionality limitations
+
+:::caution
+Remember this is an alpha feature. Functionality may be limited or change without notice.
+:::
