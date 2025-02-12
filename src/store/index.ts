@@ -32,7 +32,7 @@ declare global {
       DUCK_UI_EXTERNAL_PORT: string;
       DUCK_UI_EXTERNAL_USER: string;
       DUCK_UI_EXTERNAL_PASS: string;
-      DUCK_UI_EXTERNAL_DATABASE_NAME: string
+      DUCK_UI_EXTERNAL_DATABASE_NAME: string;
     };
   }
 }
@@ -460,32 +460,22 @@ export const useDuckStore = create<DuckStoreState>()(
         initialize: async () => {
           let initialConnections: ConnectionProvider[] = [];
 
-          // // check if there's window.env existis on window object
-
-          // let externalConnectionName;
-          // let externalHost;
-          // let externalPort;
-          // let externalUser;
-          // let externalPass;
-          // let externalDatabaseName;
-
-          // if (window.env) {
-          //   externalConnectionName =
-          //     window.env.DUCK_UI_EXTERNAL_CONNECTION_NAME;
-          //   externalHost = window.env.DUCK_UI_EXTERNAL_HOST;
-          //   externalPort = window.env.DUCK_UI_EXTERNAL_PORT;
-          //   externalUser = window.env.DUCK_UI_EXTERNAL_USER;
-          //   externalPass = window.env.DUCK_UI_EXTERNAL_PASS;
-          //   externalDatabaseName = window.env.DUCK_UI_EXTERNAL_DATABASE_NAME;
-          // }
-
-          const externalConnectionName = import.meta.env.DUCK_UI_EXTERNAL_CONNECTION_NAME;
-          const externalHost = import.meta.env.DUCK_UI_EXTERNAL_HOST;
-          const externalPort = import.meta.env.DUCK_UI_EXTERNAL_PORT;
-          const externalUser = import.meta.env.DUCK_UI_EXTERNAL_USER;
-          const externalPass = import.meta.env.DUCK_UI_EXTERNAL_PASS;
-          const externalDatabaseName = import.meta.env.DUCK_UI_EXTERNAL_DATABASE_NAME;
-
+          // check if there's window.env existis on window obje
+          let externalConnectionName;
+          let externalHost;
+          let externalPort;
+          let externalUser;
+          let externalPass;
+          let externalDatabaseName;
+          if (window.env) {
+            externalConnectionName =
+              window.env.DUCK_UI_EXTERNAL_CONNECTION_NAME;
+            externalHost = window.env.DUCK_UI_EXTERNAL_HOST;
+            externalPort = window.env.DUCK_UI_EXTERNAL_PORT;
+            externalUser = window.env.DUCK_UI_EXTERNAL_USER;
+            externalPass = window.env.DUCK_UI_EXTERNAL_PASS;
+            externalDatabaseName = window.env.DUCK_UI_EXTERNAL_DATABASE_NAME;
+          }
 
           const wasmConnection: ConnectionProvider = {
             environment: "APP",
