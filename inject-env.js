@@ -13,7 +13,10 @@ const envVars = {
   DUCK_UI_EXTERNAL_USER: process.env.DUCK_UI_EXTERNAL_USER || "",
   DUCK_UI_EXTERNAL_PASS: process.env.DUCK_UI_EXTERNAL_PASS || "",
   DUCK_UI_EXTERNAL_DATABASE_NAME:
-    process.env.DUCK_UI_EXTERNAL_DATABASE_NAME || ""
+    process.env.DUCK_UI_EXTERNAL_DATABASE_NAME || "",
+  // Add new configuration for DuckDB settings
+  DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS:
+    process.env.DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS === "true" || false
 };
 
 const scriptContent = `

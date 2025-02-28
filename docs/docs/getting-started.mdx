@@ -4,9 +4,9 @@ title: Getting Started
 description: Get started with Duck-UI - A web-based interface for DuckDB
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-import { Terminal, Package, FileSearch } from 'lucide-react';
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+import { Terminal, Package, FileSearch } from "lucide-react";
 
 # Getting Started with Duck-UI
 
@@ -21,10 +21,9 @@ Choose your preferred installation method:
       <div style={{ marginBottom: '1rem' }}>
       The easiest way to get started with Duck-UI is using Docker. You can use either the simple `docker run` command or Docker Compose.
 
-      
       <details>
         <summary>Using <code>docker run</code></summary>
-      
+
         Run this command:
         ```bash
         docker run -p 5522:5522 ghcr.io/caioricciuti/duck-ui:latest
@@ -45,6 +44,16 @@ Choose your preferred installation method:
             restart: always
             ports:
               - "${DUCK_UI_PORT:-5522}:5522"
+            environment:
+              # External connection (optional)
+              - DUCK_UI_EXTERNAL_CONNECTION_NAME=${DUCK_UI_EXTERNAL_CONNECTION_NAME:-}
+              - DUCK_UI_EXTERNAL_HOST=${DUCK_UI_EXTERNAL_HOST:-}
+              - DUCK_UI_EXTERNAL_PORT=${DUCK_UI_EXTERNAL_PORT:-}
+              - DUCK_UI_EXTERNAL_USER=${DUCK_UI_EXTERNAL_USER:-}
+              - DUCK_UI_EXTERNAL_PASS=${DUCK_UI_EXTERNAL_PASS:-}
+              - DUCK_UI_EXTERNAL_DATABASE_NAME=${DUCK_UI_EXTERNAL_DATABASE_NAME:-}
+              # DuckDB configuration
+              - DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS=${DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS:-false}
         ```
 
         2.  Run docker compose:
@@ -57,6 +66,7 @@ Choose your preferred installation method:
 
       </details>
     </div>
+
   </TabItem>
   <TabItem value="source" label="From Source">
     If you prefer to run from source, follow these steps:
@@ -84,25 +94,208 @@ Choose your preferred installation method:
     ```
 
     The application will be available at `http://localhost:5173`.
+
   </TabItem>
 </Tabs>
+
+## Environment Variables
+
+Duck-UI can be customized through environment variables when running with Docker:
+
+<div className="table-responsive">
+  <table>
+    <thead>
+      <tr>
+        <th>Variable</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <code>DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS</code>
+        </td>
+        <td>
+          Allow unsigned DuckDB extensions to be loaded (useful for custom or
+          development extensions)
+        </td>
+        <td>
+          <code>false</code>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <code>DUCK_UI_EXTERNAL_CONNECTION_NAME</code>
+        </td>
+        <td>Display name for external DuckDB connection</td>
+        <td>
+          <code>""</code>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <code>DUCK_UI_EXTERNAL_HOST</code>
+        </td>
+        <td>Host URL for external DuckDB server</td>
+        <td>
+          <code>""</code>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <code>DUCK_UI_EXTERNAL_PORT</code>
+        </td>
+        <td>Port for external DuckDB server</td>
+        <td>
+          <code>null</code>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <code>DUCK_UI_EXTERNAL_USER</code>
+        </td>
+        <td>Username for external connection</td>
+        <td>
+          <code>""</code>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <code>DUCK_UI_EXTERNAL_PASS</code>
+        </td>
+        <td>Password for external connection</td>
+        <td>
+          <code>""</code>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <code>DUCK_UI_EXTERNAL_DATABASE_NAME</code>
+        </td>
+        <td>Database name for external connection</td>
+        <td>
+          <code>""</code>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+### Example with Environment Variables
+
+```bash
+docker run -p 5522:5522 \
+  -e DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS=true \
+  -e DUCK_UI_EXTERNAL_CONNECTION_NAME="My DuckDB Server" \
+  -e DUCK_UI_EXTERNAL_HOST="https://duckdb-server.example.com" \
+  -e DUCK_UI_EXTERNAL_PORT=8000 \
+  -e DUCK_UI_EXTERNAL_USER="duckuser" \
+  -e DUCK_UI_EXTERNAL_PASS="duckpass" \
+  ghcr.io/caioricciuti/duck-ui:latest
+```
 
 ## Core Features
 
 ### SQL Editor
+
 - Write and execute SQL queries with syntax highlighting
 - Auto-completion support
 - Execute queries using `Cmd/Ctrl + Enter`
 - View results in a formatted table
 
 ### Data Import
-Import your data from various formats:
-- CSV files
-- JSON files
-- Parquet files
-- Apache Arrow files
+
+Duck-UI supports importing data from various file formats:
+
+<div className="row">
+  <div className="col col--6">
+    <h4>Supported File Formats</h4>
+    <ul>
+      <li>CSV files (.csv)</li>
+      <li>JSON files (.json)</li>
+      <li>Parquet files (.parquet)</li>
+      <li>Apache Arrow files (.arrow)</li>
+      <li>Excel files (.xlsx)</li>
+      <li>DuckDB database files (.duckdb)</li>
+    </ul>
+  </div>
+  <div className="col col--6">
+    <h4>Import Features</h4>
+    <ul>
+      <li>Drag-and-drop interface</li>
+      <li>Multiple file import</li>
+      <li>Custom table naming</li>
+      <li>Automatic schema detection</li>
+      <li>Format-specific options</li>
+      <li>Import progress tracking</li>
+    </ul>
+  </div>
+</div>
+
+#### Enhanced CSV Import Options
+
+When importing CSV files, Duck-UI provides advanced configuration options:
+
+<div
+  className="table-responsive"
+  style={{ marginTop: "1rem", marginBottom: "1rem" }}
+>
+  <table>
+    <thead>
+      <tr>
+        <th>Option</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Header Row</td>
+        <td>Treat the first row as column headers</td>
+        <td>True</td>
+      </tr>
+      <tr>
+        <td>Auto-detect Types</td>
+        <td>Automatically detect column data types</td>
+        <td>True</td>
+      </tr>
+      <tr>
+        <td>Ignore Errors</td>
+        <td>Skip rows with parsing errors</td>
+        <td>True</td>
+      </tr>
+      <tr>
+        <td>Pad Missing Columns</td>
+        <td>Fill missing columns with NULL values</td>
+        <td>True</td>
+      </tr>
+      <tr>
+        <td>Delimiter</td>
+        <td>Character used to separate columns</td>
+        <td>Comma (,)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+To import data:
+
+1. Click the "Import Files" button in the sidebar
+2. Drag & drop files or use the file picker
+3. Configure import options for each file
+4. Click "Import" to load your data
+
+:::tip
+For large CSV files with complex schemas, consider using a combination of "Auto-detect Types" and "Ignore Errors" to ensure the best import results.
+:::
+
+:::info
+File must have a maximum of 2gb!
+:::
 
 ### Data Explorer
+
 - Browse databases and tables
 - View table schemas
 - Preview table contents
@@ -110,11 +303,11 @@ Import your data from various formats:
 
 ### Keyboard Shortcuts
 
-| Action | Shortcut |
-|--------|----------|
-| Expand/Shrink Sidebar | `Cmd/Ctrl + B` |
-| Open Search Bar | `Cmd/Ctrl + K` |
-| Run Query | `Cmd/Ctrl + Enter` |
+| Action                | Shortcut                   |
+| --------------------- | -------------------------- |
+| Expand/Shrink Sidebar | `Cmd/Ctrl + B`             |
+| Open Search Bar       | `Cmd/Ctrl + K`             |
+| Run Query             | `Cmd/Ctrl + Enter`         |
 | Run Highlighted Query | `Cmd/Ctrl + Shift + Enter` |
 
 ## Quick Start Example
@@ -124,6 +317,7 @@ Here's a quick example to get you started:
 1. **Launch Duck-UI** and navigate to the SQL Editor
 
 2. **Create a sample table**:
+
    ```sql
    CREATE TABLE users (
      id INTEGER,

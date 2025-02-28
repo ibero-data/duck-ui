@@ -38,13 +38,15 @@ docker run -p 5522:5522 \
     -e DUCK_UI_EXTERNAL_PORT=443 \
     -e DUCK_UI_EXTERNAL_USER="" \
     -e DUCK_UI_EXTERNAL_PASS="" \
-    -e DUCK_UI_EXTERNAL_DATABASE_NAME=""
+    -e DUCK_UI_EXTERNAL_DATABASE_NAME="" \
+    -e DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS="true"
 ```
 
 :::note
 - DUCK_UI_EXTERNAL_HOST: Currently, only Quackpy - That's running http_server extension under the hood is available as a provider
 - USER/PASS: Any values can be used to create credentials
 - DATABASE_NAME: Not required for this implementation (leave empty)
+- DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: Set to "true" if you need to use unsigned DuckDB extensions
 :::
 
 ### Method 2: User Interface

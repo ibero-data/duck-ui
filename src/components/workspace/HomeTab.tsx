@@ -106,9 +106,6 @@ SELECT * FROM read_csv_auto('https://raw.githubusercontent.com/tobilg/public-clo
 
 -- Remote JSON from API call
 SELECT * FROM read_json('https://api.tvmaze.com/search/shows?q=duck', auto_detect=true);
-
--- Attach remote database
-ATTACH 'https://raw.githubusercontent.com/tobilg/aws-iam-data/main/data/db/iam.duckdb' as aws_iam (READ_ONLY);
 `,
   "Duck UI Explore"
       );

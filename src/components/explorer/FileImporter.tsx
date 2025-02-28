@@ -85,6 +85,16 @@ interface FileImportState {
   error?: string;
 }
 
+// CSV import options
+interface CsvImportOptions {
+  ignoreErrors: boolean;
+  nullPadding: boolean;
+  allVarchar: boolean;
+  header: boolean;
+  delimiter: string;
+  autoDetect: boolean;
+}
+
 interface FileImporterProps {
   isSheetOpen: boolean;
   setIsSheetOpen: (open: boolean) => void;
@@ -98,6 +108,8 @@ interface FileDetailsProps {
   status: FileImportState;
   onRemove: () => void;
   onRetry: () => void;
+  csvOptions?: CsvImportOptions;
+  onCsvOptionsChange?: (options: CsvImportOptions) => void;
 }
 
 // Utility Functions
@@ -146,10 +158,14 @@ const FileDetails: React.FC<FileDetailsProps> = ({
   status,
   onRemove,
   onRetry,
+  csvOptions,
+  onCsvOptionsChange,
 }) => {
   const [tableNameError, setTableNameError] = useState<string | null>(null);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const fileType = file.name.split(".").pop()?.toLowerCase() || "";
   const lastModified = new Date(file.lastModified);
+  const isCsvFile = fileType === "csv";
 
   useEffect(() => {
     try {
@@ -163,6 +179,16 @@ const FileDetails: React.FC<FileDetailsProps> = ({
       );
     }
   }, [tableName]);
+
+  // Handle CSV option changes
+  const handleCsvOptionChange = (key: keyof CsvImportOptions, value: any) => {
+    if (onCsvOptionsChange && csvOptions) {
+      onCsvOptionsChange({
+        ...csvOptions,
+        [key]: value,
+      });
+    }
+  };
 
   return (
     <div className="rounded-lg border p-4 shadow-sm">
@@ -194,7 +220,7 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                   </Tooltip>
                 </TooltipProvider>
 
-                <span className="uppercase bg-gray-100 px-2 py-0.5 rounded text-xs">
+                <span className="uppercase px-2 py-0.5 rounded text-xs">
                   {fileType}
                 </span>
               </div>
@@ -242,6 +268,146 @@ const FileDetails: React.FC<FileDetailsProps> = ({
             </p>
           </div>
 
+          {/* CSV import options */}
+          {isCsvFile && csvOptions && (
+            <div className="mt-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <h4 className="font-medium text-sm">CSV Import Options</h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                >
+                  {showAdvancedOptions ? "Hide Options" : "Show Options"}
+                </Button>
+              </div>
+
+              {showAdvancedOptions && (
+                <div className="p-3 rounded-md space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`header-${file.name}`}
+                        checked={csvOptions.header}
+                        onChange={(e) =>
+                          handleCsvOptionChange("header", e.target.checked)
+                        }
+                        disabled={
+                          status.status === "uploading" ||
+                          status.status === "processing"
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <Label
+                        htmlFor={`header-${file.name}`}
+                        className="text-sm"
+                      >
+                        Has header row
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`auto-detect-${file.name}`}
+                        checked={csvOptions.autoDetect}
+                        onChange={(e) =>
+                          handleCsvOptionChange("autoDetect", e.target.checked)
+                        }
+                        disabled={
+                          status.status === "uploading" ||
+                          status.status === "processing"
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <Label
+                        htmlFor={`auto-detect-${file.name}`}
+                        className="text-sm"
+                      >
+                        Auto-detect types
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`ignore-errors-${file.name}`}
+                        checked={csvOptions.ignoreErrors}
+                        onChange={(e) =>
+                          handleCsvOptionChange(
+                            "ignoreErrors",
+                            e.target.checked
+                          )
+                        }
+                        disabled={
+                          status.status === "uploading" ||
+                          status.status === "processing"
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <Label
+                        htmlFor={`ignore-errors-${file.name}`}
+                        className="text-sm"
+                      >
+                        Ignore errors
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`null-padding-${file.name}`}
+                        checked={csvOptions.nullPadding}
+                        onChange={(e) =>
+                          handleCsvOptionChange("nullPadding", e.target.checked)
+                        }
+                        disabled={
+                          status.status === "uploading" ||
+                          status.status === "processing"
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <Label
+                        htmlFor={`null-padding-${file.name}`}
+                        className="text-sm"
+                      >
+                        Pad missing columns
+                      </Label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor={`delimiter-${file.name}`}
+                      className="text-sm"
+                    >
+                      Delimiter
+                    </Label>
+                    <div className="max-w-xs">
+                      <Input
+                        id={`delimiter-${file.name}`}
+                        value={csvOptions.delimiter}
+                        onChange={(e) =>
+                          handleCsvOptionChange("delimiter", e.target.value)
+                        }
+                        placeholder="Delimiter character"
+                        className="h-8"
+                        disabled={
+                          status.status === "uploading" ||
+                          status.status === "processing"
+                        }
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Common values: , (comma), ; (semicolon), tab, pipe (|)
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {status.status === "uploading" && status.progress !== undefined && (
             <div className="flex flex-col space-y-2">
               <span className="text-sm text-gray-500">
@@ -282,9 +448,22 @@ const FileImporter: React.FC<FileImporterProps> = ({
   const [importStates, setImportStates] = useState<
     Record<string, FileImportState>
   >({});
+  const [csvOptions, setCsvOptions] = useState<
+    Record<string, CsvImportOptions>
+  >({});
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Default CSV import options
+  const defaultCsvOptions: CsvImportOptions = {
+    ignoreErrors: true,
+    nullPadding: true,
+    allVarchar: false,
+    header: true,
+    delimiter: ",",
+    autoDetect: true,
+  };
 
   const hasFilesToImport = useMemo(() => files.length > 0, [files]);
 
@@ -377,6 +556,20 @@ const FileImporter: React.FC<FileImporterProps> = ({
       );
 
       setTableNames((prev) => ({ ...prev, ...newTableNames }));
+
+      // Initialize CSV options for any CSV files
+      const newCsvOptions = validFiles.reduce<Record<string, CsvImportOptions>>(
+        (acc, file) => {
+          const extension = file.name.split(".").pop()?.toLowerCase();
+          if (extension === "csv") {
+            acc[file.name] = { ...defaultCsvOptions };
+          }
+          return acc;
+        },
+        {}
+      );
+
+      setCsvOptions((prev) => ({ ...prev, ...newCsvOptions }));
 
       const initialImportStates = validFiles.reduce<
         Record<string, FileImportState>
@@ -474,7 +667,21 @@ const FileImporter: React.FC<FileImporterProps> = ({
             .pop()
             ?.toLowerCase() as FileExtension;
           const arrayBuffer = await file.arrayBuffer();
-          await importFile(file.name, arrayBuffer, cleanTableName, fileType);
+
+          // Add options for CSV files
+          const importOptions: Record<string, any> = {};
+          if (fileType === "csv" && csvOptions[file.name]) {
+            importOptions.csv = csvOptions[file.name];
+          }
+
+          await importFile(
+            file.name,
+            arrayBuffer,
+            cleanTableName,
+            fileType,
+            undefined,
+            importOptions
+          );
           updateImportState(file.name, { status: "success" });
           toast.success(`Successfully imported ${file.name}`);
         } catch (e) {
@@ -647,27 +854,42 @@ const FileImporter: React.FC<FileImporterProps> = ({
             <div className="space-y-4">
               <h3 className="font-medium text-lg">Files to Import</h3>
               <div className="space-y-3">
-                {files.map((file) => (
-                  <FileDetails
-                    key={file.name}
-                    file={file}
-                    tableName={tableNames[file.name] || ""}
-                    onTableNameChange={(name) =>
-                      setTableNames((prev) => ({
-                        ...prev,
-                        [file.name]: name,
-                      }))
-                    }
-                    status={
-                      importStates[file.name] || {
-                        fileName: file.name,
-                        status: "pending",
+                {files.map((file) => {
+                  const fileType = file.name.split(".").pop()?.toLowerCase();
+                  const isCsvFile = fileType === "csv";
+
+                  return (
+                    <FileDetails
+                      key={file.name}
+                      file={file}
+                      tableName={tableNames[file.name] || ""}
+                      onTableNameChange={(name) =>
+                        setTableNames((prev) => ({
+                          ...prev,
+                          [file.name]: name,
+                        }))
                       }
-                    }
-                    onRemove={() => removeFile(file.name)}
-                    onRetry={() => retryFileUpload(file.name)}
-                  />
-                ))}
+                      status={
+                        importStates[file.name] || {
+                          fileName: file.name,
+                          status: "pending",
+                        }
+                      }
+                      csvOptions={isCsvFile ? csvOptions[file.name] : undefined}
+                      onCsvOptionsChange={
+                        isCsvFile
+                          ? (options) =>
+                              setCsvOptions((prev) => ({
+                                ...prev,
+                                [file.name]: options,
+                              }))
+                          : undefined
+                      }
+                      onRemove={() => removeFile(file.name)}
+                      onRetry={() => retryFileUpload(file.name)}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}

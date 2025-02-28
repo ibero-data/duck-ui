@@ -16,13 +16,40 @@ Duck-UI is a web-based interface for interacting with DuckDB, a high-performance
 ## Getting Started
 
 
-### Docker (Recomended)
+### Docker (Recommended)
 
 ```bash
 docker run -p 5522:5522 ghcr.io/caioricciuti/duck-ui:latest
 ```
 
 Open your browser and navigate to `http://localhost:5522`.
+
+### Environment Variables
+
+You can customize Duck-UI behavior using environment variables:
+
+```bash
+# For external DuckDB connections
+docker run -p 5522:5522 \
+  -e DUCK_UI_EXTERNAL_CONNECTION_NAME="My DuckDB Server" \
+  -e DUCK_UI_EXTERNAL_HOST="http://duckdb-server" \
+  -e DUCK_UI_EXTERNAL_PORT="8000" \
+  -e DUCK_UI_EXTERNAL_USER="username" \
+  -e DUCK_UI_EXTERNAL_PASS="password" \
+  -e DUCK_UI_EXTERNAL_DATABASE_NAME="my_database" \
+  -e DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS="true" \
+  ghcr.io/caioricciuti/duck-ui:latest
+```
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DUCK_UI_EXTERNAL_CONNECTION_NAME` | Name for the external connection | "" |
+| `DUCK_UI_EXTERNAL_HOST` | Host URL for external DuckDB | "" |
+| `DUCK_UI_EXTERNAL_PORT` | Port for external DuckDB | null |
+| `DUCK_UI_EXTERNAL_USER` | Username for external connection | "" |
+| `DUCK_UI_EXTERNAL_PASS` | Password for external connection | "" |
+| `DUCK_UI_EXTERNAL_DATABASE_NAME` | Database name for external connection | "" |
+| `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow unsigned extensions in DuckDB | false |
 
 
 
@@ -100,6 +127,11 @@ The output will be in the `dist` directory.
 
 - Click on the "Import Files" button to upload CSV, JSON, Parquet, or Arrow files.
 - Configure the table name and import settings.
+- For CSV files, you can customize import options:
+  - Header row detection
+  - Auto-detection of column types
+  - Delimiter specification
+  - Error handling (ignore errors, null padding for missing columns)
 - View the imported data in the Data Explorer.
 
 ### Data Explorer

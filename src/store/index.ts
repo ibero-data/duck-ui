@@ -33,6 +33,7 @@ declare global {
       DUCK_UI_EXTERNAL_USER: string;
       DUCK_UI_EXTERNAL_PASS: string;
       DUCK_UI_EXTERNAL_DATABASE_NAME: string;
+      DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: boolean;
     };
   }
 }
@@ -148,7 +149,8 @@ export interface DuckStoreState {
     fileContent: ArrayBuffer,
     tableName: string,
     fileType: string,
-    database?: string
+    database?: string,
+    options?: Record<string, any>
   ) => Promise<void>;
   createTab: (
     type?: EditorTabType,
@@ -309,11 +311,27 @@ const initializeWasmConnection = async (): Promise<{
   const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
   const worker = new Worker(bundle.mainWorker!);
   const logger = new duckdb.VoidLogger();
+
+  // Check if unsigned extensions are allowed from environment
+  const allowUnsignedExtensions =
+    window.env?.DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS || false;
+
+  // Create database with configuration
   const db = new duckdb.AsyncDuckDB(logger, worker);
+
   await db.instantiate(bundle.mainModule);
+
+  const dbConfig: duckdb.DuckDBConfig = {
+    allowUnsignedExtensions: allowUnsignedExtensions,
+  };
+
+  await db.open(dbConfig);
+
   const connection = await db.connect();
   // Validate immediately
   validateConnection(connection);
+
+  // Install and load extensions
   await Promise.all([
     connection.query(`INSTALL excel`),
     connection.query(`LOAD excel`),
@@ -460,22 +478,33 @@ export const useDuckStore = create<DuckStoreState>()(
         initialize: async () => {
           let initialConnections: ConnectionProvider[] = [];
 
-          // check if there's window.env existis on window obje
-          let externalConnectionName;
-          let externalHost;
-          let externalPort;
-          let externalUser;
-          let externalPass;
-          let externalDatabaseName;
-          if (window.env) {
-            externalConnectionName =
-              window.env.DUCK_UI_EXTERNAL_CONNECTION_NAME;
-            externalHost = window.env.DUCK_UI_EXTERNAL_HOST;
-            externalPort = window.env.DUCK_UI_EXTERNAL_PORT;
-            externalUser = window.env.DUCK_UI_EXTERNAL_USER;
-            externalPass = window.env.DUCK_UI_EXTERNAL_PASS;
-            externalDatabaseName = window.env.DUCK_UI_EXTERNAL_DATABASE_NAME;
-          }
+          // Extract environment variables if available
+          const envVars: Window["env"] = window.env || {
+            DUCK_UI_EXTERNAL_CONNECTION_NAME: "",
+            DUCK_UI_EXTERNAL_HOST: "",
+            DUCK_UI_EXTERNAL_PORT: "",
+            DUCK_UI_EXTERNAL_USER: "",
+            DUCK_UI_EXTERNAL_PASS: "",
+            DUCK_UI_EXTERNAL_DATABASE_NAME: "",
+            DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: false,
+          };
+          const {
+            DUCK_UI_EXTERNAL_CONNECTION_NAME: externalConnectionName = "",
+            DUCK_UI_EXTERNAL_HOST: externalHost = "",
+            DUCK_UI_EXTERNAL_PORT: externalPort = "",
+            DUCK_UI_EXTERNAL_USER: externalUser = "",
+            DUCK_UI_EXTERNAL_PASS: externalPass = "",
+            DUCK_UI_EXTERNAL_DATABASE_NAME: externalDatabaseName = "",
+            DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: allowUnsignedExtensions = false,
+          } = envVars;
+
+          // Log config for debugging
+          console.log("DuckDB Config:", {
+            allowUnsignedExtensions,
+            hasExternalConnection: Boolean(
+              externalConnectionName && externalHost && externalPort
+            ),
+          });
 
           const wasmConnection: ConnectionProvider = {
             environment: "APP",
@@ -589,7 +618,8 @@ export const useDuckStore = create<DuckStoreState>()(
           fileContent,
           tableName,
           fileType,
-          database = "memory"
+          database = "memory",
+          options = {}
         ) => {
           try {
             const { db, connection, currentConnection } = get();
@@ -614,10 +644,56 @@ export const useDuckStore = create<DuckStoreState>()(
               await get().fetchDatabasesAndTablesInfo();
               return;
             }
-            await connection.query(`
-              CREATE OR REPLACE TABLE "${tableName}" AS 
-              SELECT * FROM read_${fileType.toLowerCase()}('${fileName}')
-            `);
+
+            // Enhanced import with format-specific options
+            if (fileType.toLowerCase() === "csv") {
+              // Use provided options or defaults
+              const csvOptions = options.csv || {};
+              const headerOption =
+                csvOptions.header !== undefined ? csvOptions.header : true;
+              const autoDetectOption =
+                csvOptions.autoDetect !== undefined
+                  ? csvOptions.autoDetect
+                  : true;
+              const ignoreErrorsOption =
+                csvOptions.ignoreErrors !== undefined
+                  ? csvOptions.ignoreErrors
+                  : true;
+              const nullPaddingOption =
+                csvOptions.nullPadding !== undefined
+                  ? csvOptions.nullPadding
+                  : true;
+              const allVarcharOption =
+                csvOptions.allVarchar !== undefined
+                  ? csvOptions.allVarchar
+                  : false;
+              const delimiterOption = csvOptions.delimiter || ",";
+
+              // Build CSV options string
+              const optionsString = `
+                header=${headerOption}, 
+                auto_detect=${autoDetectOption}, 
+                all_varchar=${allVarcharOption}, 
+                ignore_errors=${ignoreErrorsOption}, 
+                null_padding=${nullPaddingOption},
+                delim='${delimiterOption}'
+              `;
+
+              await connection.query(`
+                CREATE OR REPLACE TABLE "${tableName}" AS 
+                SELECT * FROM read_csv('${fileName}', ${optionsString})
+              `);
+            } else if (fileType.toLowerCase() === "json") {
+              await connection.query(`
+                CREATE OR REPLACE TABLE "${tableName}" AS 
+                SELECT * FROM read_json('${fileName}', auto_detect=true, ignore_errors=true)
+              `);
+            } else {
+              await connection.query(`
+                CREATE OR REPLACE TABLE "${tableName}" AS 
+                SELECT * FROM read_${fileType.toLowerCase()}('${fileName}')
+              `);
+            }
             const verification = await connection.query(`
               SELECT COUNT(*) AS count 
               FROM information_schema.tables 
