@@ -55,13 +55,14 @@ export interface ConnectionProvider {
   environment: "APP" | "ENV" | "BUILT_IN";
   id: string;
   name: string;
-  scope: "WASM" | "External";
+  scope: "WASM" | "External" | "OPFS";
   host?: string;
   port?: number;
   user?: string;
   password?: string;
   database?: string;
   authMode?: "none" | "password" | "api_key";
+  path?: string;
 }
 
 export interface ConnectionList {
@@ -367,6 +368,44 @@ const testExternalConnection = async (
 };
 
 /**
+ * Tests an OPFS connection by executing a basic query.
+ */
+const testOPFSConnection = async (conn: ConnectionProvider): Promise<{
+  db: duckdb.AsyncDuckDB;
+  connection: duckdb.AsyncDuckDBConnection;
+}> => {
+  const { path } = conn;
+  if (!path) {
+    throw new Error("Path must be defined for OPFS connections.");
+  }
+
+  const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
+  const worker = new Worker(bundle.mainWorker!);
+  const logger = new duckdb.VoidLogger();
+  const db = new duckdb.AsyncDuckDB(logger, worker);
+
+  await db.instantiate(bundle.mainModule);
+
+  let opfsPath = path;
+  if (path.startsWith('/')) {
+    opfsPath = path.slice(1);
+  }
+
+  await db.open({
+    path: `opfs://${opfsPath}`,
+    accessMode: duckdb.DuckDBAccessMode.AUTOMATIC
+  });
+
+  const connection = await db.connect();
+  // Validate immediately
+  validateConnection(connection);
+
+  await connection.query(`show tables`);
+
+  return { db, connection };
+};
+
+/**
  * Helper to update query history.
  */
 
@@ -384,7 +423,7 @@ const updateHistory = (
   const existingIndex = currentHistory.findIndex(
     (item) => item.query === query
   );
-  let newHistory =
+  const newHistory =
     existingIndex !== -1
       ? [newItem, ...currentHistory.filter((_, idx) => idx !== existingIndex)]
       : [newItem, ...currentHistory];
@@ -476,7 +515,7 @@ export const useDuckStore = create<DuckStoreState>()(
 
         // Initialize DuckDB using WASM or External.
         initialize: async () => {
-          let initialConnections: ConnectionProvider[] = [];
+          const initialConnections: ConnectionProvider[] = [];
 
           // Extract environment variables if available
           const envVars: Window["env"] = window.env || {
@@ -932,8 +971,11 @@ export const useDuckStore = create<DuckStoreState>()(
                 `A connection with the name "${connection.name}" already exists.`
               );
             }
+            console.log(connection);
             if (connection.scope === "External") {
               await testExternalConnection(connection);
+            } else if (connection.scope === "OPFS") {
+              await testOPFSConnection(connection);
             }
             set((state) => ({
               connectionList: {

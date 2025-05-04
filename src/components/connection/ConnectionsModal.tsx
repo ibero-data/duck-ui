@@ -31,16 +31,27 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDuckStore } from "@/store";
 
-const connectionSchema = z.object({
-  name: z
-    .string()
-    .min(2, {
-      message: "Connection name must be at least 2 characters.",
-    })
-    .max(30, {
-      message: "Connection name must not exceed 30 characters.",
-    }),
-  scope: z.enum(["External"]),
+const scopeEnum = z.enum(["External", "OPFS"]);
+const nameSchema = z
+  .string()
+  .min(2, {
+    message: "Connection name must be at least 2 characters.",
+  })
+  .max(30, {
+    message: "Connection name must not exceed 30 characters.",
+  });
+
+const opfsSchema = z.object({
+  name: nameSchema,
+  scope: z.literal(scopeEnum.enum.OPFS),
+  path: z.string().min(1, {
+    message: "Path is required.",
+  }),
+});
+
+const externalSchema = z.object({
+  name: nameSchema,
+  scope: z.literal(scopeEnum.enum.External),
   host: z.string().url({
     message: "Host must be a valid URL.",
   }),
@@ -57,6 +68,8 @@ const connectionSchema = z.object({
   authMode: z.enum(["none", "password", "api_key"]).optional(),
   apiKey: z.string().optional(),
 });
+
+const connectionSchema = z.discriminatedUnion("scope", [opfsSchema, externalSchema]);
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
@@ -87,6 +100,7 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
       password: "",
       authMode: "none",
       apiKey: "",
+      path: "",
     },
     mode: "onChange",
   });
@@ -148,6 +162,7 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="External">External</SelectItem>
+                        <SelectItem value="OPFS">OPFS</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -276,6 +291,22 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                       )}
                     />
                   )}
+                </>
+              )}
+              {form.watch("scope") === "OPFS" && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="path"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Path</FormLabel>
+                        <FormControl>
+                          <Input placeholder="/my_database.db" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
                 </>
               )}
               <DialogFooter>

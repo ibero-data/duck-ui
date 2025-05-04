@@ -49,16 +49,27 @@ import {
 // Define ConnectionFormValues type here for use in Connections component
 import * as z from "zod";
 
-const connectionSchema = z.object({
-  name: z
-    .string()
-    .min(2, {
-      message: "Connection name must be at least 2 characters.",
-    })
-    .max(30, {
-      message: "Connection name must not exceed 30 characters.",
-    }),
-  scope: z.enum(["External"]),
+const scopeEnum = z.enum(["External", "OPFS"]);
+const nameSchema = z
+  .string()
+  .min(2, {
+    message: "Connection name must be at least 2 characters.",
+  })
+  .max(30, {
+    message: "Connection name must not exceed 30 characters.",
+  });
+
+const opfsSchema = z.object({
+  name: nameSchema,
+  scope: z.literal(scopeEnum.enum.OPFS),
+  path: z.string().min(1, {
+    message: "Path is required.",
+  }),
+});
+
+const externalSchema = z.object({
+  name: nameSchema,
+  scope: z.literal(scopeEnum.enum.External),
   host: z.string().url({
     message: "Host must be a valid URL.",
   }),
@@ -75,6 +86,8 @@ const connectionSchema = z.object({
   authMode: z.enum(["none", "password", "api_key"]).optional(),
   apiKey: z.string().optional(),
 });
+
+const connectionSchema = z.discriminatedUnion("scope", [opfsSchema, externalSchema]);
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
