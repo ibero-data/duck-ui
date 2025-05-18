@@ -88,26 +88,9 @@ const HomeTab = () => {
       createTab(
         "sql",
         `
--- Welcome to Duck UI Explore 🦆
--- You can run the following queries to get a grasp of it.
--- Remote Parquet scans:
 SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' LIMIT 1000;
-
-SELECT avg(c_acctbal) FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/customer.parquet';
-
-SELECT count(*)::int as aws_service_cnt FROM 'https://raw.githubusercontent.com/tobilg/aws-iam-data/main/data/parquet/aws_services.parquet';
-
-SELECT * FROM 'https://raw.githubusercontent.com/tobilg/aws-edge-locations/main/data/aws-edge-locations.parquet';
-
-SELECT cloud_provider, sum(ip_address_cnt)::int as cnt FROM 'https://raw.githubusercontent.com/tobilg/public-cloud-provider-ip-ranges/main/data/providers/all.parquet' GROUP BY cloud_provider;
-                
--- Remote CSV scan
-SELECT * FROM read_csv_auto('https://raw.githubusercontent.com/tobilg/public-cloud-provider-ip-ranges/main/data/providers/all.csv');
-
--- Remote JSON from API call
-SELECT * FROM read_json('https://api.tvmaze.com/search/shows?q=duck', auto_detect=true);
 `,
-  "Duck UI Explore"
+        "Duck UI Explore"
       );
     }
   };
