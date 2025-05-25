@@ -634,7 +634,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
         const state = importStates[file.name];
         if (state?.status === "success") return;
 
-        let cleanTableName = tableNames[file.name];
+        const cleanTableName = tableNames[file.name];
         try {
           tableNameSchema.parse(cleanTableName);
         } catch (error) {
