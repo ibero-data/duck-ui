@@ -121,7 +121,7 @@ const Connections = () => {
     const connectionData: ConnectionProvider = {
       ...values,
       id: crypto.randomUUID(),
-      port: values.port ? parseInt(values.port, 10) : undefined,
+      port: values.scope === "External" && values.port ? parseInt(values.port, 10) : undefined,
       environment: "APP",
     };
     await addConnection(connectionData);
@@ -135,7 +135,7 @@ const Connections = () => {
     const connectionData: ConnectionProvider = {
       ...values,
       id: editingConnectionId,
-      port: values.port ? parseInt(values.port, 10) : undefined,
+      port: values.scope === "External" && values.port ? parseInt(values.port, 10) : undefined,
       environment: "APP",
     };
     updateConnection(connectionData);

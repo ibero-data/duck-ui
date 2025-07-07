@@ -20,22 +20,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Use Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
+          bun-version: latest
 
       - name: Install dependencies
         run: |
           cd docs
-          npm ci
+          bun install
 
       - name: Build website
         run: |
           cd docs
-          npm run build
+          bun run build
 
       - name: Add .nojekyll file
         run: touch docs/build/.nojekyll

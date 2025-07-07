@@ -92,15 +92,14 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
     resolver: zodResolver(connectionSchema),
     defaultValues: initialValues || {
       name: "",
-      scope: "External",
+      scope: "External" as const,
       host: "",
       port: "",
       database: "",
       user: "",
       password: "",
-      authMode: "none",
+      authMode: "none" as const,
       apiKey: "",
-      path: "",
     },
     mode: "onChange",
   });

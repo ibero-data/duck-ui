@@ -33,10 +33,10 @@ jobs:
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.1")
           echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: '20'
+          bun-version: latest
           
       - name: Bump version and update package.json
         id: tag_version
@@ -51,11 +51,13 @@ jobs:
           echo "New version: $new_version"
           echo "New tag: $new_tag"
           
-          npm version $new_version --no-git-tag-version --allow-same-version
+          bun --version
+          # Update package.json version directly
+          sed -i "s/\"version\": \".*\"/\"version\": \"$new_version\"/" package.json
           
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add package.json package-lock.json
+          git add package.json
           git commit -m "chore: bump version to ${new_tag}"
           git push
           

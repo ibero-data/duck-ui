@@ -42,13 +42,14 @@ export interface CurrentConnection {
   environment: "APP" | "ENV" | "BUILT_IN";
   id: string;
   name: string;
-  scope: "WASM" | "External";
+  scope: "WASM" | "External" | "OPFS";
   host?: string;
   port?: number;
   user?: string;
   password?: string;
   database?: string;
   authMode?: "none" | "password" | "api_key";
+  path?: string;
 }
 
 export interface ConnectionProvider {
@@ -1043,6 +1044,7 @@ export const useDuckStore = create<DuckStoreState>()(
                 password: connectionProvider.password,
                 database: connectionProvider.database,
                 authMode: connectionProvider.authMode,
+                path: connectionProvider.path,
               },
               isLoading: false,
             });
