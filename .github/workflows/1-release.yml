@@ -58,8 +58,14 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add package.json
-          git commit -m "chore: bump version to ${new_tag}"
-          git push
+          
+          # Only commit and push if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: bump version to ${new_tag}"
+            git push
+          else
+            echo "No changes to commit - version already up to date"
+          fi
           
           git tag "$new_tag"
           git push origin "$new_tag"

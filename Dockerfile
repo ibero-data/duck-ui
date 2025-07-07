@@ -1,32 +1,29 @@
-# Use an official Node runtime as a parent image
-FROM node:20-alpine AS build
+# Use an official Node runtime as a parent image with bun
+FROM oven/bun:1-alpine AS build
 
 # Set the working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json (or yarn.lock)
-COPY package*.json ./
+# Copy package.json and bun.lockb (if exists)
+COPY package.json bun.lockb* ./
 
 # Install dependencies
-RUN npm install
-
-# Run browser list update
-RUN npx update-browserslist-db@latest
+RUN bun install --frozen-lockfile
 
 # Bundle app source inside Docker image
 COPY . .
 
 # Build the app
-RUN npm run build
+RUN bun run build
 
 # Use a second stage to reduce image size
-FROM node:20-alpine
+FROM oven/bun:1-alpine
 
 # Set the working directory for the second stage
 WORKDIR /app
 
 # Install 'serve' to serve the app on port 5522
-RUN npm install -g serve
+RUN bun add -g serve
 
 # Copy the build directory from the first stage to the second stage
 COPY --from=build /app/dist /app
