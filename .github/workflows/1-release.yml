@@ -67,8 +67,12 @@ jobs:
             echo "No changes to commit - version already up to date"
           fi
           
-          git tag "$new_tag"
-          git push origin "$new_tag"
+          if git rev-parse "$new_tag" >/dev/null 2>&1; then
+            echo "Tag $new_tag already exists. Skipping tag creation."
+          else
+            git tag "$new_tag"
+            git push origin "$new_tag"
+          fi
           
           echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 

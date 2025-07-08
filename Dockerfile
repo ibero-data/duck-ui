@@ -22,14 +22,14 @@ FROM oven/bun:1-alpine
 # Set the working directory for the second stage
 WORKDIR /app
 
-# Install 'serve' to serve the app on port 5522
-RUN bun add -g serve
-
 # Copy the build directory from the first stage to the second stage
 COPY --from=build /app/dist /app
 
 # Copy the injection script
 COPY inject-env.js /app/
+
+# Install just serve for serving the built app
+RUN bun add serve
 
 # Expose port 5522
 EXPOSE 5522
@@ -42,10 +42,11 @@ ENV DUCK_UI_EXTERNAL_USER=""
 ENV DUCK_UI_EXTERNAL_PASS=""
 ENV DUCK_UI_EXTERNAL_DATABASE_NAME=""
 
+# Create user and change ownership
 RUN addgroup -S duck-group -g 1001 && adduser -S duck-user -u 1001 -G duck-group
 RUN chown -R duck-user:duck-group /app
 
 USER duck-user
 
-# Run the injection script then serve
-CMD node inject-env.js && serve -s -l 5522
+# Run the injection script then serve using bunx
+CMD bun inject-env.js && bunx serve -s -l 5522
