@@ -1621,16 +1621,13 @@ const FileImporter: React.FC<FileImporterProps> = ({
                 <div className="space-y-2">
                   <p className="font-medium">
                     Drag & drop files here, or
-                    <div>
-                      <Button
-                        variant="outline"
-                        className="mt-2"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        Select Files
-                      </Button>
-                    </div>
                   </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Select Files
+                  </Button>
                   <p className="text-sm text-gray-500">
                     Supported formats: CSV, JSON, Parquet, Arrow and DuckDB
                   </p>

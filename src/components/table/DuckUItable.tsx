@@ -24,13 +24,21 @@ import {
   Copy,
   MousePointer,
   MoreHorizontal,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { useDuckStore } from "@/store";
 
 // Define a generic type for the data row
 type DataRow = Record<string, any>;
@@ -553,12 +561,156 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `yaat-query-results-${new Date().toISOString().slice(0, 19)}.csv`
+      `duck-ui-export-${new Date().toISOString().slice(0, 19)}.csv`
     );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    toast.success("Exported to CSV");
+  };
+
+  const exportToJSON = () => {
+    if (!data || !data.length) return;
+
+    const dataToExport = table
+      .getFilteredRowModel()
+      .rows.map((r) => r.original);
+
+    const jsonString = JSON.stringify(
+      dataToExport,
+      (_, v) => (typeof v === "bigint" ? v.toString() : v),
+      2
+    );
+
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `duck-ui-export-${new Date().toISOString().slice(0, 19)}.json`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success("Exported to JSON");
+  };
+
+  const exportToXLSX = async () => {
+    if (!data || !data.length) return;
+
+    try {
+      // Dynamic import - only load XLSX when needed
+      const XLSX = await import("xlsx");
+
+      const dataToExport = table
+        .getFilteredRowModel()
+        .rows.map((r) => {
+          // Handle BigInt for XLSX
+          const row: Record<string, any> = {};
+          Object.keys(r.original).forEach((key) => {
+            const val = r.original[key];
+            row[key] = typeof val === "bigint" ? val.toString() : val;
+          });
+          return row;
+        });
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+
+      // Auto-size columns
+      const maxWidth = 50;
+      const colWidths = Object.keys(dataToExport[0] || {}).map((key) => ({
+        wch: Math.min(
+          maxWidth,
+          Math.max(
+            key.length,
+            ...dataToExport.slice(0, 100).map((row) => String(row[key] || "").length)
+          )
+        ),
+      }));
+      worksheet["!cols"] = colWidths;
+
+      XLSX.writeFile(
+        workbook,
+        `duck-ui-export-${new Date().toISOString().slice(0, 19)}.xlsx`
+      );
+
+      toast.success("Exported to Excel");
+    } catch (error) {
+      console.error("XLSX export failed:", error);
+      toast.error("Failed to export to Excel");
+    }
+  };
+
+  const exportToDuckDB = async () => {
+    if (!data || !data.length) return;
+
+    try {
+      toast.info("Preparing DuckDB export...");
+
+      const dataToExport = table.getFilteredRowModel().rows.map((r) => r.original);
+
+      // Get current connection from store
+      const { connection, db } = useDuckStore.getState();
+      if (!connection || !db) {
+        throw new Error("Database not initialized");
+      }
+
+      // Use Parquet format (DuckDB native format)
+      const fileName = `export_${new Date().toISOString().slice(0, 19)}.parquet`;
+
+      // Create VALUES clause for the data
+      const createValuesClause = () => {
+        if (dataToExport.length === 0) return "";
+
+        const keys = Object.keys(dataToExport[0]);
+        const values = dataToExport.map((row) => {
+          const rowValues = keys.map((key) => {
+            const val = row[key];
+            if (val === null || val === undefined) return "NULL";
+            if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+            if (typeof val === "bigint") return val.toString();
+            if (typeof val === "object") return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
+            return String(val);
+          });
+          return `(${rowValues.join(", ")})`;
+        });
+
+        return values.join(", ");
+      };
+
+      const valuesClause = createValuesClause();
+      const keys = Object.keys(dataToExport[0]);
+
+      await connection.query(
+        `COPY (SELECT * FROM (VALUES ${valuesClause}) AS t(${keys.map(k => `"${k}"`).join(", ")})) TO '${fileName}' (FORMAT 'parquet')`
+      );
+
+      const buffer = await db.copyFileToBuffer(fileName);
+      await db.dropFile(fileName);
+
+      // Convert Uint8Array to ArrayBuffer for Blob compatibility
+      const arrayBuffer = buffer.buffer.slice(0) as ArrayBuffer;
+      const blob = new Blob([arrayBuffer], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("Exported to Parquet (DuckDB format)");
+    } catch (error) {
+      console.error("DuckDB export failed:", error);
+      toast.error("Failed to export: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
   };
 
   const toggleColumnVisibility = (columnId: string) => {
@@ -821,7 +973,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
           }}
         >
           <Download className="h-3 w-3" />
-          Export CSV
+          Export...
         </button>
       </div>
     );
@@ -927,17 +1079,39 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                 Reset Size
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportToCSV}
-              className="h-8 text-xs"
-              disabled={!data || !data.length}
-              title="Export visible data as CSV"
-            >
-              <Download className="mr-1 h-3.5 w-3.5" />
-              Export CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  disabled={!data || !data.length}
+                  title="Export data in various formats"
+                >
+                  <Download className="mr-1 h-3.5 w-3.5" />
+                  Export
+                  <ChevronDown className="ml-1 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportToCSV}>
+                  <Download className="mr-2 h-3.5 w-3.5" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToJSON}>
+                  <Download className="mr-2 h-3.5 w-3.5" />
+                  Export as JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToXLSX}>
+                  <Download className="mr-2 h-3.5 w-3.5" />
+                  Export as Excel (XLSX)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToDuckDB}>
+                  <Download className="mr-2 h-3.5 w-3.5" />
+                  Export as Parquet
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Selection indicator */}
             {selectedCells.size > 0 && (

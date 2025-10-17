@@ -7,8 +7,10 @@ import {
   ResizablePanelGroup,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DuckUiTable from "@/components/table/DuckUItable";
-import { FileX2 } from "lucide-react";
+import ChartVisualization from "@/components/charts/ChartVisualization";
+import { FileX2, Table, BarChart3 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "../ui/skeleton";
 
@@ -17,7 +19,7 @@ interface SqlTabProps {
 }
 
 const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
-  const { tabs, isExecuting } = useDuckStore();
+  const { tabs, isExecuting, updateTabChartConfig } = useDuckStore();
   const currentTab = tabs.find((tab) => tab.id === tabId);
 
   const renderResults = () => {
@@ -83,11 +85,36 @@ const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
       );
     }
 
-    // Show results table
+    // Show results in tabs (Table and Charts)
     return (
-      <div className="h-full">
-        <DuckUiTable data={currentTab.result.data} />
-      </div>
+      <Tabs defaultValue="table" className="h-full flex flex-col">
+        <TabsList className="mx-4 mt-2">
+          <TabsTrigger value="table" className="flex items-center gap-2">
+            <Table className="w-4 h-4" />
+            Table
+          </TabsTrigger>
+          <TabsTrigger value="charts" className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Charts
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="table" className="flex-1 min-h-0">
+          <div className="h-full">
+            <DuckUiTable data={currentTab.result.data} />
+          </div>
+        </TabsContent>
+        <TabsContent value="charts" className="flex-1 min-h-0">
+          <div className="h-full">
+            <ChartVisualization
+              result={currentTab.result}
+              chartConfig={currentTab.chartConfig}
+              onConfigChange={(config) =>
+                updateTabChartConfig(tabId, config)
+              }
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
     );
   };
 

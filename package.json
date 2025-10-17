@@ -1,7 +1,7 @@
 {
   "name": "duck-ui",
   "private": true,
-  "version": "0.0.14",
+  "version": "0.0.15",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,7 @@
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
-    "@duckdb/duckdb-wasm": "1.31.1-dev1.0",
+    "@duckdb/duckdb-wasm": "1.30.0",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -47,11 +47,10 @@
     "date-fns": "^4.1.0",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.2",
-    "esbuild": "^0.25.11",
     "fflate": "^0.8.2",
     "framer-motion": "^12.23.24",
     "lodash": "^4.17.21",
-    "lucide-react": "^0.545.0",
+    "lucide-react": "^0.546.0",
     "monaco-editor": "^0.54.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.0",
@@ -61,25 +60,27 @@
     "react-hook-form": "^7.65.0",
     "react-resizable-panels": "^3.0.6",
     "react-router": "^7.9.4",
-    "recharts": "^3.2.1",
+    "recharts": "^3.3.0",
     "sonner": "^2.0.7",
     "sql-formatter": "^15.6.10",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
+    "xlsx": "^0.18.5",
     "zod": "^4.1.12",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "@eslint/js": "^9.37.0",
+    "@eslint/js": "^9.38.0",
     "@types/lodash": "^4.17.20",
-    "@types/node": "^24.7.2",
+    "@types/node": "^24.8.1",
     "@types/papaparse": "^5.3.16",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
-    "eslint": "^9.37.0",
+    "esbuild": "^0.25.11",
+    "eslint": "^9.38.0",
     "eslint-plugin-react-hooks": "^7.0.0",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.4.0",
@@ -104,5 +105,9 @@
   "bugs": {
     "url": "https://github.com/ibero-data/duck-ui/issues"
   },
-  "homepage": "https://github.com/ibero-data/duck-ui#readme"
+  "homepage": "https://github.com/ibero-data/duck-ui#readme",
+  "resolutions": {
+    "dompurify": "^3.2.4",
+    "brace-expansion": "^2.0.1"
+  }
 }

@@ -108,12 +108,20 @@ export interface QueryHistoryItem {
 
 export type EditorTabType = "sql" | "home";
 
+export interface ChartConfig {
+  type: "bar" | "line" | "pie" | "area";
+  xAxis: string;
+  yAxis: string;
+  series?: string;
+}
+
 export interface EditorTab {
   id: string;
   title: string;
   type: EditorTabType;
   content: string | { database?: string; table?: string };
   result?: QueryResult | null;
+  chartConfig?: ChartConfig;
 }
 
 export interface DuckStoreState {
@@ -172,6 +180,7 @@ export interface DuckStoreState {
   setActiveTab: (tabId: string) => void;
   updateTabQuery: (tabId: string, query: string) => void;
   updateTabTitle: (tabId: string, title: string) => void;
+  updateTabChartConfig: (tabId: string, chartConfig: ChartConfig | undefined) => void;
   moveTab: (oldIndex: number, newIndex: number) => void;
   closeAllTabs: () => void;
   deleteTable: (tableName: string, database?: string) => Promise<void>;
@@ -738,8 +747,20 @@ export const useDuckStore = create<DuckStoreState>()(
               connection.query(`INSTALL parquet`),
             ]);
 
-            //Then automatically connect to the first connection.
-            await get().setCurrentConnection(initialConnections[0].id);
+            // Only switch if first connection is not WASM (we already initialized WASM above)
+            if (initialConnections[0].scope !== "WASM") {
+              await get().setCurrentConnection(initialConnections[0].id);
+            } else {
+              // Set WASM as current without reinitializing
+              set({
+                currentConnection: {
+                  environment: initialConnections[0].environment,
+                  id: initialConnections[0].id,
+                  name: initialConnections[0].name,
+                  scope: initialConnections[0].scope,
+                },
+              });
+            }
           } else {
             set({ isLoading: false, isInitialized: true }); // Set as initialized if no connections are configured.
           }
@@ -997,6 +1018,14 @@ export const useDuckStore = create<DuckStoreState>()(
           }));
         },
 
+        updateTabChartConfig: (tabId, chartConfig) => {
+          set((state) => ({
+            tabs: state.tabs.map((tab) =>
+              tab.id === tabId ? { ...tab, chartConfig } : tab
+            ),
+          }));
+        },
+
         moveTab: (oldIndex, newIndex) => {
           set((state) => {
             const newTabs = [...state.tabs];
@@ -1206,39 +1235,62 @@ export const useDuckStore = create<DuckStoreState>()(
                 currentDatabase: "memory",
               });
             } else if (connectionProvider.scope === "OPFS") {
-              // Initialize or switch to OPFS connection
-              let opfsInstance = { db: opfsDb, connection: opfsConnection };
+              // Check if we need to create a new OPFS connection
+              const needsNewConnection =
+                !opfsDb ||
+                !opfsConnection ||
+                connectionProvider.path !== get().currentConnection?.path;
 
-              // If switching to a different OPFS path, cleanup old and create new
-              if (!opfsDb || !opfsConnection) {
+              if (needsNewConnection) {
                 toast.info("Initializing OPFS connection...");
-                opfsInstance = await testOPFSConnection(connectionProvider);
 
-                // Cleanup old OPFS if exists
+                // IMPORTANT: Cleanup OLD connection BEFORE creating new one
                 if (opfsDb && opfsConnection) {
                   try {
+                    console.log("Closing previous OPFS connection...");
                     await opfsConnection.close();
                     await opfsDb.terminate();
+                    // Give it a moment to fully release file handles
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    console.log("Previous OPFS connection closed successfully");
                   } catch (e) {
                     console.warn("Failed to cleanup old OPFS connection:", e);
                   }
                 }
-              }
 
-              set({
-                db: opfsInstance.db,
-                connection: opfsInstance.connection,
-                opfsDb: opfsInstance.db,
-                opfsConnection: opfsInstance.connection,
-                currentConnection: {
-                  environment: connectionProvider.environment,
-                  id: connectionProvider.id,
-                  name: connectionProvider.name,
-                  scope: connectionProvider.scope,
-                  path: connectionProvider.path,
-                },
-                currentDatabase: connectionProvider.path?.replace(/\.db$/, "") || "opfs",
-              });
+                // Now create the new connection
+                const opfsInstance = await testOPFSConnection(connectionProvider);
+
+                set({
+                  db: opfsInstance.db,
+                  connection: opfsInstance.connection,
+                  opfsDb: opfsInstance.db,
+                  opfsConnection: opfsInstance.connection,
+                  currentConnection: {
+                    environment: connectionProvider.environment,
+                    id: connectionProvider.id,
+                    name: connectionProvider.name,
+                    scope: connectionProvider.scope,
+                    path: connectionProvider.path,
+                  },
+                  currentDatabase: connectionProvider.path?.replace(/\.db$/, "") || "opfs",
+                });
+              } else {
+                // Reuse existing OPFS connection (same path)
+                console.log("Reusing existing OPFS connection");
+                set({
+                  db: opfsDb,
+                  connection: opfsConnection,
+                  currentConnection: {
+                    environment: connectionProvider.environment,
+                    id: connectionProvider.id,
+                    name: connectionProvider.name,
+                    scope: connectionProvider.scope,
+                    path: connectionProvider.path,
+                  },
+                  currentDatabase: connectionProvider.path?.replace(/\.db$/, "") || "opfs",
+                });
+              }
             } else if (connectionProvider.scope === "External") {
               // For external connections, we don't use a WASM connection
               // Keep WASM instances alive but set current to null

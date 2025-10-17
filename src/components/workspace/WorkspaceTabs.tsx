@@ -90,7 +90,6 @@ export default function WorkspaceTabs() {
             onClick={addNewCodeTab}
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New</span>
           </Button>
           <ScrollArea className="flex-grow">
             <ContextMenu>
