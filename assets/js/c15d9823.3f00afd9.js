@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkdocs=self.webpackChunkdocs||[]).push([[146],{9328:t=>{t.exports=JSON.parse('{"metadata":{"permalink":"/blog","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Keep up with the latest news, tutorials, and updates about Duck-UI data visualization tools.","blogTitle":"Duck-UI Blog - Latest Updates and Tutorials"}}')}}]);

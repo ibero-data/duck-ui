@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkdocs=self.webpackChunkdocs||[]).push([[472],{5513:e=>{e.exports=JSON.parse('{"title":"Recent posts","items":[{"title":"... Duck-UI?","permalink":"/blog/welcome-duck-ui-blog","unlisted":false,"date":"2025-02-01T00:00:00.000Z"}]}')}}]);
