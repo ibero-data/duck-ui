@@ -1,6 +1,6 @@
 services:
   duck-ui:
-    image: ghcr.io/caioricciuti/duck-ui:latest
+    image: ghcr.io/ibero-data/duck-ui:latest
     restart: always
     ports:
       - "${DUCK_UI_PORT:-5522}:5522"

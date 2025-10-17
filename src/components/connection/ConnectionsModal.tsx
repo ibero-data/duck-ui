@@ -1,13 +1,13 @@
 // ConnectionManager.tsx
 import React from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -28,7 +28,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDuckStore } from "@/store";
 
 const scopeEnum = z.enum(["External", "OPFS"]);
@@ -113,19 +112,19 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-[500px] sm:w-[600px] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>
             {isEditMode ? "Edit Connection" : "Add New Connection"}
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             {isEditMode
               ? "Modify existing connection details."
               : "Create a new database connection."}
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="h-[500px]">
+          </SheetDescription>
+        </SheetHeader>
+        <div className="mt-6">
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(handleSubmit)}
@@ -301,14 +300,15 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                       <FormItem>
                         <FormLabel>Path</FormLabel>
                         <FormControl>
-                          <Input placeholder="/my_database.db" {...field} />
+                          <Input placeholder="my_database.db" {...field} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 </>
               )}
-              <DialogFooter>
+              <SheetFooter className="mt-6">
                 <Button
                   type="button"
                   variant="secondary"
@@ -320,12 +320,12 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                 <Button type="submit" disabled={isLoadingExternalConnection}>
                   {isEditMode ? "Update Connection" : "Create Connection"}
                 </Button>
-              </DialogFooter>
+              </SheetFooter>
             </form>
           </Form>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };
 

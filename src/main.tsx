@@ -3,15 +3,12 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Suspense } from "react";
-import Sidebar from "@/components/sidebar/Sidebar";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Routes, Route } from "react-router";
 import { useDuckStore } from "./store";
 import Home from "@/pages/Home";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
-import Logo from "/logo.png";
-import Metrics from "./pages/Metrics";
 import NotFound from "./pages/NotFound";
 import Connections from "./pages/Connections";
 
@@ -26,11 +23,6 @@ interface AppInitializerProps {
 const LoadingScreen = ({ message }: LoadingScreenProps) => (
   <div className="h-screen flex items-center justify-center bg-black/90 text-white">
     <div className="text-center">
-      <img
-        src={Logo.toString()}
-        alt="Logo"
-        className="h-18 w-22 m-auto mb-8 pl-24"
-      />
       <Loader2 className="animate-spin m-auto mb-12" size={64} />
       <p className="text-lg">{message}</p>
     </div>
@@ -77,19 +69,19 @@ const App = () => {
   }, []);
 
   return (
-    <div className="flex w-full h-screen overflow-hidden">
-      <Sidebar />
+    <div className="flex flex-col w-full h-screen overflow-hidden">
       <Toaster
         richColors
         toastOptions={{ duration: 2000, closeButton: true }}
         expand={true}
       />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/connections" element={<Connections />} />
-        <Route path="/metrics" element={<Metrics />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <div className="flex-1 overflow-hidden">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/connections" element={<Connections />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
     </div>
   );
 };

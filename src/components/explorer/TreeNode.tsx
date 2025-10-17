@@ -70,10 +70,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     (databaseName: string, tableName: string) => async () => {
       const query = `SELECT * FROM "${databaseName}"."${tableName}" LIMIT 100`;
 
-      createTab("sql", query, {
-        database: databaseName,
-        table: tableName,
-      });
+      createTab("sql", query, tableName);
 
       const tabId = useDuckStore.getState().activeTabId;
       if (tabId) {
@@ -106,10 +103,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     (databaseName: string, tableName: string) => async () => {
       const query = `DESCRIBE "${databaseName}"."${tableName}"`;
 
-      createTab("sql", query, {
-        database: databaseName,
-        table: tableName,
-      });
+      createTab("sql", query, `${tableName} Schema`);
 
       const tabId = useDuckStore.getState().activeTabId;
       if (tabId) {

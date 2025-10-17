@@ -1,0 +1,226 @@
+/* Duck-UI Brand Colors - Aligned with main app (src/index.css) */
+:root {
+  /* Brand Colors - Duck-UI Primary (Golden Orange/Yellow) */
+  /* Converted from oklch(0.6716 0.1368 48.513) */
+  --vp-c-brand-1: #D99B43;
+  --vp-c-brand-2: #E5A856;
+  --vp-c-brand-3: #CD8E35;
+  --vp-c-brand-soft: rgba(217, 155, 67, 0.14);
+
+  /* Button Colors */
+  --vp-button-brand-bg: #D99B43;
+  --vp-button-brand-border: #D99B43;
+  --vp-button-brand-hover-bg: #CD8E35;
+  --vp-button-brand-hover-border: #CD8E35;
+  --vp-button-brand-active-bg: #C18529;
+  --vp-button-brand-active-border: #C18529;
+
+  /* Home Hero */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(120deg, #D99B43 30%, #E5A856);
+
+  /* Custom additions */
+  --vp-c-accent: #D99B43;
+  --vp-c-text-accent: #D99B43;
+
+  /* Use oklch for modern browsers with fallback */
+  --vp-c-brand-1: oklch(0.6716 0.1368 48.513);
+  --vp-c-brand-2: oklch(0.7016 0.1368 48.513);
+  --vp-c-brand-3: oklch(0.6416 0.1368 48.513);
+}
+
+/* Dark mode adjustments */
+.dark {
+  /* Brand Colors - Duck-UI Dark Mode (Bright Yellow) */
+  /* Converted from oklch(0.852 0.199 91.936) */
+  --vp-c-brand-1: #FFD752;
+  --vp-c-brand-2: #FFE070;
+  --vp-c-brand-3: #F5CD42;
+  --vp-c-brand-soft: rgba(255, 215, 82, 0.16);
+
+  /* Use oklch for modern browsers with fallback */
+  --vp-c-brand-1: oklch(0.852 0.199 91.936);
+  --vp-c-brand-2: oklch(0.882 0.199 91.936);
+  --vp-c-brand-3: oklch(0.822 0.199 91.936);
+}
+
+/* Sponsors Section */
+.sponsors-section {
+  margin: 4rem 0;
+  padding: 2rem 0;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.sponsors-container {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.sponsors-title {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.sponsors-subtitle {
+  color: var(--vp-c-text-2);
+  margin-bottom: 2rem;
+}
+
+.sponsors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+.sponsor-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.sponsor-card:hover {
+  border-color: var(--vp-c-brand-1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.sponsor-logo {
+  width: auto;
+  height: 60px;
+  object-fit: contain;
+  margin-bottom: 1rem;
+}
+
+.sponsor-name {
+  color: var(--vp-c-text-1);
+  font-weight: 500;
+}
+
+.sponsor-button {
+  display: inline-block;
+  margin-top: 2rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--vp-c-brand-1);
+  color: white;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.3s ease;
+}
+
+.sponsor-button:hover {
+  background: var(--vp-c-brand-2);
+}
+
+/* Screenshot styles for markdown images */
+.vp-doc img[alt*="Duck-UI"],
+.vp-doc img[alt*="DuckDB"],
+.vp-doc img[alt*="SQL"],
+.vp-doc img[alt*="Database"],
+.vp-doc img[alt*="Query"],
+.vp-doc img[alt*="Metrics"],
+.vp-doc img[alt*="Table"],
+.vp-doc img[alt*="User"],
+.vp-doc img[alt*="Settings"],
+.vp-doc img[alt*="Advanced"],
+.vp-doc img[alt*="Data"],
+.vp-doc img[alt*="Performance"],
+.vp-doc img[alt*="Import"],
+.vp-doc img[alt*="Explorer"] {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  margin: 1rem 0;
+}
+
+.vp-doc img[alt*="Duck-UI"]:hover,
+.vp-doc img[alt*="DuckDB"]:hover,
+.vp-doc img[alt*="SQL"]:hover,
+.vp-doc img[alt*="Database"]:hover,
+.vp-doc img[alt*="Query"]:hover,
+.vp-doc img[alt*="Metrics"]:hover,
+.vp-doc img[alt*="Table"]:hover,
+.vp-doc img[alt*="User"]:hover,
+.vp-doc img[alt*="Settings"]:hover,
+.vp-doc img[alt*="Advanced"]:hover,
+.vp-doc img[alt*="Data"]:hover,
+.vp-doc img[alt*="Performance"]:hover,
+.vp-doc img[alt*="Import"]:hover,
+.vp-doc img[alt*="Explorer"]:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+/* Screenshot Modal */
+.screenshot-modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  cursor: pointer;
+}
+
+.screenshot-modal.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screenshot-modal img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+/* Fix logo in dark mode */
+.dark .VPImage.logo {
+  filter: brightness(1.2);
+}
+
+/* Improve feature cards */
+.VPFeature {
+  transition: transform 0.3s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+}
+
+/* Buy Me a Coffee Button styling */
+.coffee-button {
+  text-align: center;
+  margin: 3rem 0;
+  padding: 2rem 0;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+/* Code block enhancements */
+.vp-doc div[class*="language-"] {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* Link color adjustments for better contrast */
+.vp-doc a {
+  color: var(--vp-c-brand-1);
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.vp-doc a:hover {
+  color: var(--vp-c-brand-2);
+}

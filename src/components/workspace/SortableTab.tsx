@@ -77,9 +77,9 @@ function SortableTab({ tab, isActive }: SortableTabProps) {
         value={tab.id}
         className={cn(
           "flex h-8 items-center rounded-sm px-3 relative w-full",
-          "data-[state=active]:bg-[#ffe814] data-[state=active]:text-black",
+          "data-[state=active]:bg-primary data-[state=active]:text-black",
           "transition-colors duration-200",
-          "hover:bg-[#ffe814]/40",
+          "hover:bg-primary/40",
           tab.id === "home" ? "cursor-default" : "cursor-pointer",
           tab.type === "sql" ? "pl-7" : "pl-3", // Add padding for drag handle
           isExecuting ? "pointer-events-none opacity-50" : ""

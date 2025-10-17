@@ -191,7 +191,7 @@ export const ConnectionDisclaimer = () => {
               onClick={() => {
                 // open issue link
                 window.open(
-                  "https://github.com/caioricciuti/duck-ui/issues/new",
+                  "https://github.com/ibero-data/duck-ui/issues/new",
                   "_blank"
                 );
               }}

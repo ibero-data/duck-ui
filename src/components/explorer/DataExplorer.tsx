@@ -15,6 +15,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import Logo from "/logo.png";
+import LogoLight from "/logo-light.png";
+import { useTheme } from "@/components/theme/theme-provider";
+
 export default function DataExplorer() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { databases, isLoading, currentConnection } = useDuckStore();
@@ -63,6 +67,8 @@ export default function DataExplorer() {
     );
   }
 
+  const { theme } = useTheme();
+
   return (
     <Card className="h-full overflow-hidden border-none">
       {isLoading && (
@@ -71,10 +77,14 @@ export default function DataExplorer() {
         </div>
       )}
 
-      <CardHeader className="p-4 border-b">
+      <CardHeader className="p-2 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Database className="h-5 w-5 text-primary" />
+            <img
+              src={theme === "dark" ? Logo : LogoLight}
+              alt="Logo"
+              className="h-5"
+            />
             <CardTitle className="text-lg font-semibold">Explorer</CardTitle>
           </div>
 
@@ -114,10 +124,6 @@ export default function DataExplorer() {
               "
             />
             <div className="flex items-center justify-between px-2">
-              <p className="text-muted-foreground text-xs">
-                {databases.length}{" "}
-                {databases.length > 1 ? "databases" : "database"}
-              </p>
             </div>
             <ul className="ml-2">
               {treeData.map((node, index) => (

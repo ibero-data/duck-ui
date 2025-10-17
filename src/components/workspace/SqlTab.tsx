@@ -86,10 +86,7 @@ const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
     // Show results table
     return (
       <div className="h-full">
-        <DuckUiTable
-          result={currentTab.result}
-          query={currentTab.content as string}
-        />
+        <DuckUiTable data={currentTab.result.data} />
       </div>
     );
   };

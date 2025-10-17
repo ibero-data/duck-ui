@@ -85,10 +85,12 @@ export default function WorkspaceTabs() {
         <div className="flex-shrink-0 flex items-center border-b bg-muted">
           <Button
             variant="ghost"
-            className="rounded-none hover:bg-gray-100 dark:hover:bg-gray-800 h-8 px-2 sticky left-0 z-10"
+            size="sm"
+            className="rounded-none hover:bg-accent h-9 px-3 gap-2"
             onClick={addNewCodeTab}
           >
             <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New</span>
           </Button>
           <ScrollArea className="flex-grow">
             <ContextMenu>

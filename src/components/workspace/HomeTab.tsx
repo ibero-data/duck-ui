@@ -20,6 +20,10 @@ import {
 import { useDuckStore } from "@/store";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
+import TopBar from "@/components/layout/TopBar";
+import Logo from "/logo.png";
+import LogoLight from "/logo-light.png";
+import { useTheme } from "@/components/theme/theme-provider";
 
 const quickStartActions = [
   {
@@ -40,7 +44,7 @@ const resourceCards = [
   {
     title: "Star us on GitHub!",
     description: "Support our project by starring it on GitHub.",
-    link: "https://github.com/caioricciuti/duck-ui",
+    link: "https://github.com/ibero-data/duck-ui",
     Icon: Github,
     action: "Star on GitHub",
   },
@@ -119,166 +123,180 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
   //@ts-ignore
   const duck_ui_version = __DUCK_UI_VERSION__ || "Error loading version";
 
+  const { theme } = useTheme();
+
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto truncate">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-2"
-      >
-        <h1 className="text-3xl font-bold tracking-tight">Welcome</h1>
-        <p className="text-muted-foreground">Let's get busy...</p>
-      </motion.div>
+    <div className="flex flex-col h-full">
+      <TopBar />
+      <div className="p-8 space-y-10 w-full max-w-[1400px] mx-auto overflow-auto flex-1">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-3 flex items-center space-x-4"
+        >
+          <img
+            src={theme === "dark" ? Logo : LogoLight}
+            alt="Logo"
+            className="h-12"
+          />
+          <h1 className="text-4xl font-bold tracking-tight">
+            Welcome to Duck-UI
+          </h1>
+        </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="grid grid-cols-1 md:grid-cols-2 gap-4"
-      >
-        {quickStartActions.map((action, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Button
-              variant="outline"
-              className="h-auto p-4 flex flex-col items-start space-y-2 hover:bg-accent hover:text-accent-foreground group w-full truncate"
-              onClick={() => handleNewAction(action.action)}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6"
+        >
+          {quickStartActions.map((action, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.1 }}
             >
-              <div className="flex items-center space-x-2 text-primary">
-                <div className="p-2 rounded-full bg-primary/10 group-hover:bg-primary/20 ">
-                  {action.icon}
+              <Button
+                variant="outline"
+                className="h-auto p-6 flex flex-col items-start space-y-3 hover:bg-accent hover:text-accent-foreground group w-full border-2"
+                onClick={() => handleNewAction(action.action)}
+              >
+                <div className="flex items-center space-x-3 text-primary">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    {action.icon}
+                  </div>
+                  <p className="font-bold text-lg">{action.title}</p>
                 </div>
-                <p className="font-semibold text-base">{action.title}</p>
+                <p className="text-sm text-muted-foreground text-left leading-relaxed">
+                  {action.description}
+                </p>
+              </Button>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        <Tabs defaultValue="recent" className="space-y-6">
+          <TabsList className="h-11">
+            <TabsTrigger
+              value="recent"
+              className="flex items-center gap-2 data-[state=active]:text-primary px-6"
+            >
+              Recent Queries
+              {loading && <Loader2 className="w-3 h-3 animate-spin" />}
+            </TabsTrigger>
+            <TabsTrigger
+              value="resources"
+              className="data-[state=active]:text-primary px-6"
+            >
+              Resources
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="recent" className="space-y-6">
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="space-y-2">
+                    <CardHeader>
+                      <Skeleton className="h-4 w-[250px]" />
+                      <Skeleton className="h-4 w-[200px]" />
+                    </CardHeader>
+                    <CardFooter>
+                      <Skeleton className="h-4 w-[150px]" />
+                    </CardFooter>
+                  </Card>
+                ))}
               </div>
-              <p className="text-sm text-muted-foreground text-left">
-                {action.description}
-              </p>
-            </Button>
-          </motion.div>
-        ))}
-      </motion.div>
+            ) : error ? (
+              <Card className="p-4 text-center text-muted-foreground">
+                {error}
+              </Card>
+            ) : recentItems.length === 0 ? (
+              <Card className="p-8 text-center text-muted-foreground border-dashed">
+                No recent queries found
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {recentItems.map((item, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Card
+                      className="hover:bg-accent/50 cursor-pointer transition-colors"
+                      onClick={() => handleNewAction("sql", item.cleaned_query)}
+                    >
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium flex items-center space-x-2">
+                          <Database className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            {item.query_kind || "Query"}
+                          </span>
+                        </CardTitle>
+                        <CardDescription className="text-xs font-mono text-muted-foreground truncate">
+                          {truncateQuery(item.cleaned_query)}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardFooter className="text-xs text-muted-foreground">
+                        {formatDate(item.latest_event_time)}
+                      </CardFooter>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
-      <Tabs defaultValue="recent" className="space-y-4">
-        <TabsList className="w-full justify-start">
-          <TabsTrigger
-            value="recent"
-            className="flex items-center gap-2 data-[state=active]:text-primary"
-          >
-            Recent Queries
-            {loading && <Loader2 className="w-3 h-3 animate-spin" />}
-          </TabsTrigger>
-          <TabsTrigger
-            value="resources"
-            className="data-[state=active]:text-primary"
-          >
-            Resources
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="recent" className="space-y-4">
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="space-y-2">
-                  <CardHeader>
-                    <Skeleton className="h-4 w-[250px]" />
-                    <Skeleton className="h-4 w-[200px]" />
-                  </CardHeader>
-                  <CardFooter>
-                    <Skeleton className="h-4 w-[150px]" />
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          ) : error ? (
-            <Card className="p-4 text-center text-muted-foreground">
-              {error}
-            </Card>
-          ) : recentItems.length === 0 ? (
-            <Card className="p-4 text-center text-muted-foreground">
-              No recent queries found
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recentItems.map((item, index) => (
+          <TabsContent value="resources" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {resourceCards.map((card, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card
-                    className="hover:bg-accent/50 cursor-pointer transition-colors"
-                    onClick={() => handleNewAction("sql", item.cleaned_query)}
-                  >
+                  <Card className="hover:bg-accent/50 transition-colors">
                     <CardHeader>
                       <CardTitle className="text-sm font-medium flex items-center space-x-2">
-                        <Database className="w-4 h-4 text-muted-foreground" />
+                        <div className="p-2 rounded-full bg-primary/10">
+                          <card.Icon className="w-4 h-4 text-primary" />
+                        </div>
                         <span className="text-muted-foreground">
-                          {item.query_kind || "Query"}
+                          {card.title}
                         </span>
                       </CardTitle>
-                      <CardDescription className="text-xs font-mono text-muted-foreground truncate">
-                        {truncateQuery(item.cleaned_query)}
+                      <CardDescription className="text-xs text-muted-foreground">
+                        {card.description}
                       </CardDescription>
                     </CardHeader>
-                    <CardFooter className="text-xs text-muted-foreground">
-                      {formatDate(item.latest_event_time)}
+                    <CardFooter>
+                      <a
+                        href={card.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                        >
+                          {card.action}
+                        </Button>
+                      </a>
                     </CardFooter>
                   </Card>
                 </motion.div>
               ))}
             </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="resources" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {resourceCards.map((card, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Card className="hover:bg-accent/50 transition-colors">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-medium flex items-center space-x-2">
-                      <div className="p-2 rounded-full bg-primary/10">
-                        <card.Icon className="w-4 h-4 text-primary" />
-                      </div>
-                      <span className="text-muted-foreground">
-                        {card.title}
-                      </span>
-                    </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground">
-                      {card.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardFooter>
-                    <a
-                      href={card.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button variant="ghost" className="w-full justify-start">
-                        {card.action}
-                      </Button>
-                    </a>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-      <p className="text-muted-foreground text-center text-xs">
-        Duck-UI Version: {duck_ui_version}
-      </p>
+          </TabsContent>
+        </Tabs>
+        <p className="text-muted-foreground text-center text-xs">
+          Duck-UI Version: {duck_ui_version}
+        </p>
+      </div>
     </div>
   );
 };

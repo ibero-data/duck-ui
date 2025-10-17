@@ -19,7 +19,7 @@ Duck-UI is a web-based interface for interacting with DuckDB, a high-performance
 ### Docker (Recommended)
 
 ```bash
-docker run -p 5522:5522 ghcr.io/caioricciuti/duck-ui:latest
+docker run -p 5522:5522 ghcr.io/ibero-data/duck-ui:latest
 ```
 
 Open your browser and navigate to `http://localhost:5522`.
@@ -38,7 +38,7 @@ docker run -p 5522:5522 \
   -e DUCK_UI_EXTERNAL_PASS="password" \
   -e DUCK_UI_EXTERNAL_DATABASE_NAME="my_database" \
   -e DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS="true" \
-  ghcr.io/caioricciuti/duck-ui:latest
+  ghcr.io/ibero-data/duck-ui:latest
 ```
 
 | Variable | Description | Default |
@@ -63,7 +63,7 @@ docker run -p 5522:5522 \
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/caioricciuti/duck-ui.git
+   git clone https://github.com/ibero-data/duck-ui.git
    cd duck-ui
    ```
 

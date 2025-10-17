@@ -1,801 +1,1190 @@
-import React, {
-  useState,
-  useRef,
-  useCallback,
-  useMemo,
-  useEffect,
-} from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   flexRender,
-  useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
   getFilteredRowModel,
-  ColumnDef,
-  SortingState,
-  RowData,
-  VisibilityState,
-  Row,
-  ColumnFiltersState,
   getPaginationRowModel,
+  useReactTable,
+  type ColumnDef,
+  type FilterFn,
+  type ColumnFiltersState,
+  type ColumnResizeMode,
+  type PaginationState,
+  type ColumnSizingState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Button } from "@/components/ui/button";
+import { formatBytes, formatDuration } from "@/lib/utils";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
-} from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Columns,
-  RefreshCw,
-  Loader2,
-  BarChart,
-  LineChart,
-  PieChart,
+  Download,
+  Search,
+  X,
+  Clock,
+  SlidersHorizontal,
+  Grid3X3,
+  Copy,
+  MousePointer,
+  MoreHorizontal,
 } from "lucide-react";
-import DownloadDialog from "@/components/table/DownloadDialog";
-import { SimpleFilter } from "@/components/table/SimpleFilter";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent } from "@/components/ui/card";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ReactECharts from "echarts-for-react";
 
-// Constants
-const DEFAULT_COLUMN_SIZE = 150;
-const MIN_COLUMN_SIZE = 50;
-const OVERSCAN_COUNT = 5;
-const ROW_HEIGHT = 35;
-const DEFAULT_PAGE_SIZE = 50;
-const PAGE_SIZE_OPTIONS = [50, 100, 200, 400];
+// Define a generic type for the data row
+type DataRow = Record<string, any>;
 
-// Chart types
-const CHART_TYPES = [
-  { value: "bar", label: "Bar Chart", icon: BarChart },
-  { value: "line", label: "Line Chart", icon: LineChart },
-  { value: "pie", label: "Pie Chart", icon: PieChart },
-];
+// Types for cell selection
+type CellPosition = { row: number; col: string };
+type ContextMenuPosition = { x: number; y: number };
 
-// Types
-export interface TableMeta {
-  name: string;
-  type: string;
+// Type for the component props
+interface DuckTableProps {
+  data: DataRow[];
+  executionTime?: number | null;
+  responseSize?: number | null;
+  initialPageSize?: number;
+  columnRenderers?: Record<string, (value: any) => React.ReactNode>;
+  tableHeight?: string | number;
 }
 
-export interface TableResult<T extends RowData> {
-  columns?: string[];
-  columnTypes?: string[];
-  data?: T[];
-  message?: string;
-  query_id?: string;
-}
+const globalFilterFn: FilterFn<DataRow> = (row, columnId, value) => {
+  const cellValue = row.getValue(columnId);
+  if (cellValue === null || cellValue === undefined) return false;
+  const searchStr = String(cellValue).toLowerCase();
+  const filterValue = String(value).toLowerCase();
+  return searchStr.includes(filterValue);
+};
 
-export interface TableProps<T extends RowData> {
-  result: TableResult<T>;
-  onLoadMore?: () => void;
-  onRefresh?: () => void;
-  isLoading?: boolean;
-  virtualScrolling?: boolean;
-  defaultSorting?: SortingState;
-  defaultColumnVisibility?: VisibilityState;
-  onSortingChange?: (sorting: SortingState) => void;
-  className?: string;
-  query?: string;
-}
+const DEFAULT_COLUMN_WIDTH = 150;
+const MIN_COLUMN_WIDTH = 50;
+const MAX_COLUMN_WIDTH = 1000; // Generous max for "free" resizing
+const DEFAULT_MAX_AUTO_WIDTH = 250;
+const DEFAULT_MIN_AUTO_WIDTH = 80;
+const DEFAULT_SAMPLE_SIZE = 100;
 
-function DuckUiTable<T extends RowData>({
-  result,
-  onLoadMore,
-  onRefresh,
-  isLoading = false,
-  virtualScrolling = true,
-  defaultSorting = [],
-  defaultColumnVisibility = {},
-  onSortingChange,
-  className,
-  query,
-}: TableProps<T>) {
-  // State
-  const [sorting, setSorting] = useState<SortingState>(defaultSorting);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    defaultColumnVisibility
+// Safe JSON stringify that handles BigInt
+const safeStringify = (value: any): string => {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value, (_, v) =>
+        typeof v === "bigint" ? v.toString() : v
+      );
+    } catch (e) {
+      return String(value);
+    }
+  }
+  return String(value);
+};
+
+// Calculate optimal column width based on content
+const calculateOptimalWidth = (
+  data: DataRow[],
+  columnKey: string,
+  minWidth: number = DEFAULT_MIN_AUTO_WIDTH,
+  maxWidth: number = DEFAULT_MAX_AUTO_WIDTH,
+  sampleSize: number = DEFAULT_SAMPLE_SIZE
+): number => {
+  if (!data.length) return DEFAULT_COLUMN_WIDTH;
+
+  // Sample data for performance
+  const sample = data.slice(0, Math.min(sampleSize, data.length));
+
+  // Calculate based on content length
+  let maxLength = columnKey.length; // Start with header length
+
+  sample.forEach((row) => {
+    const value = row[columnKey];
+    const strValue = safeStringify(value);
+    maxLength = Math.max(maxLength, strValue.length);
+  });
+
+  // Rough estimation: 8px per character + padding
+  const estimatedWidth = Math.max(
+    minWidth,
+    Math.min(maxWidth, maxLength * 8 + 20)
   );
-  const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
+
+  return estimatedWidth;
+};
+
+const DuckUITable: React.FC<DuckTableProps> = ({
+  data = [],
+  executionTime,
+  responseSize,
+  initialPageSize = 25,
+  columnRenderers,
+  tableHeight = "100%",
+}) => {
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const horizontalScrollRef = useRef<HTMLDivElement>(null);
+
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
-  const [, setFilterValue] = useState("");
-  const [pagination, setPagination] = useState({
+  const [globalFilterInput, setGlobalFilterInput] = useState("");
+
+  const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: DEFAULT_PAGE_SIZE,
+    pageSize: initialPageSize,
   });
-  const [activeTab, setActiveTab] = useState<string>("table");
-  const [chartType, setChartType] = useState<string>("bar");
-  const [chartColumns, setChartColumns] = useState<{
-    category: string;
-    values: string[];
-  }>({ category: "", values: [] });
+  const [enabledColumns, setEnabledColumns] = useState<Record<string, boolean>>(
+    {}
+  );
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+  const [userResizedColumns, setUserResizedColumns] = useState<
+    Record<string, number>
+  >({});
+  const [columnSelectorFilter, setColumnSelectorFilter] = useState("");
+  // const [sorting, setSorting] = useState<SortingState>([]); // REMOVED
 
-  // Refs
-  const sizeCache = useRef<Record<string, number>>({});
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const loadMoreRef = useRef<HTMLTableRowElement>(null);
-  const resizeTimeout = useRef<NodeJS.Timeout | null>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
+  // New spreadsheet features
+  const [showRowNumbers, setShowRowNumbers] = useState(false);
+  const [zebraStripes, setZebraStripes] = useState(true);
+  const [showGridLines, setShowGridLines] = useState(false);
+  const [showSpreadsheetOptions, setShowSpreadsheetOptions] = useState(false);
 
-  const { columns, data, message, query_id } = result;
+  // Cell selection state
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const [lastSelectedCell, setLastSelectedCell] = useState<CellPosition | null>(
+    null
+  );
+  const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(
+    null
+  );
+  // Drag selection state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<CellPosition | null>(null);
+  const [dragEnd, setDragEnd] = useState<CellPosition | null>(null);
 
-  // Error handling
-  if (message) {
-    useEffect(() => {
-      toast.error(`Error: ${message}`);
-    }, [message]);
+  const columnResizeMode = "onChange" as ColumnResizeMode;
 
-    return (
-      <div className="w-full mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-        <p className="text-sm text-red-600 dark:text-red-400">{message}</p>
-        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-          Query ID: {query_id || "Unknown"}
-        </p>
-      </div>
-    );
-  }
-
-  if (!data || !columns) {
-    return (
-      <div className="w-full mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg animate-pulse">
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-      </div>
-    );
-  }
-
-  // Initialize chart columns when data is available
   useEffect(() => {
-    if (columns && columns.length > 0) {
-      // Default to first column as category and second column as value
-      setChartColumns({
-        category: columns[1] || "",
-        values: columns.length > 2 ? [columns[2]] : [],
+    const handler = setTimeout(() => setGlobalFilter(globalFilterInput), 300);
+    return () => clearTimeout(handler);
+  }, [globalFilterInput]);
+
+  useEffect(() => {
+    if (globalFilter !== globalFilterInput) setGlobalFilterInput(globalFilter);
+  }, [globalFilter]);
+
+  // Initialize/Update enabled columns when data changes
+  useEffect(() => {
+    if (data && data.length > 0 && data[0]) {
+      const allKeys = Object.keys(data[0]);
+      const initialEnabledCols = allKeys.reduce((acc, key) => {
+        acc[key] =
+          enabledColumns[key] === undefined ? true : enabledColumns[key];
+        return acc;
+      }, {} as Record<string, boolean>);
+      setEnabledColumns(initialEnabledCols);
+
+      const validUserResized: Record<string, number> = {};
+      allKeys.forEach((key) => {
+        if (userResizedColumns[key] !== undefined) {
+          validUserResized[key] = userResizedColumns[key];
+        }
       });
+      setUserResizedColumns(validUserResized);
+    } else {
+      setEnabledColumns({});
+      setUserResizedColumns({});
     }
-  }, [columns]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]); // Keep enabledColumns and userResizedColumns out to preserve user settings
 
-  // Handle column resize
-  const handleColumnResize = useCallback((size: number, columnId: string) => {
-    if (resizeTimeout.current) {
-      clearTimeout(resizeTimeout.current);
+  // Effect to initialize columnSizing or update it when userResizedColumns change
+  useEffect(() => {
+    if (data && data.length > 0 && data[0]) {
+      const newSizingState: ColumnSizingState = {};
+      Object.keys(data[0]).forEach((key) => {
+        newSizingState[key] =
+          userResizedColumns[key] !== undefined
+            ? userResizedColumns[key]
+            : DEFAULT_COLUMN_WIDTH; // Use default width
+      });
+      if (JSON.stringify(columnSizing) !== JSON.stringify(newSizingState)) {
+        setColumnSizing(newSizingState);
+      }
+    } else if (Object.keys(columnSizing).length > 0) {
+      setColumnSizing({});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, userResizedColumns]); // columnSizing itself should not be a direct dependency here to avoid loops
 
-    resizeTimeout.current = setTimeout(() => {
-      setColumnSizing((prev) => ({
-        ...prev,
-        [columnId]: Math.max(MIN_COLUMN_SIZE, size),
-      }));
-    }, 10);
-  }, []);
+  const columns = useMemo<ColumnDef<DataRow>[]>(() => {
+    if (!data || !data.length || !data[0]) return [];
+    const keys = Object.keys(data[0]);
+    const cols: ColumnDef<DataRow>[] = [];
 
-  // Update your memoizedColumns definition
-  const memoizedColumns = useMemo<ColumnDef<T>[]>(() => {
-    const baseColumns = columns.map((col) => ({
-      id: col,
-      accessorKey: col,
-      header: col,
-      enableResizing: true,
-      size: columnSizing[col] || DEFAULT_COLUMN_SIZE,
-      minSize: MIN_COLUMN_SIZE,
-      cell: ({ row }: any) => {
-        return String(row.original[col] ?? "");
-      },
-    }));
-
-    return [
-      {
-        id: "__index",
-        header: "#",
-        size: 70,
+    // Add row numbers column if enabled
+    if (showRowNumbers) {
+      cols.push({
+        id: "__row_number__",
+        accessorFn: (_, index) => index + 1,
         minSize: 50,
         maxSize: 70,
-        enableResizing: false,
-        cell: (info) => (
-          <span className="font-mono tabular-nums">{info.row.index + 1}</span>
+        size: 60,
+        header: () => (
+          <div
+            className="h-7 text-xs w-full flex items-center justify-center text-muted-foreground font-medium bg-muted cursor-pointer hover:brightness-95"
+            title="Click to select all"
+          >
+            #
+          </div>
         ),
-      },
-      ...baseColumns,
-    ];
-  }, [columns, columnSizing]);
+        cell: ({ row }) => (
+          <div className="text-xs text-center text-muted-foreground font-mono bg-muted cursor-pointer hover:brightness-95">
+            {row.index + 1}
+          </div>
+        ),
+        enableColumnFilter: false,
+        enableSorting: false,
+        enableResizing: false,
+      });
+    }
 
-  // Table instance
+    const dataCols = keys
+      .map((key): ColumnDef<DataRow> => {
+        return {
+          accessorKey: key,
+          minSize: MIN_COLUMN_WIDTH,
+          maxSize: MAX_COLUMN_WIDTH,
+          header: () => (
+            // Simplified header
+            <div
+              className="h-7 text-xs w-full flex items-center justify-start pl-0"
+              title={key}
+            >
+              <span className="truncate">{key}</span>
+            </div>
+          ),
+          cell: ({ row }) => {
+            const value = row.getValue(key);
+            const titleAttribute = safeStringify(value);
+            let displayValue: React.ReactNode;
+
+            if (
+              columnRenderers &&
+              columnRenderers[key] &&
+              value !== null &&
+              value !== undefined
+            ) {
+              displayValue = columnRenderers[key](value);
+            } else if (value === null || value === undefined) {
+              displayValue = (
+                <span className="text-neutral-400 italic text-xs opacity-50">
+                  null
+                </span>
+              );
+            } else if (typeof value === "object" || typeof value === "bigint") {
+              // Properly stringify objects and BigInt for display
+              const stringifiedValue = safeStringify(value);
+              displayValue = stringifiedValue; // Use plain string for better copy behavior
+            } else {
+              displayValue = String(value); // Default to string
+            }
+
+            return (
+              <div
+                className={`p-1 px-2 align-middle text-xs overflow-hidden whitespace-nowrap select-text ${
+                  typeof value === "object" ? "font-mono text-blue-500" : ""
+                }`}
+                title={titleAttribute}
+              >
+                {displayValue}
+              </div>
+            );
+          },
+          enableColumnFilter: false,
+          filterFn: globalFilterFn,
+        };
+      })
+      .filter((column) => {
+        const accessorKey = (column as any).accessorKey as string;
+        return (
+          accessorKey === undefined || enabledColumns[accessorKey] !== false
+        );
+      });
+
+    return [...cols, ...dataCols];
+  }, [data, enabledColumns, columnRenderers, showRowNumbers]);
+
+  const handleColumnSizeChange = (
+    updater: React.SetStateAction<ColumnSizingState>
+  ) => {
+    const newSizingFromTable =
+      typeof updater === "function" ? updater(columnSizing) : updater;
+    setColumnSizing(newSizingFromTable);
+    setUserResizedColumns(newSizingFromTable);
+  };
+
   const table = useReactTable({
-    data: data || [],
-    columns: memoizedColumns,
+    data,
+    columns,
+    columnResizeMode,
     state: {
-      sorting,
-      columnVisibility,
       columnFilters,
       globalFilter,
       pagination,
       columnSizing,
+      // sorting, // REMOVED
     },
-    onSortingChange: (updater) => {
-      const newSorting =
-        typeof updater === "function" ? updater(sorting) : updater;
-      setSorting(newSorting);
-      onSortingChange?.(newSorting);
-    },
-    onColumnVisibilityChange: setColumnVisibility,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: (updater) => {
-      const newPagination =
-        typeof updater === "function" ? updater(pagination) : updater;
-      setPagination(newPagination);
-    },
-    onColumnSizingChange: (updater) => {
-      const newSizing =
-        typeof updater === "function" ? updater(columnSizing) : updater;
-      setColumnSizing(newSizing);
-    },
+    onPaginationChange: setPagination,
+    onColumnSizingChange: handleColumnSizeChange,
+    // onSortingChange: setSorting, // REMOVED
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    // getSortedRowModel: getSortedRowModel(), // REMOVED
+    enableGlobalFilter: true,
     enableColumnResizing: true,
-    columnResizeMode: "onChange",
-    globalFilterFn: (row, columnId, filterValue) => {
-      const searchValue = String(filterValue).toLowerCase().trim();
-      if (!searchValue) return true;
-
-      const cellValue = row.getValue(columnId);
-      if (cellValue == null) return false;
-
-      return String(cellValue).toLowerCase().includes(searchValue);
-    },
+    // enableSorting: true, // REMOVED (or set to false)
+    debugTable: false, // Set to true for debugging if needed
   });
 
-  // Virtual scrolling setup
   const { rows } = table.getRowModel();
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: useCallback(() => ROW_HEIGHT, []),
-    overscan: OVERSCAN_COUNT,
-  });
+  const ROW_HEIGHT = 32; // Must match CSS and cell content height
 
-  const virtualRows = virtualScrolling
-    ? rowVirtualizer.getVirtualItems()
-    : rows.map((_, index) => ({
-        index,
-        start: index * ROW_HEIGHT,
-        size: ROW_HEIGHT,
-      }));
+  // Helper function to create selection range between two points
+  const createSelectionRange = (
+    start: CellPosition,
+    end: CellPosition
+  ): Set<string> => {
+    const selection = new Set<string>();
+    if (!data || !data[0]) return selection;
 
-  // Column auto-sizing
-  const calculateAutoSize = useCallback(
-    (columnId: string) => {
-      if (sizeCache.current[columnId]) return sizeCache.current[columnId];
+    const columns = Object.keys(data[0]);
+    const minRow = Math.min(start.row, end.row);
+    const maxRow = Math.max(start.row, end.row);
+    const startColIndex = columns.indexOf(start.col);
+    const endColIndex = columns.indexOf(end.col);
+    const minColIndex = Math.min(startColIndex, endColIndex);
+    const maxColIndex = Math.max(startColIndex, endColIndex);
 
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-      if (!context) return DEFAULT_COLUMN_SIZE;
-
-      context.font = getComputedStyle(document.body).font || "12px sans-serif";
-      const headerWidth = context.measureText(columnId).width + 24;
-      let maxWidth = headerWidth;
-
-      const sampleRows = rows.slice(0, 200);
-      for (const row of sampleRows) {
-        const value = row.getValue(columnId);
-        const width = context.measureText(String(value ?? "")).width + 24;
-        maxWidth = Math.max(maxWidth, width);
-      }
-
-      const finalSize = Math.max(maxWidth, MIN_COLUMN_SIZE);
-      sizeCache.current[columnId] = finalSize;
-      return finalSize;
-    },
-    [rows]
-  );
-
-  // Handle filter change
-  const handleFilterChange = useCallback(
-    (value: string) => {
-      setFilterValue(value);
-      setGlobalFilter(value);
-    },
-    [setGlobalFilter]
-  );
-
-  // Handle chart column selection
-  const handleChartColumnChange = useCallback(
-    (type: "category" | "values", value: string | string[]) => {
-      setChartColumns((prev) => ({
-        ...prev,
-        [type]: value,
-      }));
-    },
-    []
-  );
-
-  // Load more effect
-  useEffect(() => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-
-    if (!onLoadMore || !loadMoreRef.current || isLoading) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isLoading) {
-          onLoadMore();
+    for (let row = minRow; row <= maxRow && row < data.length; row++) {
+      for (
+        let colIdx = minColIndex;
+        colIdx <= maxColIndex && colIdx < columns.length;
+        colIdx++
+      ) {
+        const col = columns[colIdx];
+        if (col !== "__row_number__") {
+          selection.add(`${row}::${col}`);
         }
-      },
-      { threshold: 0.8 }
-    );
-
-    observerRef.current = observer;
-    observer.observe(loadMoreRef.current);
-
-    return () => {
-      observer.disconnect();
-      observerRef.current = null;
-    };
-  }, [
-    onLoadMore,
-    isLoading,
-    globalFilter,
-    table.getState().pagination.pageSize,
-  ]);
-
-  // Effects
-  useEffect(() => {
-    table.setPageSize(DEFAULT_PAGE_SIZE);
-  }, [table]);
-
-  // Render methods
-  const renderCell = useCallback((cell: any) => {
-    return flexRender(cell.column.columnDef.cell, cell.getContext());
-  }, []);
-
-  const TableRow = ({ row }: { row: Row<T> }) => (
-    <tr
-      key={row.id}
-      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-xs"
-    >
-      {row.getVisibleCells().map((cell) => (
-        <td
-          key={cell.id}
-          style={{ width: cell.column.getSize() }}
-          className="p-2 border dark:border-gray-700 truncate"
-        >
-          {renderCell(cell)}
-        </td>
-      ))}
-    </tr>
-  );
-
-  // Chart data processing
-  const getChartOptions = useMemo(() => {
-    if (!data || !chartColumns.category || chartColumns.values.length === 0) {
-      return {};
+      }
     }
 
-    const filteredData = table.getFilteredRowModel().rows.map((row) => row.original);
-    
-    // Process data based on chart type
-    if (chartType === "pie") {
-      return {
-        title: {
-          text: `Distribution by ${chartColumns.category}`,
-          left: 'center',
-        },
-        tooltip: {
-          trigger: 'item',
-          formatter: '{a} <br/>{b}: {c} ({d}%)'
-        },
-        legend: {
-          orient: 'vertical',
-          left: 'left',
-          data: filteredData.map((item: any) => String(item[chartColumns.category] || 'Undefined'))
-        },
-        series: [
-          {
-            name: chartColumns.values[0],
-            type: 'pie',
-            radius: '60%',
-            center: ['50%', '50%'],
-            data: filteredData.map((item: any) => ({
-              name: String(item[chartColumns.category] || 'Undefined'),
-              value: Number(item[chartColumns.values[0]]) || 0
-            })),
-            emphasis: {
-              itemStyle: {
-                shadowBlur: 10,
-                shadowOffsetX: 0,
-                shadowColor: 'rgba(0, 0, 0, 0.5)'
-              }
+    return selection;
+  };
+
+  // Keyboard handlers
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + C to copy selected cells
+      if ((e.ctrlKey || e.metaKey) && e.key === "c" && selectedCells.size > 0) {
+        e.preventDefault();
+
+        // Get selected cells data organized by row and column
+        const cellsByPosition = new Map<string, any>();
+        const rowIndices = new Set<number>();
+        const columnIds = new Set<string>();
+
+        selectedCells.forEach((cellKey) => {
+          const [rowStr, colId] = cellKey.split("::");
+          const rowIndex = parseInt(rowStr);
+          rowIndices.add(rowIndex);
+          columnIds.add(colId);
+
+          const row = rows[rowIndex];
+          if (row) {
+            const cell = row.getAllCells().find((c) => c.column.id === colId);
+            if (cell) {
+              cellsByPosition.set(cellKey, cell.getValue());
             }
           }
-        ]
-      };
-    }
-    
-    // Bar and line charts
-    const categories = Array.from(new Set(filteredData.map((item: any) => 
-      String(item[chartColumns.category] || 'Undefined'))));
-    
-    const series = chartColumns.values.map(valueCol => ({
-      name: valueCol,
-      type: chartType,
-      data: categories.map(cat => {
-        const items = filteredData.filter((item: any) => 
-          String(item[chartColumns.category]) === cat);
-        // Sum values for this category
-        return items.reduce((sum, item: any) => 
-          sum + (Number(item[valueCol]) || 0), 0);
-      })
-    }));
+        });
 
-    return {
-      title: {
-        text: `${chartType === 'bar' ? 'Bar' : 'Line'} Chart by ${chartColumns.category}`,
-        left: 'center'
-      },
-      tooltip: {
-        trigger: 'axis'
-      },
-      legend: {
-        data: chartColumns.values,
-        bottom: 0
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '15%',
-        containLabel: true
-      },
-      xAxis: {
-        type: 'category',
-        data: categories,
-        axisLabel: {
-          rotate: categories.length > 10 ? 45 : 0,
-          interval: 0
-        }
-      },
-      yAxis: {
-        type: 'value'
-      },
-      series
+        // Sort rows and columns
+        const sortedRows = Array.from(rowIndices).sort((a, b) => a - b);
+        const sortedCols = Array.from(columnIds);
+
+        // Build TSV string for Excel/Sheets compatibility
+        const tsvRows: string[] = [];
+        sortedRows.forEach((rowIndex) => {
+          const rowValues: string[] = [];
+          sortedCols.forEach((colId) => {
+            const cellKey = `${rowIndex}::${colId}`;
+            const value = cellsByPosition.get(cellKey);
+            if (value !== undefined) {
+              const strValue = value === null ? "" : safeStringify(value);
+              rowValues.push(strValue);
+            } else if (selectedCells.has(cellKey)) {
+              rowValues.push("");
+            }
+          });
+          if (rowValues.length > 0) {
+            tsvRows.push(rowValues.join("\t"));
+          }
+        });
+
+        const tsvContent = tsvRows.join("\n");
+        navigator.clipboard.writeText(tsvContent).then(() => {
+          toast.success(`Copied ${selectedCells.size} cells to clipboard`);
+
+          // Visual feedback - flash selected cells
+          const tempCells = new Set(selectedCells);
+          setSelectedCells(new Set());
+          setTimeout(() => setSelectedCells(tempCells), 100);
+        });
+      }
+
+      // Ctrl/Cmd + A to select all
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+        e.preventDefault();
+        const allCells = new Set<string>();
+        rows.forEach((row, rowIndex) => {
+          row.getVisibleCells().forEach((cell) => {
+            if (cell.column.id !== "__row_number__") {
+              allCells.add(`${rowIndex}::${cell.column.id}`);
+            }
+          });
+        });
+        setSelectedCells(allCells);
+      }
+
+      // Escape to clear selection
+      if (e.key === "Escape") {
+        setSelectedCells(new Set());
+        setContextMenu(null);
+      }
     };
-  }, [data, chartType, chartColumns, table]);
 
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start || 0 : 0;
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedCells, rows]);
+
+  // Handle mouse up globally for drag selection
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        if (dragEnd) {
+          setLastSelectedCell(dragEnd);
+        }
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => document.removeEventListener("mouseup", handleMouseUp);
+    }
+  }, [isDragging, dragEnd, setLastSelectedCell]);
+
+  // Auto-size columns when data changes
+  useEffect(() => {
+    if (data && data.length > 0 && data[0]) {
+      const newSizing: ColumnSizingState = {};
+      const keys = Object.keys(data[0]);
+
+      keys.forEach((key) => {
+        newSizing[key] = calculateOptimalWidth(data, key);
+      });
+
+      setColumnSizing(newSizing);
+      setUserResizedColumns(newSizing);
+    }
+  }, [data]); // Trigger when data changes
+
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    estimateSize: () => ROW_HEIGHT,
+    getScrollElement: () => horizontalScrollRef.current,
+    overscan: 10, // Lowered slightly, adjust as needed
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
   const paddingBottom =
     virtualRows.length > 0
       ? rowVirtualizer.getTotalSize() -
-        (virtualRows[virtualRows.length - 1].start || 0) -
-        virtualRows[virtualRows.length - 1].size
+        (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
 
-  return (
-    <div className={`w-full h-full flex min-h-[200px] flex-col ${className}`}>
-      {/* Controls */}
-      <div className="flex items-center justify-between p-2 border-b dark:border-gray-700">
-        <div className="flex items-center space-x-2 flex-1">
-          {/* Simple Filter */}
-          <div className="flex-1">
-            <SimpleFilter
-              onFilterChange={handleFilterChange}
-              className="w-full"
-            />
-          </div>
+  const exportToCSV = () => {
+    if (!data || !data.length) return;
+    const visibleKeys = table.getVisibleLeafColumns().map((c) => c.id);
+    const headers =
+      visibleKeys.length > 0
+        ? visibleKeys
+        : data[0]
+        ? Object.keys(data[0])
+        : [];
+    if (headers.length === 0) return;
 
-          {/* Column visibility */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
-                <Columns className="h-4 w-4 mr-2" />
-                Columns
+    const csvRows = [headers.join(",")];
+    // Export based on current filter, but original data (not paginated)
+    const dataToExport = table
+      .getFilteredRowModel()
+      .rows.map((r) => r.original);
+
+    for (const row of dataToExport) {
+      const values = headers.map((header) => {
+        const value = row[header];
+        if (value === null || value === undefined) return "";
+        if (typeof value === "string" && value.includes(","))
+          return `"${value.replace(/"/g, '""')}"`;
+        if (typeof value === "object" || typeof value === "bigint")
+          return `"${safeStringify(value).replace(/"/g, '""')}"`;
+        return String(value);
+      });
+      csvRows.push(values.join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `yaat-query-results-${new Date().toISOString().slice(0, 19)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleColumnVisibility = (columnId: string) => {
+    setEnabledColumns((prev) => ({ ...prev, [columnId]: !prev[columnId] }));
+  };
+
+  const toggleAllColumns = (value: boolean) => {
+    if (!data || !data.length || !data[0]) return;
+    setEnabledColumns(
+      Object.keys(data[0]).reduce((acc, key) => {
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, boolean>)
+    );
+  };
+
+  const ColumnSelector = () => {
+    if (!data || !data.length || !data[0]) return null;
+    const allColumnKeys = Object.keys(data[0]);
+    const visibleCount = Object.values(enabledColumns).filter(Boolean).length;
+    const totalCount = allColumnKeys.length;
+
+    // Simplified filtering for column selector
+    const filteredColumnKeys = useMemo(() => {
+      if (!columnSelectorFilter) return allColumnKeys;
+      return allColumnKeys.filter((key) =>
+        key.toLowerCase().includes(columnSelectorFilter.toLowerCase())
+      );
+    }, [allColumnKeys, columnSelectorFilter]);
+
+    return (
+      <Card className="absolute right-0 top-12 z-20 w-[350px] bg-background shadow-lg rounded-md border p-2">
+        <CardContent className="p-2">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-semibold">
+              Toggle Columns{" "}
+              <span className="text-xs text-muted-foreground">
+                ({visibleCount}/{totalCount})
+              </span>
+            </h3>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-1.5 text-xs"
+                onClick={() => toggleAllColumns(true)}
+              >
+                All
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <div className="max-h-64 overflow-auto">
-                {table
-                  .getAllColumns()
-                  .filter((col) => col.id !== "__index")
-                  .map((column) => (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                      className="text-sm"
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-1.5 text-xs"
+                onClick={() => toggleAllColumns(false)}
+              >
+                None
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setShowColumnSelector(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="relative mb-3">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <Input
+              value={columnSelectorFilter}
+              onChange={(e) => setColumnSelectorFilter(e.target.value)}
+              placeholder="Filter columns..."
+              className="pl-7 h-7 text-xs w-full"
+            />
+            {columnSelectorFilter && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-5 w-5 p-0"
+                onClick={() => setColumnSelectorFilter("")}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+          <div className="h-[350px] pr-1 overflow-y-auto space-y-1">
+            {filteredColumnKeys.map((columnId) => (
+              <div key={columnId} className="flex items-center space-x-2 pl-1">
+                <Checkbox
+                  id={`column-sel-${columnId}`}
+                  checked={enabledColumns[columnId] !== false}
+                  onCheckedChange={() => toggleColumnVisibility(columnId)}
+                />
+                <label
+                  htmlFor={`column-sel-${columnId}`}
+                  className="text-xs cursor-pointer truncate max-w-[240px]"
+                  title={columnId}
+                >
+                  {columnId}
+                </label>
               </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            ))}
+            {filteredColumnKeys.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-2">
+                No columns match your filter.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
-          <DownloadDialog data={data || []} query={query} />
-
-          {onRefresh && (
+  const SpreadsheetOptions = () => {
+    return (
+      <Card className="absolute right-0 top-12 z-20 w-[300px] bg-background shadow-lg rounded-md border p-2">
+        <CardContent className="p-2">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-semibold">Spreadsheet Options</h3>
             <Button
               variant="ghost"
               size="sm"
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="h-8"
+              className="h-7 w-7 p-0"
+              onClick={() => setShowSpreadsheetOptions(false)}
             >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
+              <X className="h-4 w-4" />
             </Button>
-          )}
-        </div>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show-row-numbers"
+                checked={showRowNumbers}
+                onCheckedChange={(checked) =>
+                  setShowRowNumbers(checked === true)
+                }
+              />
+              <label
+                htmlFor="show-row-numbers"
+                className="text-xs cursor-pointer"
+              >
+                Show row numbers
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="zebra-stripes"
+                checked={zebraStripes}
+                onCheckedChange={(checked) => setZebraStripes(checked === true)}
+              />
+              <label htmlFor="zebra-stripes" className="text-xs cursor-pointer">
+                Zebra stripes
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show-grid-lines"
+                checked={showGridLines}
+                onCheckedChange={(checked) =>
+                  setShowGridLines(checked === true)
+                }
+              />
+              <label
+                htmlFor="show-grid-lines"
+                className="text-xs cursor-pointer"
+              >
+                Show grid lines
+              </label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
-        {/* Pagination controls */}
-        <div className="flex items-center space-x-2">
-          {activeTab === "table" && (
-            <>
-              {/* First Page Button */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={() => table.setPageIndex(0)}
-                      disabled={!table.getCanPreviousPage()}
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 p-0"
-                    >
-                      <ChevronsLeft size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>First Page</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+  const ContextMenu = () => {
+    if (!contextMenu) return null;
 
-              {/* Previous Page Button */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={() => table.previousPage()}
-                      disabled={!table.getCanPreviousPage()}
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 p-0"
-                    >
-                      <ChevronLeft size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Previous Page</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+    return (
+      <div
+        className="fixed z-20 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px]"
+        style={{ left: contextMenu.x, top: contextMenu.y }}
+        onMouseLeave={() => setContextMenu(null)}
+      >
+        <button
+          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+          onClick={() => {
+            // Trigger copy
+            const e = new KeyboardEvent("keydown", { key: "c", ctrlKey: true });
+            window.dispatchEvent(e);
+            setContextMenu(null);
+          }}
+        >
+          <Copy className="h-3 w-3" />
+          Copy
+        </button>
+        <button
+          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+          onClick={() => {
+            // Select all
+            const e = new KeyboardEvent("keydown", { key: "a", ctrlKey: true });
+            window.dispatchEvent(e);
+            setContextMenu(null);
+          }}
+        >
+          <MousePointer className="h-3 w-3" />
+          Select All
+        </button>
+        <button
+          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+          onClick={() => {
+            // Select row
+            if (selectedCells.size > 0) {
+              const firstCell = Array.from(selectedCells)[0];
+              const rowIndex = parseInt(firstCell.split("::")[0]);
+              if (data[0]) {
+                const rowCells = new Set<string>();
+                Object.keys(data[0]).forEach((key) => {
+                  if (key !== "__row_number__") {
+                    rowCells.add(`${rowIndex}::${key}`);
+                  }
+                });
+                setSelectedCells(rowCells);
+              }
+            }
+            setContextMenu(null);
+          }}
+        >
+          <MoreHorizontal className="h-3 w-3" />
+          Select Row
+        </button>
+        <button
+          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+          onClick={() => {
+            // Select column
+            if (selectedCells.size > 0) {
+              const firstCell = Array.from(selectedCells)[0];
+              const colId = firstCell.split("::")[1];
+              if (colId) {
+                const colCells = new Set<string>();
+                for (let i = 0; i < data.length; i++) {
+                  colCells.add(`${i}::${colId}`);
+                }
+                setSelectedCells(colCells);
+              }
+            }
+            setContextMenu(null);
+          }}
+        >
+          <MoreHorizontal className="h-3 w-3 rotate-90" />
+          Select Column
+        </button>
+        <hr className="my-1 border-border" />
+        <button
+          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+          onClick={() => {
+            exportToCSV();
+            setContextMenu(null);
+          }}
+        >
+          <Download className="h-3 w-3" />
+          Export CSV
+        </button>
+      </div>
+    );
+  };
 
-              {/* Page Number Display */}
-              <span className="text-gray-600 dark:text-gray-300 min-w-[100px] text-center text-xs">
-                Page {table.getState().pagination.pageIndex + 1} of{" "}
-                {table.getPageCount()}
-              </span>
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex justify-center items-center h-32 text-muted-foreground">
+        No data available.
+      </div>
+    );
+  }
 
-              {/* Next Page Button */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={() => table.nextPage()}
-                      disabled={!table.getCanNextPage()}
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 p-0"
-                    >
-                      <ChevronRight size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Next Page</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              {/* Last Page Button */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                      disabled={!table.getCanNextPage()}
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 p-0"
-                    >
-                      <ChevronsRight size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Last Page</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              {/* Page Size Selector */}
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="page-size" className="text-xs text-gray-500">
-                  Rows:
-                </Label>
-                <Select onValueChange={(value) => table.setPageSize(Number(value))}>
-                  <SelectTrigger className="w-[70px] h-8 text-xs">
-                    <SelectValue
-                      placeholder={String(table.getState().pagination.pageSize)}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <SelectItem key={size} value={String(size)}>
-                        {size}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+  return (
+    <TooltipProvider>
+      <div
+        className="flex flex-col h-full w-full min-w-0 overflow-hidden"
+        ref={tableContainerRef}
+      >
+        {/* Top controls area */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2 flex-shrink-0 mt-2 px-2">
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search all columns..."
+                value={globalFilterInput}
+                onChange={(e) => setGlobalFilterInput(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setGlobalFilterInput("");
+                table.resetColumnFilters(true);
+              }}
+              className="h-8 text-xs"
+              disabled={
+                !globalFilterInput && !table.getState().columnFilters.length
+              }
+            >
+              Clear Filters
+            </Button>
+          </div>
+          <div className="hidden md:flex items-center gap-x-4 text-xs text-muted-foreground px-2">
+            {executionTime !== null && executionTime !== undefined && (
+              <div
+                className="flex items-center gap-1"
+                title="Query execution time"
+              >
+                <Clock className="h-3 w-3" />
+                <span>{formatDuration(executionTime)}</span>
               </div>
-            </>
-          )}
+            )}
+            {responseSize !== null && responseSize !== undefined && (
+              <div className="flex items-center" title="Response size">
+                <span>{formatBytes(responseSize)}</span>
+              </div>
+            )}
+            <span title="Showing rows count">
+              {data.length.toLocaleString()} rows
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowColumnSelector(!showColumnSelector)}
+                className="h-8 text-xs"
+                title="Configure visible columns"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
+                Columns
+              </Button>
+              {showColumnSelector && <ColumnSelector />}
+            </div>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setShowSpreadsheetOptions(!showSpreadsheetOptions)
+                }
+                className="h-8 text-xs"
+                title="Spreadsheet display options"
+              >
+                <Grid3X3 className="h-3.5 w-3.5 mr-1" />
+                View
+              </Button>
+              {showSpreadsheetOptions && <SpreadsheetOptions />}
+            </div>
+            {Object.keys(userResizedColumns).length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setUserResizedColumns({})}
+                className="h-8 text-xs"
+                title="Reset column widths"
+              >
+                Reset Size
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToCSV}
+              className="h-8 text-xs"
+              disabled={!data || !data.length}
+              title="Export visible data as CSV"
+            >
+              <Download className="mr-1 h-3.5 w-3.5" />
+              Export CSV
+            </Button>
+
+            {/* Selection indicator */}
+            {selectedCells.size > 0 && (
+              <div className="flex items-center gap-2 ml-4 px-3 py-1 bg-primary/10 rounded-md border">
+                <span className="text-xs text-muted-foreground">
+                  {selectedCells.size} cell{selectedCells.size !== 1 ? "s" : ""}{" "}
+                  selected
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedCells(new Set())}
+                  className="h-6 px-2 text-xs hover:bg-primary/20"
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="border-b dark:border-gray-700">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-2 max-w-[200px] mx-2 my-1">
-            <TabsTrigger value="table">Table</TabsTrigger>
-            <TabsTrigger value="charts">Charts</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
-        {/* Table View */}
-        <div className={`h-full ${activeTab !== "table" ? "hidden" : ""}`}>
+        {/* Main table area */}
+        <div
+          className={`flex-1 rounded-md bg-card relative overflow-hidden ${
+            showGridLines ? "border-2" : "border"
+          } border-border`}
+        >
           <div
-            ref={tableContainerRef}
-            className="relative flex-1 overflow-auto w-full h-full"
+            ref={horizontalScrollRef}
+            className="h-full w-full overflow-auto"
+            style={{
+              height:
+                typeof tableHeight === "string"
+                  ? tableHeight
+                  : `${tableHeight}px`,
+              maxWidth: "100%",
+            }}
           >
             <div
               style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                width: "100%",
+                width: table.getTotalSize(),
+                minWidth: "100%",
+                maxWidth: "max-content",
                 position: "relative",
               }}
             >
-              <table className="w-full table-fixed">
-                <colgroup>
-                  {table.getAllColumns().map((column) => (
-                    <col key={column.id} style={{ width: column.getSize() }} />
-                  ))}
-                </colgroup>
-
-                <thead className="sticky top-0 z-1 bg-gray-50 dark:bg-gray-800">
+              <table
+                className={`w-full border-collapse table-fixed ${
+                  showGridLines ? "border-spacing-0" : ""
+                }`}
+              >
+                <thead
+                  className={`sticky top-0 z-10 bg-muted/70 backdrop-blur-sm ${
+                    showGridLines ? "border-b-2 border-border" : "shadow-sm"
+                  }`}
+                >
                   {table.getHeaderGroups().map((headerGroup) => (
-                    <tr key={headerGroup.id}>
+                    <tr
+                      key={headerGroup.id}
+                      className="border-b border-border/40"
+                    >
                       {headerGroup.headers.map((header) => (
                         <th
                           key={header.id}
-                          style={{ width: header.getSize() }}
-                          className={`
-                            relative p-2 text-left font-medium text-gray-600 dark:text-gray-200
-                            border-b dark:border-gray-700 text-xs select-none
-                            ${header.column.getCanSort() ? "cursor-pointer" : ""}
-                        `}
-                          onClick={
-                            header.column.getCanSort()
-                              ? header.column.getToggleSortingHandler()
-                              : undefined
-                          }
+                          className={`h-9 px-0 text-left align-middle font-medium text-muted-foreground whitespace-nowrap text-xs relative select-none ${
+                            showGridLines ? "border-r border-border/50" : ""
+                          }`}
+                          style={{
+                            width: header.getSize(),
+                            minWidth: header.column.columnDef.minSize, // From columnDef
+                            maxWidth: header.column.columnDef.maxSize, // From columnDef
+                          }}
                         >
-                          <div className="flex items-center gap-2">
-                            <span className="truncate">
-                              {flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                            </span>
-                            {header.column.getIsSorted() && (
-                              <span className="text-primary">
-                                {header.column.getIsSorted() === "asc" ? (
-                                  <ArrowUp className="h-3.5 w-3.5" />
-                                ) : (
-                                  <ArrowDown className="h-3.5 w-3.5" />
-                                )}
-                              </span>
+                          <div className="flex items-center justify-between w-full h-full px-2">
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
                             )}
                           </div>
-
                           {header.column.getCanResize() && (
                             <div
+                              className={`absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none group ${
+                                header.column.getIsResizing()
+                                  ? "bg-primary/20"
+                                  : ""
+                              }`}
                               onMouseDown={header.getResizeHandler()}
                               onTouchStart={header.getResizeHandler()}
-                              onDoubleClick={() => {
-                                const newSize = calculateAutoSize(header.column.id);
-                                handleColumnResize(newSize, header.column.id);
-                              }}
-                              className={`
-                            absolute right-0 top-0 h-full w-1
-                            cursor-col-resize select-none touch-none
-                            bg-gray-300 dark:bg-gray-600
-                            hover:bg-primary/50
-                             ${
-                               header.column.getIsResizing() ? "bg-primary w-1" : ""
-                             }
-                             transition-colors
-                         `}
-                            />
+                              style={{ userSelect: "none" }}
+                            >
+                              <div
+                                className={`w-[1px] h-4/6 my-auto ${
+                                  header.column.getIsResizing()
+                                    ? "bg-primary w-[2px]"
+                                    : "bg-border/60 group-hover:bg-primary/60 group-hover:w-[2px]"
+                                }`}
+                              />
+                            </div>
                           )}
                         </th>
                       ))}
                     </tr>
                   ))}
                 </thead>
-
-                <tbody>
+                <tbody
+                  className="bg-card text-card-foreground relative"
+                  style={{ userSelect: isDragging ? "none" : "auto" }}
+                >
                   {paddingTop > 0 && (
-                    <tr>
-                      <td
-                        style={{ height: `${paddingTop}px` }}
-                        colSpan={memoizedColumns.length}
-                      />
+                    <tr style={{ height: `${paddingTop}px` }}>
+                      <td colSpan={table.getVisibleLeafColumns().length} />
                     </tr>
                   )}
-
                   {virtualRows.map((virtualRow) => {
                     const row = rows[virtualRow.index];
-                    return <TableRow key={row.id} row={row} />;
+                    if (!row) return null;
+                    return (
+                      <tr
+                        key={virtualRow.key}
+                        data-index={virtualRow.index}
+                        className={`transition-colors ${
+                          zebraStripes && virtualRow.index % 2 === 0
+                            ? "hover:bg-muted/40" // Stronger hover for zebra striped rows
+                            : "hover:bg-muted/20" // Subtle hover for regular rows
+                        } ${row.getIsSelected() ? "bg-muted" : ""} ${
+                          zebraStripes && virtualRow.index % 2 === 0
+                            ? "bg-muted/20"
+                            : "bg-background"
+                        } ${showGridLines ? "border-b border-border/30" : ""}`}
+                        style={{ height: `${ROW_HEIGHT}px` }} // Use fixed ROW_HEIGHT
+                      >
+                        {row.getVisibleCells().map((cell) => {
+                          const cellKey = `${virtualRow.index}::${cell.column.id}`;
+                          const isSelected = selectedCells.has(cellKey);
+
+                          return (
+                            <td
+                              key={cell.id}
+                              className={`align-middle overflow-hidden relative ${
+                                showGridLines ? "border-r border-border/30" : ""
+                              } ${
+                                isSelected
+                                  ? "bg-primary/20 ring-1 ring-primary/30"
+                                  : ""
+                              } ${
+                                isDragging ? "cursor-crosshair" : "cursor-cell"
+                              }`}
+                              style={{
+                                width: cell.column.getSize(),
+                                minWidth: cell.column.columnDef.minSize,
+                                maxWidth: cell.column.columnDef.maxSize,
+                              }}
+                              onMouseDown={(e) => {
+                                if (
+                                  cell.column.id !== "__row_number__" &&
+                                  e.button === 0
+                                ) {
+                                  e.preventDefault();
+                                  const currentPosition = {
+                                    row: virtualRow.index,
+                                    col: cell.column.id,
+                                  };
+
+                                  if (e.shiftKey && lastSelectedCell) {
+                                    // Shift+click: select rectangular range using helper function
+                                    const rangeSelection = createSelectionRange(
+                                      lastSelectedCell,
+                                      currentPosition
+                                    );
+                                    setSelectedCells(rangeSelection);
+                                  } else if (e.ctrlKey || e.metaKey) {
+                                    // Ctrl/Cmd+click: toggle cell in selection
+                                    const newSelection = new Set(selectedCells);
+                                    if (newSelection.has(cellKey)) {
+                                      newSelection.delete(cellKey);
+                                    } else {
+                                      newSelection.add(cellKey);
+                                    }
+                                    setSelectedCells(newSelection);
+                                    setLastSelectedCell(currentPosition);
+                                  } else {
+                                    // Regular click: select only this cell and start drag
+                                    setSelectedCells(new Set([cellKey]));
+                                    setLastSelectedCell(currentPosition);
+
+                                    // Start drag selection
+                                    setIsDragging(true);
+                                    setDragStart(currentPosition);
+                                    setDragEnd(currentPosition);
+                                  }
+                                }
+                              }}
+                              onMouseEnter={() => {
+                                if (
+                                  isDragging &&
+                                  dragStart &&
+                                  cell.column.id !== "__row_number__"
+                                ) {
+                                  const currentPosition = {
+                                    row: virtualRow.index,
+                                    col: cell.column.id,
+                                  };
+                                  setDragEnd(currentPosition);
+
+                                  // Update selection during drag
+                                  const dragSelection = createSelectionRange(
+                                    dragStart,
+                                    currentPosition
+                                  );
+                                  setSelectedCells(dragSelection);
+                                }
+                              }}
+                              onContextMenu={(e) => {
+                                if (cell.column.id !== "__row_number__") {
+                                  e.preventDefault();
+                                  setContextMenu({
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                  });
+                                  if (!selectedCells.has(cellKey)) {
+                                    setSelectedCells(new Set([cellKey]));
+                                  }
+                                }
+                              }}
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
                   })}
                   {paddingBottom > 0 && (
-                    <tr>
-                      <td
-                        style={{ height: `${paddingBottom}px` }}
-                        colSpan={memoizedColumns.length}
-                      />
+                    <tr style={{ height: `${paddingBottom}px` }}>
+                      <td colSpan={table.getVisibleFlatColumns().length} />
                     </tr>
                   )}
-                  {onLoadMore && (
-                    <tr ref={loadMoreRef}>
+                  {rows.length === 0 && (
+                    <tr>
                       <td
-                        colSpan={memoizedColumns.length}
-                        className="text-center p-4"
+                        colSpan={columns.length || 1}
+                        className="h-24 text-center text-muted-foreground"
                       >
-                        {isLoading ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Loading more...</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-500 dark:text-gray-400">
-                            Scroll to load more
-                          </span>
-                        )}
+                        No results match your filters.
                       </td>
                     </tr>
                   )}
@@ -805,110 +1194,97 @@ function DuckUiTable<T extends RowData>({
           </div>
         </div>
 
-        {/* Chart View */}
-        <div className={`flex flex-col h-full ${activeTab !== "charts" ? "hidden" : ""}`}>
-          <div className="p-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Chart Type Selection */}
-              <div>
-                <Label htmlFor="chart-type" className="text-xs text-gray-600 dark:text-gray-300 mb-1">
-                  Chart Type
-                </Label>
-                <Select value={chartType} onValueChange={setChartType}>
-                  <SelectTrigger className="w-full h-8 text-xs">
-                    <SelectValue placeholder="Select chart type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CHART_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value} className="flex items-center">
-                        <span className="flex items-center">
-                          {React.createElement(type.icon, { className: "h-4 w-4 mr-2" })}
-                          {type.label}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Category Selection */}
-              <div>
-                <Label htmlFor="category-column" className="text-xs text-gray-600 dark:text-gray-300 mb-1">
-                  Category Column
-                </Label>
-                <Select 
-                  value={chartColumns.category} 
-                  onValueChange={(value) => handleChartColumnChange("category", value)}
-                >
-                  <SelectTrigger className="w-full h-8 text-xs">
-                    <SelectValue placeholder="Select category column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {columns
-                      .filter(col => col !== "__index") // Exclude index column
-                      .map((column) => (
-                        <SelectItem key={column} value={column}>
-                          {column}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Value Selection */}
-              <div>
-                <Label htmlFor="value-column" className="text-xs text-gray-600 dark:text-gray-300 mb-1">
-                  Value Column
-                </Label>
-                <Select 
-                  value={chartColumns.values[0] || ""} 
-                  onValueChange={(value) => handleChartColumnChange("values", [value])}
-                >
-                  <SelectTrigger className="w-full h-8 text-xs">
-                    <SelectValue placeholder="Select value column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {columns
-                      .filter(col => col !== "__index" && col !== chartColumns.category) // Exclude index and category
-                      .map((column) => (
-                        <SelectItem key={column} value={column}>
-                          {column}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+        {/* Pagination controls */}
+        <div className="flex items-center justify-between mt-4 flex-shrink-0 mb-2 px-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+              className="h-7 w-7 p-0 text-xs"
+              title="First page"
+            >
+              ««
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="h-7 w-7 p-0 text-xs"
+              title="Previous page"
+            >
+              «
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="h-7 w-7 p-0 text-xs"
+              title="Next page"
+            >
+              »
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+              className="h-7 w-7 p-0 text-xs"
+              title="Last page"
+            >
+              »»
+            </Button>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              Page {table.getState().pagination.pageIndex + 1} of{" "}
+              {table.getPageCount() || 1}
+            </span>
+            <select
+              value={table.getState().pagination.pageSize}
+              onChange={(e) => {
+                table.setPageSize(Number(e.target.value));
+              }}
+              className="text-xs border border-border/40 rounded-md h-7 px-2 bg-background"
+              title="Rows per page"
+            >
+              {[10, 25, 50, 100, 200].map((pageSize) => (
+                <option key={pageSize} value={pageSize}>
+                  {pageSize} rows
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
-          {/* Chart Display */}
-          <div className="flex-1 overflow-auto p-4">
-            {Object.keys(getChartOptions).length > 0 ? (
-              <ReactECharts 
-                option={getChartOptions} 
-                style={{ height: '100%', minHeight: '300px', width: '100%' }}
-                opts={{ renderer: 'canvas' }}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
-                <p>Select chart options to visualize data</p>
+        {/* Context Menu */}
+        <ContextMenu />
+
+        {/* Mobile stats */}
+        <div className="md:hidden flex items-center justify-between text-xs text-muted-foreground py-2 border-t border-border/30 mt-2 flex-shrink-0">
+          <span>
+            {table.getFilteredRowModel().rows.length} of {data.length} rows
+          </span>
+          <div className="flex items-center gap-x-3">
+            {executionTime !== null && executionTime !== undefined && (
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                <span>{formatDuration(executionTime)}</span>
+              </div>
+            )}
+            {responseSize !== null && responseSize !== undefined && (
+              <div className="flex items-center">
+                <span>{formatBytes(responseSize)}</span>
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* Footer with stats */}
-      <div className="p-2 border-t dark:border-gray-700">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            {table.getFilteredRowModel().rows.length.toLocaleString()} of{" "}
-            {table.getPreFilteredRowModel().rows.length.toLocaleString()} rows
-          </span>
-        </div>
-      </div>
-    </div>
+    </TooltipProvider>
   );
-}
+};
 
-export default React.memo(DuckUiTable) as typeof DuckUiTable;
+export default DuckUITable;

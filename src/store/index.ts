@@ -49,6 +49,7 @@ export interface CurrentConnection {
   password?: string;
   database?: string;
   authMode?: "none" | "password" | "api_key";
+  apiKey?: string;
   path?: string;
 }
 
@@ -63,6 +64,7 @@ export interface ConnectionProvider {
   password?: string;
   database?: string;
   authMode?: "none" | "password" | "api_key";
+  apiKey?: string;
   path?: string;
 }
 
@@ -115,9 +117,16 @@ export interface EditorTab {
 }
 
 export interface DuckStoreState {
-  // Database state
+  // Database state - active instances
   db: duckdb.AsyncDuckDB | null;
   connection: duckdb.AsyncDuckDBConnection | null;
+
+  // Multiple DB instances support
+  wasmDb: duckdb.AsyncDuckDB | null;
+  wasmConnection: duckdb.AsyncDuckDBConnection | null;
+  opfsDb: duckdb.AsyncDuckDB | null;
+  opfsConnection: duckdb.AsyncDuckDBConnection | null;
+
   isInitialized: boolean;
   currentDatabase: string;
   currentConnection: CurrentConnection | null;
@@ -279,28 +288,61 @@ const executeExternalQuery = async (
   query: string,
   connection: CurrentConnection
 ): Promise<QueryResult> => {
-  if (!connection.host || !connection.port) {
-    throw new Error("Host and port must be defined for external connections.");
+  if (!connection.host) {
+    throw new Error("Host must be defined for external connections.");
   }
-  const url = `${connection.host}:${connection.port}/`;
-  const authHeader = btoa(`${connection.user}:${connection.password}`);
-  const body = query;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${authHeader}`,
-    },
-    body,
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `HTTP error! Status: ${response.status}, Message: ${errorText}`
-    );
+
+  // Construct URL properly - handle schemes and ports
+  let url = connection.host;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
   }
-  const rawResult = await response.text();
-  return rawResultToJSON(rawResult);
+  if (connection.port && !connection.host.includes(':')) {
+    url = `${url}:${connection.port}`;
+  }
+  if (!url.endsWith('/')) {
+    url = `${url}/`;
+  }
+
+  // Build headers based on auth mode
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  if (connection.authMode === "api_key" && connection.apiKey) {
+    headers["X-API-Key"] = connection.apiKey;
+  } else if (connection.authMode === "password" && connection.user && connection.password) {
+    const authHeader = btoa(`${connection.user}:${connection.password}`);
+    headers["Authorization"] = `Basic ${authHeader}`;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: query,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (response.status === 401) {
+        throw new Error("Authentication failed - check your credentials");
+      } else if (response.status === 404) {
+        throw new Error(`Cannot reach server at ${url}`);
+      }
+      throw new Error(
+        `HTTP error! Status: ${response.status}, Message: ${errorText}`
+      );
+    }
+
+    const rawResult = await response.text();
+    return rawResultToJSON(rawResult);
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error(`Network error: Cannot reach ${url}. Check your connection and CORS settings.`);
+    }
+    throw error;
+  }
 };
 
 /**
@@ -347,24 +389,57 @@ const initializeWasmConnection = async (): Promise<{
 const testExternalConnection = async (
   connection: ConnectionProvider
 ): Promise<void> => {
-  if (!connection.host || !connection.port) {
-    throw new Error("Host and port must be defined for external connections.");
+  if (!connection.host) {
+    throw new Error("Host must be defined for external connections.");
   }
-  const url = `${connection.host}:${connection.port}/`;
-  const authHeader = btoa(`${connection.user}:${connection.password}`);
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${authHeader}`,
-    },
-    body: `SELECT 1`,
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Connection test failed! Status: ${response.status}, Message: ${errorText}`
-    );
+
+  // Construct URL properly
+  let url = connection.host;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+  if (connection.port && !connection.host.includes(':')) {
+    url = `${url}:${connection.port}`;
+  }
+  if (!url.endsWith('/')) {
+    url = `${url}/`;
+  }
+
+  // Build headers based on auth mode
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  if (connection.authMode === "api_key" && connection.apiKey) {
+    headers["X-API-Key"] = connection.apiKey;
+  } else if (connection.authMode === "password" && connection.user && connection.password) {
+    const authHeader = btoa(`${connection.user}:${connection.password}`);
+    headers["Authorization"] = `Basic ${authHeader}`;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: `SELECT 1`,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (response.status === 401) {
+        throw new Error("Authentication failed - check your credentials");
+      } else if (response.status === 404) {
+        throw new Error(`Cannot reach server at ${url}`);
+      }
+      throw new Error(
+        `Connection test failed! Status: ${response.status}, Message: ${errorText}`
+      );
+    }
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error(`Network error: Cannot reach ${url}. Check your connection and CORS settings.`);
+    }
+    throw error;
   }
 };
 
@@ -432,8 +507,76 @@ const updateHistory = (
 };
 
 /**
- * Fetches databases and tables for an external connection. TODO
+ * Fetches databases and tables for an external connection.
  */
+const fetchExternalDatabases = async (
+  connection: CurrentConnection
+): Promise<DatabaseInfo[]> => {
+  try {
+    // Try to get database list
+    const dbListResult = await executeExternalQuery("SHOW DATABASES", connection);
+    const databases: DatabaseInfo[] = [];
+
+    // If database list is available, fetch tables for each
+    if (dbListResult.data && dbListResult.data.length > 0) {
+      for (const dbRow of dbListResult.data) {
+        const dbName = dbRow[dbListResult.columns[0] as string] as string;
+        try {
+          const tablesResult = await executeExternalQuery(
+            `SELECT table_name FROM information_schema.tables WHERE table_catalog = '${dbName}'`,
+            connection
+          );
+
+          const tables: TableInfo[] = [];
+          for (const tableRow of tablesResult.data) {
+            const tableName = tableRow.table_name as string;
+            try {
+              // Try to get columns info
+              const columnsResult = await executeExternalQuery(
+                `DESCRIBE ${dbName}.${tableName}`,
+                connection
+              );
+
+              const columns: ColumnInfo[] = columnsResult.data.map((col: any) => ({
+                name: col.column_name as string,
+                type: col.column_type as string,
+                nullable: col.null === "YES",
+              }));
+
+              tables.push({
+                name: tableName,
+                schema: dbName,
+                columns,
+                rowCount: 0, // External connections don't provide row count easily
+                createdAt: new Date().toISOString(),
+              });
+            } catch (e) {
+              // If describe fails, add table with basic info
+              tables.push({
+                name: tableName,
+                schema: dbName,
+                columns: [],
+                rowCount: 0,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          }
+
+          databases.push({ name: dbName, tables });
+        } catch (e) {
+          console.warn(`Failed to fetch tables for database ${dbName}:`, e);
+          databases.push({ name: dbName, tables: [] });
+        }
+      }
+    }
+
+    return databases;
+  } catch (error) {
+    // If fetching databases fails, return empty array
+    console.warn("Failed to fetch external databases:", error);
+    return [];
+  }
+};
 
 /**
  * Fetches databases and tables using the WASM connection.
@@ -491,6 +634,10 @@ export const useDuckStore = create<DuckStoreState>()(
         // Initial state
         db: null,
         connection: null,
+        wasmDb: null,
+        wasmConnection: null,
+        opfsDb: null,
+        opfsConnection: null,
         isInitialized: false,
         currentDatabase: "memory",
         databases: [],
@@ -580,6 +727,8 @@ export const useDuckStore = create<DuckStoreState>()(
             set({
               db,
               connection,
+              wasmDb: db,
+              wasmConnection: connection,
               isInitialized: true,
               currentDatabase: "memory",
             });
@@ -760,10 +909,12 @@ export const useDuckStore = create<DuckStoreState>()(
           try {
             set({ isLoadingDbTablesFetch: true, error: null });
             let databases: DatabaseInfo[] = [];
+
             if (currentConnection?.scope === "External") {
-              // TODO: Implement fetch database logic for external connection.
-              databases = [];
-            } else {
+              // Fetch databases from external connection
+              databases = await fetchExternalDatabases(currentConnection);
+            } else if (currentConnection?.scope === "OPFS" || currentConnection?.scope === "WASM") {
+              // Fetch from WASM/OPFS connection
               if (!connection) {
                 set({ databases: [], error: null });
                 return;
@@ -771,6 +922,7 @@ export const useDuckStore = create<DuckStoreState>()(
               const wasmConnection = validateConnection(connection);
               databases = await fetchWasmDatabases(wasmConnection);
             }
+
             set({ databases, error: null });
           } catch (error) {
             set({
@@ -918,7 +1070,9 @@ export const useDuckStore = create<DuckStoreState>()(
             );
             const parquet_buffer = await db.copyFileToBuffer(fileName);
             await db.dropFile(fileName);
-            return new Blob([parquet_buffer], { type: "application/parquet" });
+            // Convert to plain ArrayBuffer to satisfy TypeScript
+            const arrayBuffer = parquet_buffer.buffer.slice(0) as ArrayBuffer;
+            return new Blob([arrayBuffer], { type: "application/parquet" });
           } catch (error) {
             console.error("Failed to export to parquet:", error);
             throw new Error(
@@ -1032,22 +1186,83 @@ export const useDuckStore = create<DuckStoreState>()(
               throw new Error(`Connection with ID ${connectionId} not found.`);
             }
 
-            set({
-              currentConnection: {
-                environment: connectionProvider.environment,
-                id: connectionProvider.id,
-                name: connectionProvider.name,
-                scope: connectionProvider.scope,
-                host: connectionProvider.host,
-                port: connectionProvider.port,
-                user: connectionProvider.user,
-                password: connectionProvider.password,
-                database: connectionProvider.database,
-                authMode: connectionProvider.authMode,
-                path: connectionProvider.path,
-              },
-              isLoading: false,
-            });
+            const { wasmDb, wasmConnection, opfsDb, opfsConnection } = get();
+
+            // Handle different connection scopes
+            if (connectionProvider.scope === "WASM") {
+              // Switch to WASM connection
+              if (!wasmDb || !wasmConnection) {
+                throw new Error("WASM connection not initialized");
+              }
+              set({
+                db: wasmDb,
+                connection: wasmConnection,
+                currentConnection: {
+                  environment: connectionProvider.environment,
+                  id: connectionProvider.id,
+                  name: connectionProvider.name,
+                  scope: connectionProvider.scope,
+                },
+                currentDatabase: "memory",
+              });
+            } else if (connectionProvider.scope === "OPFS") {
+              // Initialize or switch to OPFS connection
+              let opfsInstance = { db: opfsDb, connection: opfsConnection };
+
+              // If switching to a different OPFS path, cleanup old and create new
+              if (!opfsDb || !opfsConnection) {
+                toast.info("Initializing OPFS connection...");
+                opfsInstance = await testOPFSConnection(connectionProvider);
+
+                // Cleanup old OPFS if exists
+                if (opfsDb && opfsConnection) {
+                  try {
+                    await opfsConnection.close();
+                    await opfsDb.terminate();
+                  } catch (e) {
+                    console.warn("Failed to cleanup old OPFS connection:", e);
+                  }
+                }
+              }
+
+              set({
+                db: opfsInstance.db,
+                connection: opfsInstance.connection,
+                opfsDb: opfsInstance.db,
+                opfsConnection: opfsInstance.connection,
+                currentConnection: {
+                  environment: connectionProvider.environment,
+                  id: connectionProvider.id,
+                  name: connectionProvider.name,
+                  scope: connectionProvider.scope,
+                  path: connectionProvider.path,
+                },
+                currentDatabase: connectionProvider.path?.replace(/\.db$/, "") || "opfs",
+              });
+            } else if (connectionProvider.scope === "External") {
+              // For external connections, we don't use a WASM connection
+              // Keep WASM instances alive but set current to null
+              set({
+                db: null,
+                connection: null,
+                currentConnection: {
+                  environment: connectionProvider.environment,
+                  id: connectionProvider.id,
+                  name: connectionProvider.name,
+                  scope: connectionProvider.scope,
+                  host: connectionProvider.host,
+                  port: connectionProvider.port,
+                  user: connectionProvider.user,
+                  password: connectionProvider.password,
+                  database: connectionProvider.database,
+                  authMode: connectionProvider.authMode,
+                  apiKey: connectionProvider.apiKey,
+                },
+                currentDatabase: connectionProvider.database || "external",
+              });
+            }
+
+            set({ isLoading: false });
             await get().fetchDatabasesAndTablesInfo();
             toast.success(`Connected to ${connectionProvider.name}`);
           } catch (error) {
@@ -1057,6 +1272,11 @@ export const useDuckStore = create<DuckStoreState>()(
               }`,
               isLoading: false,
             });
+            toast.error(
+              `Failed to connect: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
           } finally {
             set({ isLoading: false });
           }

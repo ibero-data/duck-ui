@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { useDuckStore, ConnectionProvider } from "@/store";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,8 +36,8 @@ import {
   Database,
   ExternalLink,
   InfoIcon,
+  ArrowLeft,
 } from "lucide-react";
-import { DialogFooter } from "@/components/ui/dialog"; // Import DialogFooter
 import { ConnectionDisclaimer } from "@/components/connection/Disclaimer";
 import ConnectionManager from "@/components/connection/ConnectionsModal";
 import {
@@ -92,6 +93,7 @@ const connectionSchema = z.discriminatedUnion("scope", [opfsSchema, externalSche
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
 const Connections = () => {
+  const navigate = useNavigate();
   const {
     connectionList,
     addConnection,
@@ -155,26 +157,48 @@ const Connections = () => {
     const connection = getConnection(connectionId);
     if (connection) {
       setEditingConnectionId(connectionId);
-      setEditingConnection({
-        ...connection,
-        scope: "External",
-        host: connection.host || "",
-        port: connection.port?.toString() || "",
-      });
+      const baseConnection = {
+        name: connection.name,
+        scope: connection.scope as "External" | "OPFS",
+      };
+
+      // Add scope-specific fields
+      if (connection.scope === "OPFS") {
+        setEditingConnection({
+          ...baseConnection,
+          scope: "OPFS",
+          path: connection.path || "",
+        });
+      } else {
+        setEditingConnection({
+          ...baseConnection,
+          scope: "External",
+          host: connection.host || "",
+          port: connection.port?.toString() || "",
+          database: connection.database,
+          user: connection.user,
+          password: connection.password,
+          authMode: connection.authMode,
+          apiKey: connection.apiKey,
+        });
+      }
       setIsEditing(true);
     }
   };
 
-  const onCancelEdit = () => {
-    setIsEditing(false);
-    setEditingConnectionId(null);
-    setEditingConnection(undefined);
-  };
-
   return (
-    <div className="container mx-auto p-4 space-y-6 overflow-auto">
+    <div className="container mx-auto p-4 space-y-6 overflow-auto h-full">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Connections</h1>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-bold">Connections</h1>
+        </div>
         <Button
           onClick={() => setIsAddConnectionDialogOpen(true)}
           className="flex items-center gap-2"
@@ -192,35 +216,23 @@ const Connections = () => {
           onSubmit={handleAddConnection}
           isEditMode={false} // Ensure it's in add mode
         />
+
+        {/* Use ConnectionManager for editing connections */}
+        <ConnectionManager
+          open={isEditing}
+          onOpenChange={(open) => {
+            setIsEditing(open);
+            if (!open) {
+              setEditingConnectionId(null);
+              setEditingConnection(undefined);
+            }
+          }}
+          onSubmit={handleUpdateConnection}
+          initialValues={editingConnection}
+          isEditMode={true} // Set to edit mode
+        />
       </div>
       <ConnectionDisclaimer />
-
-      {/* Editing Connection Card - using ConnectionManager */}
-      {isEditing && editingConnection ? (
-        <Card className="w-full max-w-2xl mx-auto mb-8">
-          <CardHeader>
-            <CardTitle>Edit Connection</CardTitle>
-            <CardDescription>
-              Modify existing connection details
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Use ConnectionManager for editing connections */}
-            <ConnectionManager
-              open={isEditing}
-              onOpenChange={setIsEditing}
-              onSubmit={handleUpdateConnection}
-              initialValues={editingConnection}
-              isEditMode={true} // Set to edit mode
-            />
-          </CardContent>
-          <DialogFooter>
-            <Button type="button" variant="secondary" onClick={onCancelEdit}>
-              Cancel
-            </Button>
-          </DialogFooter>
-        </Card>
-      ) : null}
 
       <Card>
         <CardHeader>
@@ -275,7 +287,7 @@ const Connections = () => {
                     <TableCell>{connection.environment}</TableCell>
 
                     <TableCell className="text-right">
-                      {connection.environment === "BUILT_IN" || "ENV" ? (
+                      {connection.environment === "BUILT_IN" || connection.environment === "ENV" ? (
                         <div className="justify-end flex gap-2 p-2 rounded-md">
                           <TooltipProvider>
                             <Tooltip>

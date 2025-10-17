@@ -17,11 +17,19 @@ import {
   HardDrive,
   AlertTriangle,
   RefreshCw,
+  Link as LinkIcon,
+  Code,
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Eye,
 } from "lucide-react";
-import { useDuckStore } from "@/store";
+import { useDuckStore, type QueryResult } from "@/store";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import DuckUITable from "@/components/table/DuckUItable";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -31,12 +39,22 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { z } from "zod";
@@ -63,6 +81,21 @@ const SUPPORTED_FILE_EXTENSIONS = [
   "xlsx",
 ] as const;
 const MAX_CONCURRENT_UPLOADS = 3;
+const PREVIEW_ROW_LIMIT = 20;
+
+// DuckDB types for schema customization
+const DUCKDB_TYPES = [
+  "VARCHAR",
+  "INTEGER",
+  "BIGINT",
+  "DOUBLE",
+  "DECIMAL",
+  "DATE",
+  "TIMESTAMP",
+  "BOOLEAN",
+  "JSON",
+  "BLOB",
+] as const;
 
 // Types
 type FileExtension = (typeof SUPPORTED_FILE_EXTENSIONS)[number];
@@ -93,6 +126,22 @@ interface CsvImportOptions {
   header: boolean;
   delimiter: string;
   autoDetect: boolean;
+  // Advanced options
+  quote?: string;
+  escape?: string;
+  skip?: number;
+  nullStr?: string;
+  dateFormat?: string;
+  timestampFormat?: string;
+  sampleSize?: number;
+}
+
+// Schema customization
+interface SchemaColumn {
+  originalName: string;
+  newName: string;
+  type: string;
+  included: boolean;
 }
 
 interface FileImporterProps {
@@ -119,6 +168,52 @@ const formatFileSize = (bytes: number): string => {
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+};
+
+const getErrorSuggestion = (errorMessage: string): string | null => {
+  const lowerError = errorMessage.toLowerCase();
+
+  // Network/URL errors
+  if (lowerError.includes("fetch") || lowerError.includes("network") || lowerError.includes("cors")) {
+    return "Check your internet connection and ensure the URL is publicly accessible. CORS restrictions may prevent access to some URLs.";
+  }
+
+  // File format errors
+  if (lowerError.includes("invalid") && (lowerError.includes("csv") || lowerError.includes("json") || lowerError.includes("parquet"))) {
+    return "The file format may be corrupted or not match the expected structure. Try opening the file locally to verify its contents.";
+  }
+
+  // Parsing errors
+  if (lowerError.includes("parse") || lowerError.includes("syntax")) {
+    return "Data parsing failed. Consider adjusting CSV options like delimiter, quote character, or enabling 'ignore errors'.";
+  }
+
+  // Type detection errors
+  if (lowerError.includes("type") || lowerError.includes("column")) {
+    return "Column type detection failed. Try enabling 'auto-detect types' or manually specify column types in schema customization.";
+  }
+
+  // Authentication errors
+  if (lowerError.includes("401") || lowerError.includes("403") || lowerError.includes("unauthorized")) {
+    return "Access denied. The URL may require authentication or the resource is not publicly accessible.";
+  }
+
+  // Not found errors
+  if (lowerError.includes("404") || lowerError.includes("not found")) {
+    return "The file was not found at the specified URL. Verify the URL is correct and the file still exists.";
+  }
+
+  // Memory/size errors
+  if (lowerError.includes("memory") || lowerError.includes("out of")) {
+    return "The file may be too large to process. Try importing a smaller file or use sampling options.";
+  }
+
+  // Table name errors
+  if (lowerError.includes("table") && lowerError.includes("exist")) {
+    return "A table with this name already exists. Choose a different name or the existing table will be replaced.";
+  }
+
+  return null;
 };
 
 const getFileIcon = (fileType: string) => {
@@ -174,7 +269,7 @@ const FileDetails: React.FC<FileDetailsProps> = ({
     } catch (error) {
       setTableNameError(
         error instanceof z.ZodError
-          ? error.errors[0].message
+          ? error.issues[0].message
           : "Invalid table name"
       );
     }
@@ -403,6 +498,176 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                       Common values: , (comma), ; (semicolon), tab, pipe (|)
                     </p>
                   </div>
+
+                  {/* Advanced CSV Options */}
+                  <div className="space-y-3 pt-3 border-t">
+                    <h5 className="font-medium text-sm text-muted-foreground">Advanced Options</h5>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`quote-${file.name}`}
+                          className="text-xs"
+                        >
+                          Quote Character
+                        </Label>
+                        <Input
+                          id={`quote-${file.name}`}
+                          value={csvOptions.quote || ""}
+                          onChange={(e) =>
+                            handleCsvOptionChange("quote", e.target.value)
+                          }
+                          placeholder={`" (default)`}
+                          className="h-8 text-xs"
+                          disabled={
+                            status.status === "uploading" ||
+                            status.status === "processing"
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`escape-${file.name}`}
+                          className="text-xs"
+                        >
+                          Escape Character
+                        </Label>
+                        <Input
+                          id={`escape-${file.name}`}
+                          value={csvOptions.escape || ""}
+                          onChange={(e) =>
+                            handleCsvOptionChange("escape", e.target.value)
+                          }
+                          placeholder={`" (default)`}
+                          className="h-8 text-xs"
+                          disabled={
+                            status.status === "uploading" ||
+                            status.status === "processing"
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`skip-${file.name}`}
+                          className="text-xs"
+                        >
+                          Skip Rows
+                        </Label>
+                        <Input
+                          id={`skip-${file.name}`}
+                          type="number"
+                          min="0"
+                          value={csvOptions.skip || ""}
+                          onChange={(e) =>
+                            handleCsvOptionChange("skip", parseInt(e.target.value, 10) || undefined)
+                          }
+                          placeholder="0"
+                          className="h-8 text-xs"
+                          disabled={
+                            status.status === "uploading" ||
+                            status.status === "processing"
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`sample-size-${file.name}`}
+                          className="text-xs"
+                        >
+                          Sample Size
+                        </Label>
+                        <Input
+                          id={`sample-size-${file.name}`}
+                          type="number"
+                          min="1"
+                          value={csvOptions.sampleSize || ""}
+                          onChange={(e) =>
+                            handleCsvOptionChange("sampleSize", parseInt(e.target.value, 10) || undefined)
+                          }
+                          placeholder="Auto"
+                          className="h-8 text-xs"
+                          disabled={
+                            status.status === "uploading" ||
+                            status.status === "processing"
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor={`null-str-${file.name}`}
+                        className="text-xs"
+                      >
+                        NULL String
+                      </Label>
+                      <Input
+                        id={`null-str-${file.name}`}
+                        value={csvOptions.nullStr || ""}
+                        onChange={(e) =>
+                          handleCsvOptionChange("nullStr", e.target.value)
+                        }
+                        placeholder="Empty values treated as NULL"
+                        className="h-8 text-xs"
+                        disabled={
+                          status.status === "uploading" ||
+                          status.status === "processing"
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Values matching this string will be treated as NULL
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`date-format-${file.name}`}
+                          className="text-xs"
+                        >
+                          Date Format
+                        </Label>
+                        <Input
+                          id={`date-format-${file.name}`}
+                          value={csvOptions.dateFormat || ""}
+                          onChange={(e) =>
+                            handleCsvOptionChange("dateFormat", e.target.value)
+                          }
+                          placeholder="ISO 8601"
+                          className="h-8 text-xs"
+                          disabled={
+                            status.status === "uploading" ||
+                            status.status === "processing"
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`timestamp-format-${file.name}`}
+                          className="text-xs"
+                        >
+                          Timestamp Format
+                        </Label>
+                        <Input
+                          id={`timestamp-format-${file.name}`}
+                          value={csvOptions.timestampFormat || ""}
+                          onChange={(e) =>
+                            handleCsvOptionChange("timestampFormat", e.target.value)
+                          }
+                          placeholder="ISO 8601"
+                          className="h-8 text-xs"
+                          disabled={
+                            status.status === "uploading" ||
+                            status.status === "processing"
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -440,7 +705,8 @@ const FileImporter: React.FC<FileImporterProps> = ({
   isSheetOpen,
   setIsSheetOpen,
 }) => {
-  const { importFile } = useDuckStore();
+  const { importFile, executeQuery } = useDuckStore();
+  const [activeTab, setActiveTab] = useState("upload");
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [tableNames, setTableNames] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
@@ -454,6 +720,28 @@ const FileImporter: React.FC<FileImporterProps> = ({
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // URL import state
+  const [urlInput, setUrlInput] = useState("");
+  const [urlTableName, setUrlTableName] = useState("");
+  const [isUrlImporting, setIsUrlImporting] = useState(false);
+
+  // Preview state (Phase 2 - used in PreviewTable component)
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [previewData, setPreviewData] = useState<QueryResult | null>(null);
+  const [previewSource, setPreviewSource] = useState<"file" | "url" | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>("");
+  const [previewTableName, setPreviewTableName] = useState<string>("");
+
+  // Schema customization state (Phase 2 - used in SchemaEditor component)
+  const [schemaColumns, setSchemaColumns] = useState<SchemaColumn[]>([]);
+  const [isSchemaCustomizing, setIsSchemaCustomizing] = useState(false);
+
+  // Query import state (Phase 2 - Query Import feature)
+  const [queryInput, setQueryInput] = useState("");
+  const [queryTableName, setQueryTableName] = useState("");
+  const [isQueryImporting, setIsQueryImporting] = useState(false);
 
   // Default CSV import options
   const defaultCsvOptions: CsvImportOptions = {
@@ -640,7 +928,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
         } catch (error) {
           const errorMessage =
             error instanceof z.ZodError
-              ? error.errors[0].message
+              ? error.issues[0].message
               : "Invalid table name";
           setErrors((prev) => [
             ...prev,
@@ -776,6 +1064,304 @@ const FileImporter: React.FC<FileImporterProps> = ({
     [toast]
   );
 
+  // Preview handlers - Phase 2
+  const handlePreviewUrl = async (url: string, tableName: string) => {
+    setIsPreviewing(true);
+    setErrors([]);
+
+    try {
+      const urlPath = url.split("?")[0];
+      const extension = urlPath.split(".").pop()?.toLowerCase();
+
+      let previewQuery = "";
+      if (extension === "csv") {
+        previewQuery = `SELECT * FROM read_csv('${url}', auto_detect=true, header=true) LIMIT ${PREVIEW_ROW_LIMIT}`;
+      } else if (extension === "json") {
+        previewQuery = `SELECT * FROM read_json('${url}', auto_detect=true) LIMIT ${PREVIEW_ROW_LIMIT}`;
+      } else if (extension === "parquet") {
+        previewQuery = `SELECT * FROM read_parquet('${url}') LIMIT ${PREVIEW_ROW_LIMIT}`;
+      } else {
+        throw new Error(`Unsupported file type for preview: .${extension}`);
+      }
+
+      const result = await executeQuery(previewQuery);
+      if (result && !result.error) {
+        setPreviewData(result);
+        setPreviewSource("url");
+        setPreviewFileName(url);
+        setPreviewTableName(tableName);
+        setIsPreviewMode(true);
+
+        // Initialize schema columns from preview
+        const initialSchema: SchemaColumn[] = result.columns.map((col, idx) => ({
+          originalName: col,
+          newName: col,
+          type: result.columnTypes[idx] || "VARCHAR",
+          included: true,
+        }));
+        setSchemaColumns(initialSchema);
+      }
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unknown error";
+      toast.error(`Preview failed: ${errorMessage}`);
+      setErrors([{
+        id: crypto.randomUUID(),
+        message: errorMessage,
+        severity: "error",
+      }]);
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  // Wrapper for preview with validation
+  const handlePreview = async () => {
+    if (!urlInput.trim()) {
+      toast.error("Please enter a URL");
+      return;
+    }
+
+    if (!urlTableName.trim()) {
+      toast.error("Please enter a table name");
+      return;
+    }
+
+    try {
+      tableNameSchema.parse(urlTableName);
+    } catch (error) {
+      const errorMessage =
+        error instanceof z.ZodError
+          ? error.issues[0].message
+          : "Invalid table name";
+      toast.error(errorMessage);
+      return;
+    }
+
+    await handlePreviewUrl(urlInput, urlTableName);
+  };
+
+  // Exit preview mode
+  const handleBackFromPreview = () => {
+    setIsPreviewMode(false);
+    setPreviewData(null);
+    setPreviewSource(null);
+    setPreviewFileName("");
+    setPreviewTableName("");
+    setSchemaColumns([]);
+  };
+
+  // Import from preview (with optional schema customization)
+  const handleImportFromPreview = async () => {
+    if (!previewFileName || !previewTableName) return;
+
+    setIsUrlImporting(true);
+    setErrors([]);
+
+    try {
+      if (previewSource === "url") {
+        const url = previewFileName;
+        const urlPath = url.split("?")[0];
+        const extension = urlPath.split(".").pop()?.toLowerCase();
+
+        // Build column selection and casting based on schema customization
+        const includedColumns = schemaColumns.filter(col => col.included);
+        const hasSchemaChanges = schemaColumns.some(
+          col => col.newName !== col.originalName || !col.included
+        );
+
+        let columnSelection = "*";
+        if (hasSchemaChanges && includedColumns.length > 0) {
+          columnSelection = includedColumns
+            .map(col => {
+              if (col.newName !== col.originalName) {
+                return `"${col.originalName}" AS "${col.newName}"`;
+              }
+              return `"${col.originalName}"`;
+            })
+            .join(", ");
+        }
+
+        let query = "";
+        if (extension === "csv") {
+          query = `CREATE OR REPLACE TABLE ${previewTableName} AS SELECT ${columnSelection} FROM read_csv('${url}', auto_detect=true, ignore_errors=true, header=true)`;
+        } else if (extension === "json") {
+          query = `CREATE OR REPLACE TABLE ${previewTableName} AS SELECT ${columnSelection} FROM read_json('${url}', auto_detect=true, ignore_errors=true)`;
+        } else if (extension === "parquet") {
+          query = `CREATE OR REPLACE TABLE ${previewTableName} AS SELECT ${columnSelection} FROM read_parquet('${url}')`;
+        } else {
+          throw new Error(`Unsupported file type: .${extension}`);
+        }
+
+        await executeQuery(query);
+        toast.success(`Successfully imported to table '${previewTableName}'`);
+
+        // Reset state and close sheet
+        handleBackFromPreview();
+        setIsSheetOpen(false);
+      }
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unknown error";
+      setErrors([{
+        id: crypto.randomUUID(),
+        message: errorMessage,
+        severity: "error",
+      }]);
+      toast.error(`Failed to import: ${errorMessage}`);
+    } finally {
+      setIsUrlImporting(false);
+    }
+  };
+
+  // Schema customization handlers
+  const handleToggleColumn = (originalName: string) => {
+    setSchemaColumns(prev =>
+      prev.map(col =>
+        col.originalName === originalName
+          ? { ...col, included: !col.included }
+          : col
+      )
+    );
+  };
+
+  const handleRenameColumn = (originalName: string, newName: string) => {
+    setSchemaColumns(prev =>
+      prev.map(col =>
+        col.originalName === originalName
+          ? { ...col, newName }
+          : col
+      )
+    );
+  };
+
+  const handleChangeColumnType = (originalName: string, type: string) => {
+    setSchemaColumns(prev =>
+      prev.map(col =>
+        col.originalName === originalName
+          ? { ...col, type }
+          : col
+      )
+    );
+  };
+
+  // Handle URL import
+  const handleUrlImport = async () => {
+    if (!urlInput.trim()) {
+      toast.error("Please enter a URL");
+      return;
+    }
+
+    if (!urlTableName.trim()) {
+      toast.error("Please enter a table name");
+      return;
+    }
+
+    try {
+      tableNameSchema.parse(urlTableName);
+    } catch (error) {
+      const errorMessage =
+        error instanceof z.ZodError
+          ? error.issues[0].message
+          : "Invalid table name";
+      toast.error(errorMessage);
+      return;
+    }
+
+    setIsUrlImporting(true);
+    setErrors([]);
+
+    try {
+      // Detect file type from URL
+      const url = urlInput.trim();
+      const urlPath = url.split("?")[0]; // Remove query params
+      const extension = urlPath.split(".").pop()?.toLowerCase();
+
+      let query = "";
+
+      // Build import query based on file type
+      if (extension === "csv") {
+        query = `CREATE OR REPLACE TABLE ${urlTableName} AS SELECT * FROM read_csv('${url}', auto_detect=true, ignore_errors=true, header=true)`;
+      } else if (extension === "json") {
+        query = `CREATE OR REPLACE TABLE ${urlTableName} AS SELECT * FROM read_json('${url}', auto_detect=true, ignore_errors=true)`;
+      } else if (extension === "parquet") {
+        query = `CREATE OR REPLACE TABLE ${urlTableName} AS SELECT * FROM read_parquet('${url}')`;
+      } else {
+        throw new Error(`Unsupported file type: .${extension}. Supported: CSV, JSON, Parquet`);
+      }
+
+      await executeQuery(query);
+
+      toast.success(`Successfully imported from URL to table '${urlTableName}'`);
+      setUrlInput("");
+      setUrlTableName("");
+      setIsSheetOpen(false);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unknown error";
+      setErrors([
+        {
+          id: crypto.randomUUID(),
+          message: errorMessage,
+          severity: "error",
+        },
+      ]);
+      toast.error(`Failed to import from URL: ${errorMessage}`);
+    } finally {
+      setIsUrlImporting(false);
+    }
+  };
+
+  // Handle Query Import
+  const handleQueryImport = async () => {
+    if (!queryInput.trim()) {
+      toast.error("Please enter a SQL query");
+      return;
+    }
+
+    if (!queryTableName.trim()) {
+      toast.error("Please enter a table name");
+      return;
+    }
+
+    try {
+      tableNameSchema.parse(queryTableName);
+    } catch (error) {
+      const errorMessage =
+        error instanceof z.ZodError
+          ? error.issues[0].message
+          : "Invalid table name";
+      toast.error(errorMessage);
+      return;
+    }
+
+    setIsQueryImporting(true);
+    setErrors([]);
+
+    try {
+      const userQuery = queryInput.trim();
+
+      // Wrap user query in CREATE TABLE statement
+      const wrappedQuery = `CREATE OR REPLACE TABLE ${queryTableName} AS ${userQuery}`;
+
+      await executeQuery(wrappedQuery);
+
+      toast.success(`Successfully created table '${queryTableName}' from query result`);
+      setQueryInput("");
+      setQueryTableName("");
+      setIsSheetOpen(false);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unknown error";
+      setErrors([
+        {
+          id: crypto.randomUUID(),
+          message: errorMessage,
+          severity: "error",
+        },
+      ]);
+      toast.error(`Failed to execute query: ${errorMessage}`);
+    } finally {
+      setIsQueryImporting(false);
+    }
+  };
+
   useEffect(() => {
     return () => {
       files.forEach((file) => {
@@ -790,10 +1376,216 @@ const FileImporter: React.FC<FileImporterProps> = ({
     <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
       <SheetContent className="xl:w-[800px] sm:w-full sm:max-w-full overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Import Data Files</SheetTitle>
+          <SheetTitle>{isPreviewMode ? "Preview Data" : "Import Data"}</SheetTitle>
         </SheetHeader>
         <Separator className="my-4" />
-        <CardContent className="space-y-4">
+
+        {/* Preview Mode UI */}
+        {isPreviewMode && previewData && (
+          <div className="space-y-4">
+            {/* Header with file info and navigation */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg mb-1">
+                      Preview: {previewFileName.length > 50 ? `...${previewFileName.slice(-47)}` : previewFileName}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Table Name: <span className="font-mono">{previewTableName}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Showing first {PREVIEW_ROW_LIMIT} rows • {previewData.rowCount} total rows
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleBackFromPreview}>
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Preview Table */}
+            <Card>
+              <CardContent className="p-4">
+                <DuckUITable
+                  data={previewData.data}
+                  initialPageSize={20}
+                  tableHeight="400px"
+                />
+              </CardContent>
+            </Card>
+
+            {/* Schema Customization */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-base">Schema Customization</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Customize column names, types, and visibility before importing
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsSchemaCustomizing(!isSchemaCustomizing)}
+                    >
+                      {isSchemaCustomizing ? (
+                        <>
+                          <ChevronUp className="w-4 h-4 mr-2" />
+                          Hide
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-4 h-4 mr-2" />
+                          Customize
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {isSchemaCustomizing && (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted">
+                            <tr>
+                              <th className="p-2 text-left w-12">Include</th>
+                              <th className="p-2 text-left">Original Name</th>
+                              <th className="p-2 text-left">New Name</th>
+                              <th className="p-2 text-left w-48">Type</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {schemaColumns.map((col) => (
+                              <tr key={col.originalName} className={!col.included ? "opacity-50" : ""}>
+                                <td className="p-2">
+                                  <Checkbox
+                                    checked={col.included}
+                                    onCheckedChange={() => handleToggleColumn(col.originalName)}
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <code className="text-xs bg-muted px-2 py-1 rounded">
+                                    {col.originalName}
+                                  </code>
+                                </td>
+                                <td className="p-2">
+                                  <Input
+                                    value={col.newName}
+                                    onChange={(e) => handleRenameColumn(col.originalName, e.target.value)}
+                                    disabled={!col.included}
+                                    className="h-8 text-xs"
+                                    placeholder="Column name"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <Select
+                                    value={col.type}
+                                    onValueChange={(value) => handleChangeColumnType(col.originalName, value)}
+                                    disabled={!col.included}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {DUCKDB_TYPES.map((type) => (
+                                        <SelectItem key={type} value={type} className="text-xs">
+                                          {type}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="p-3 bg-muted/50 text-xs text-muted-foreground">
+                        <p>
+                          {schemaColumns.filter(col => col.included).length} of {schemaColumns.length} columns will be imported
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleBackFromPreview}>
+                Cancel
+              </Button>
+              <Button onClick={handleImportFromPreview} disabled={isUrlImporting}>
+                {isUrlImporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Import Table
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Errors */}
+            {errors.length > 0 && (
+              <div className="space-y-2">
+                {errors.map((error) => {
+                  const suggestion = getErrorSuggestion(error.message);
+                  return (
+                    <Alert key={error.id} variant="destructive">
+                      <AlertTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Error
+                      </AlertTitle>
+                      <AlertDescription>
+                        <div className="space-y-2">
+                          <p>{error.message}</p>
+                          {suggestion && (
+                            <p className="text-sm opacity-90 border-t pt-2 mt-2">
+                              <strong>Suggestion:</strong> {suggestion}
+                            </p>
+                          )}
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Import Tabs (when not in preview mode) */}
+        {!isPreviewMode && (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="upload" className="gap-2">
+              <Upload className="w-4 h-4" />
+              Upload Files
+            </TabsTrigger>
+            <TabsTrigger value="url" className="gap-2">
+              <LinkIcon className="w-4 h-4" />
+              From URL
+            </TabsTrigger>
+            <TabsTrigger value="query" className="gap-2">
+              <Code className="w-4 h-4" />
+              From Query
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Upload Files Tab */}
+          <TabsContent value="upload" className="space-y-4 mt-4">
+            <CardContent className="space-y-4 p-0">
           <div
             onDrop={handleDrop}
             onDragOver={handleDragOver}
@@ -802,8 +1594,8 @@ const FileImporter: React.FC<FileImporterProps> = ({
               "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer",
               "transition-colors duration-200 min-h-[200px] flex flex-col items-center justify-center",
               isDragActive
-                ? "border-[#ffe814] bg-[#ffe814]/10"
-                : "border-gray-300 hover:border-[#ffe814] hover:bg-[#ffe814]/10"
+                ? "border-primary bg-primary/10"
+                : "border-gray-300 hover:border-primary hover:bg-primary/10"
             )}
           >
             <Input
@@ -817,7 +1609,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
             <Upload
               className={cn(
                 "w-12 h-12 mb-4 mt-4",
-                isDragActive ? "text-[#ffe814]" : "text-[#a0aec0]"
+                isDragActive ? "text-accent" : "text-muted-foreground"
               )}
             />
             {isDragActive ? (
@@ -896,28 +1688,40 @@ const FileImporter: React.FC<FileImporterProps> = ({
 
           {errors.length > 0 && (
             <div className="space-y-2">
-              {errors.map((error) => (
-                <Alert
-                  key={error.id}
-                  variant={
-                    error.severity === "error" ? "destructive" : "default"
-                  }
-                >
-                  <AlertTitle className="flex items-center gap-2">
-                    {error.severity === "error" ? (
-                      <AlertTriangle className="h-4 w-4" />
-                    ) : (
-                      <FileWarning className="h-4 w-4" />
-                    )}
-                    {error.severity === "error" ? "Error" : "Warning"}
-                  </AlertTitle>
-                  <AlertDescription>
-                    {error.file
-                      ? `${error.file}: ${error.message}`
-                      : error.message}
-                  </AlertDescription>
-                </Alert>
-              ))}
+              {errors.map((error) => {
+                const suggestion = getErrorSuggestion(error.message);
+                return (
+                  <Alert
+                    key={error.id}
+                    variant={
+                      error.severity === "error" ? "destructive" : "default"
+                    }
+                  >
+                    <AlertTitle className="flex items-center gap-2">
+                      {error.severity === "error" ? (
+                        <AlertTriangle className="h-4 w-4" />
+                      ) : (
+                        <FileWarning className="h-4 w-4" />
+                      )}
+                      {error.severity === "error" ? "Error" : "Warning"}
+                    </AlertTitle>
+                    <AlertDescription>
+                      <div className="space-y-2">
+                        <p>
+                          {error.file
+                            ? `${error.file}: ${error.message}`
+                            : error.message}
+                        </p>
+                        {suggestion && (
+                          <p className="text-sm opacity-90 border-t pt-2 mt-2">
+                            <strong>Suggestion:</strong> {suggestion}
+                          </p>
+                        )}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                );
+              })}
             </div>
           )}
 
@@ -954,7 +1758,223 @@ const FileImporter: React.FC<FileImporterProps> = ({
               )}
             </div>
           )}
-        </CardContent>
+            </CardContent>
+          </TabsContent>
+
+          {/* URL Import Tab */}
+          <TabsContent value="url" className="space-y-4 mt-4">
+            <CardContent className="space-y-4 p-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-medium text-lg mb-4">Import from URL</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    DuckDB can directly read files from HTTP/HTTPS URLs. Supports CSV, JSON, and Parquet files.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="url-input">File URL</Label>
+                  <Input
+                    id="url-input"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="https://example.com/data.csv"
+                    disabled={isUrlImporting || isPreviewing}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter a direct URL to a CSV, JSON, or Parquet file
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="url-table-name">Table Name</Label>
+                  <Input
+                    id="url-table-name"
+                    value={urlTableName}
+                    onChange={(e) => setUrlTableName(e.target.value)}
+                    placeholder="my_table"
+                    disabled={isUrlImporting || isPreviewing}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Name for the table that will be created
+                  </p>
+                </div>
+
+                {errors.length > 0 && (
+                  <div className="space-y-2">
+                    {errors.map((error) => {
+                      const suggestion = getErrorSuggestion(error.message);
+                      return (
+                        <Alert key={error.id} variant="destructive">
+                          <AlertTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            Error
+                          </AlertTitle>
+                          <AlertDescription>
+                            <div className="space-y-2">
+                              <p>{error.message}</p>
+                              {suggestion && (
+                                <p className="text-sm opacity-90 border-t pt-2 mt-2">
+                                  <strong>Suggestion:</strong> {suggestion}
+                                </p>
+                              )}
+                            </div>
+                          </AlertDescription>
+                        </Alert>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handlePreview}
+                    disabled={isUrlImporting || isPreviewing}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    {isPreviewing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Loading Preview...
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-4 h-4 mr-2" />
+                        Preview
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={handleUrlImport}
+                    disabled={isUrlImporting || isPreviewing}
+                    className="flex-1"
+                  >
+                    {isUrlImporting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="w-4 h-4 mr-2" />
+                        Import Directly
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </TabsContent>
+
+          {/* Query Import Tab */}
+          <TabsContent value="query" className="space-y-4 mt-4">
+            <CardContent className="space-y-4 p-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-medium text-lg mb-4">Import from Query Result</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Execute a SQL query and create a table from the result. Use DuckDB functions like read_csv, read_json, read_parquet, or query existing tables.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="query-input">SQL Query</Label>
+                  <Textarea
+                    id="query-input"
+                    value={queryInput}
+                    onChange={(e) => setQueryInput(e.target.value)}
+                    placeholder="SELECT * FROM read_csv('https://example.com/data.csv')"
+                    disabled={isQueryImporting}
+                    rows={8}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter any SELECT query. The result will be saved to a new table.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="query-table-name">Table Name</Label>
+                  <Input
+                    id="query-table-name"
+                    value={queryTableName}
+                    onChange={(e) => setQueryTableName(e.target.value)}
+                    placeholder="my_table"
+                    disabled={isQueryImporting}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Name for the table that will be created from the query result
+                  </p>
+                </div>
+
+                {/* Examples */}
+                <div className="rounded-lg border p-4 bg-muted/50">
+                  <h4 className="font-medium text-sm mb-2">Example Queries:</h4>
+                  <div className="space-y-2 text-xs font-mono">
+                    <p className="text-muted-foreground">
+                      <span className="text-foreground">• Import from URL:</span><br />
+                      <code className="block ml-4 mt-1">SELECT * FROM read_csv('https://example.com/data.csv')</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="text-foreground">• Filter data:</span><br />
+                      <code className="block ml-4 mt-1">SELECT * FROM read_json('data.json') WHERE age &gt; 21</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="text-foreground">• Join tables:</span><br />
+                      <code className="block ml-4 mt-1">SELECT a.*, b.name FROM table1 a JOIN table2 b ON a.id = b.id</code>
+                    </p>
+                  </div>
+                </div>
+
+                {errors.length > 0 && (
+                  <div className="space-y-2">
+                    {errors.map((error) => {
+                      const suggestion = getErrorSuggestion(error.message);
+                      return (
+                        <Alert key={error.id} variant="destructive">
+                          <AlertTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            Error
+                          </AlertTitle>
+                          <AlertDescription>
+                            <div className="space-y-2">
+                              <p>{error.message}</p>
+                              {suggestion && (
+                                <p className="text-sm opacity-90 border-t pt-2 mt-2">
+                                  <strong>Suggestion:</strong> {suggestion}
+                                </p>
+                              )}
+                            </div>
+                          </AlertDescription>
+                        </Alert>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleQueryImport}
+                  disabled={isQueryImporting}
+                  className="w-full"
+                >
+                  {isQueryImporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Executing Query...
+                    </>
+                  ) : (
+                    <>
+                      <Code className="w-4 h-4 mr-2" />
+                      Execute and Import
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </TabsContent>
+        </Tabs>
+        )}
       </SheetContent>
     </Sheet>
   );

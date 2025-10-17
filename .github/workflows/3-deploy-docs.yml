@@ -33,18 +33,18 @@ jobs:
       - name: Build website
         run: |
           cd docs
-          bun run build
+          bun run docs:build
 
       - name: Add .nojekyll file
-        run: touch docs/build/.nojekyll
+        run: touch docs/.vitepress/dist/.nojekyll
 
       - name: Create CNAME file
-        run: echo "duckui.com" > docs/build/CNAME
+        run: echo "duckui.com" > docs/.vitepress/dist/CNAME
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GHCR_PAT }}
-          publish_dir: ./docs/build
+          publish_dir: ./docs/.vitepress/dist
           user_name: ${{ secrets.GIT_USER_NAME }}
           user_email: ${{ secrets.GIT_USER_EMAIL }}
