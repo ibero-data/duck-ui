@@ -3,7 +3,8 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "Duck-UI",
   description: "Modern web interface for DuckDB wasm. Run SQL queries directly in your browser.",
-  
+  base: '/',
+
   // Ignore localhost links in examples
   ignoreDeadLinks: [
     /^http:\/\/localhost/
