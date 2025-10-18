@@ -38,8 +38,8 @@ export const CustomChartTooltip: React.FC<CustomChartTooltipProps> = ({
       style={{
         borderColor: 'hsl(var(--border))',
         backgroundColor: theme === 'dark'
-          ? 'hsla(var(--card) / 0.95)'
-          : 'hsla(var(--card) / 0.98)',
+          ? 'hsla(var(--card) / 1.0)'
+          : 'hsla(var(--card) / 1.0)',
       }}
     >
       {label && (

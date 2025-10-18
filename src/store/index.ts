@@ -108,11 +108,106 @@ export interface QueryHistoryItem {
 
 export type EditorTabType = "sql" | "home";
 
+// Advanced Chart Configuration Types
+export type ChartType =
+  | "bar"
+  | "line"
+  | "pie"
+  | "area"
+  | "scatter"
+  | "combo"
+  | "stacked_bar"
+  | "grouped_bar"
+  | "stacked_area"
+  | "donut"
+  | "heatmap"
+  | "treemap"
+  | "funnel"
+  | "gauge"
+  | "box"
+  | "bubble";
+
+export type AggregationType = "sum" | "avg" | "count" | "min" | "max" | "none";
+export type SortOrder = "asc" | "desc" | "none";
+export type AxisScale = "linear" | "log";
+
+export interface SeriesConfig {
+  column: string;
+  label?: string;
+  color?: string;
+  type?: "bar" | "line" | "area"; // For combo charts
+  yAxisId?: "left" | "right"; // For dual-axis
+  aggregation?: AggregationType;
+}
+
+export interface AxisConfig {
+  label?: string;
+  scale?: AxisScale;
+  min?: number;
+  max?: number;
+  format?: string; // Number format pattern
+  showGrid?: boolean;
+  rotate?: number; // Label rotation angle
+}
+
+export interface LegendConfig {
+  show?: boolean;
+  position?: "top" | "bottom" | "left" | "right";
+  align?: "start" | "center" | "end";
+}
+
+export interface AnnotationConfig {
+  id: string;
+  type: "line" | "text" | "box";
+  value?: number; // For reference lines
+  text?: string;
+  x?: number;
+  y?: number;
+  color?: string;
+}
+
+export interface DataTransform {
+  groupBy?: string; // Column to group by
+  aggregation?: AggregationType;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+  limit?: number; // Top N
+  filter?: string; // WHERE clause
+}
+
 export interface ChartConfig {
-  type: "bar" | "line" | "pie" | "area";
+  type: ChartType;
+
+  // Axis configuration
   xAxis: string;
-  yAxis: string;
-  series?: string;
+  xAxisConfig?: AxisConfig;
+  yAxis?: string; // Single series (backward compatible)
+  yAxisConfig?: AxisConfig;
+
+  // Multi-series support
+  series?: SeriesConfig[]; // Multiple Y columns
+  colorBy?: string; // Column for color grouping
+  sizeBy?: string; // For bubble charts
+
+  // Data operations
+  transform?: DataTransform;
+
+  // Visual customization
+  colors?: string[]; // Color palette
+  legend?: LegendConfig;
+  showValues?: boolean; // Show data labels
+  showGrid?: boolean;
+  enableAnimations?: boolean;
+  annotations?: AnnotationConfig[];
+
+  // Chart-specific options
+  stacked?: boolean; // For bar/area charts
+  smooth?: boolean; // For line charts
+  innerRadius?: number; // For donut charts (0-100)
+
+  // Title and description
+  title?: string;
+  subtitle?: string;
 }
 
 export interface EditorTab {

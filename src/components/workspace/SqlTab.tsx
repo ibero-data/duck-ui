@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DuckUiTable from "@/components/table/DuckUItable";
-import ChartVisualization from "@/components/charts/ChartVisualization";
+import ChartVisualizationPro from "@/components/charts/ChartVisualizationPro";
 import { FileX2, Table, BarChart3 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "../ui/skeleton";
@@ -105,7 +105,7 @@ const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
         </TabsContent>
         <TabsContent value="charts" className="flex-1 min-h-0">
           <div className="h-full">
-            <ChartVisualization
+            <ChartVisualizationPro
               result={currentTab.result}
               chartConfig={currentTab.chartConfig}
               onConfigChange={(config) =>

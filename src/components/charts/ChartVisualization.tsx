@@ -136,8 +136,8 @@ export const ChartVisualization: React.FC<ChartVisualizationProps> = ({
 
     const chartData = result.data.map((row) => ({
       ...row,
-      [chartConfig.xAxis]: String(row[chartConfig.xAxis]),
-      [chartConfig.yAxis]: Number(row[chartConfig.yAxis]) || 0,
+      [chartConfig.xAxis as string]: String(row[chartConfig.xAxis]),
+      [chartConfig.yAxis as string]: Number(row[chartConfig.yAxis as string]) || 0,
     }));
 
     // Common chart properties
