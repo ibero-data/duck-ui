@@ -46,6 +46,8 @@ jobs:
         run: |
           cd docs
           bun run docs:build
+          touch .vitepress/dist/.nojekyll
+          echo "duckui.com" > .vitepress/dist/CNAME
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
