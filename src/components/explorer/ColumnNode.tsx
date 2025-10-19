@@ -39,10 +39,21 @@ const getFillColor = (percentage: number) => {
 export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const nullPercentage = parseFloat(stats.null_percentage.replace(/"/g, ''));
+  // Safe parsing function that handles both string and number types
+  const parseValue = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      // Remove quotes if present
+      const cleaned = value.replace(/"/g, '');
+      return parseFloat(cleaned) || 0;
+    }
+    return 0;
+  };
+
+  const nullPercentage = parseValue(stats.null_percentage);
   const fillPercentage = 100 - nullPercentage;
-  const uniqueCount = stats.approx_unique ? parseInt(stats.approx_unique) : 0;
-  const totalCount = parseInt(stats.count);
+  const uniqueCount = stats.approx_unique ? parseValue(stats.approx_unique) : 0;
+  const totalCount = parseValue(stats.count);
 
   const isNumeric = stats.column_type.toUpperCase().includes("INT") ||
     stats.column_type.toUpperCase().includes("DOUBLE") ||
@@ -141,20 +152,20 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
               <div className="space-y-1 text-[10px]">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Min:</span>
-                  <span className="font-mono">{parseFloat(stats.min!).toLocaleString()}</span>
+                  <span className="font-mono">{parseValue(stats.min!).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Max:</span>
-                  <span className="font-mono">{parseFloat(stats.max!).toLocaleString()}</span>
+                  <span className="font-mono">{parseValue(stats.max!).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Avg:</span>
-                  <span className="font-mono">{parseFloat(stats.avg).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono">{parseValue(stats.avg).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                 </div>
                 {stats.std && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Std Dev:</span>
-                    <span className="font-mono">{parseFloat(stats.std).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    <span className="font-mono">{parseValue(stats.std).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
               </div>
@@ -166,15 +177,15 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
                     <div className="text-[9px] text-muted-foreground font-medium mb-1">Quartiles</div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Q1 (25%):</span>
-                      <span className="font-mono text-[9px]">{parseFloat(stats.q25).toLocaleString()}</span>
+                      <span className="font-mono text-[9px]">{parseValue(stats.q25).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Q2 (50%):</span>
-                      <span className="font-mono text-[9px]">{parseFloat(stats.q50).toLocaleString()}</span>
+                      <span className="font-mono text-[9px]">{parseValue(stats.q50).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Q3 (75%):</span>
-                      <span className="font-mono text-[9px]">{parseFloat(stats.q75).toLocaleString()}</span>
+                      <span className="font-mono text-[9px]">{parseValue(stats.q75).toLocaleString()}</span>
                     </div>
                   </div>
                 </>
