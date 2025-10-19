@@ -71,7 +71,7 @@ const ACCEPTED_FILE_TYPES = {
   ],
 } as const;
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+const MAX_FILE_SIZE = 3 * 1024 * 1024 * 1024; // 3GB
 const SUPPORTED_FILE_EXTENSIONS = [
   "csv",
   "json",

@@ -872,6 +872,8 @@ export const useDuckStore = create<DuckStoreState>()(
                   scope: initialConnections[0].scope,
                 },
               });
+              // Refresh schema to ensure it matches the fresh WASM database
+              await get().fetchDatabasesAndTablesInfo();
             }
           } else {
             set({ isLoading: false, isInitialized: true }); // Set as initialized if no connections are configured.
