@@ -25,6 +25,7 @@ import {
   MousePointer,
   MoreHorizontal,
   ChevronDown,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useDuckStore } from "@/store";
+import { CellValueViewer } from "./CellValueViewer";
+import { ColumnStatsPanel } from "./ColumnStatsPanel";
 
 // Define a generic type for the data row
 type DataRow = Record<string, any>;
@@ -168,6 +171,17 @@ const DuckUITable: React.FC<DuckTableProps> = ({
   const [dragStart, setDragStart] = useState<CellPosition | null>(null);
   const [dragEnd, setDragEnd] = useState<CellPosition | null>(null);
 
+  // Cell value viewer state
+  const [viewedCell, setViewedCell] = useState<{
+    value: any;
+    columnName: string;
+    rowIndex: number;
+  } | null>(null);
+
+  // Column stats panel state
+  const [showStatsPanel, setShowStatsPanel] = useState(false);
+  const [statsPanelMinimized, setStatsPanelMinimized] = useState(false);
+
   const columnResizeMode = "onChange" as ColumnResizeMode;
 
   useEffect(() => {
@@ -222,6 +236,31 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, userResizedColumns]); // columnSizing itself should not be a direct dependency here to avoid loops
+
+  // Close column selector and context menu on outside click (Issue #5, #6)
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      // Close column selector if clicking outside
+      if (showColumnSelector && !target.closest('.column-selector-panel')) {
+        setShowColumnSelector(false);
+      }
+
+      // Close spreadsheet options if clicking outside
+      if (showSpreadsheetOptions && !target.closest('.spreadsheet-options-panel')) {
+        setShowSpreadsheetOptions(false);
+      }
+
+      // Close context menu on any click
+      if (contextMenu) {
+        setContextMenu(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showColumnSelector, showSpreadsheetOptions, contextMenu]);
 
   const columns = useMemo<ColumnDef<DataRow>[]>(() => {
     if (!data || !data.length || !data[0]) return [];
@@ -733,16 +772,19 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     const visibleCount = Object.values(enabledColumns).filter(Boolean).length;
     const totalCount = allColumnKeys.length;
 
+    // Memoize column keys to prevent re-renders
+    const stableColumnKeys = useMemo(() => allColumnKeys, [JSON.stringify(allColumnKeys)]);
+
     // Simplified filtering for column selector
     const filteredColumnKeys = useMemo(() => {
-      if (!columnSelectorFilter) return allColumnKeys;
-      return allColumnKeys.filter((key) =>
+      if (!columnSelectorFilter) return stableColumnKeys;
+      return stableColumnKeys.filter((key) =>
         key.toLowerCase().includes(columnSelectorFilter.toLowerCase())
       );
-    }, [allColumnKeys, columnSelectorFilter]);
+    }, [stableColumnKeys, columnSelectorFilter]);
 
     return (
-      <Card className="absolute right-0 top-12 z-20 w-[350px] bg-background shadow-lg rounded-md border p-2">
+      <Card className="column-selector-panel absolute right-0 top-12 z-20 w-[350px] bg-background shadow-lg rounded-md border p-2">
         <CardContent className="p-2">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-sm font-semibold">
@@ -827,7 +869,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
   const SpreadsheetOptions = () => {
     return (
-      <Card className="absolute right-0 top-12 z-20 w-[300px] bg-background shadow-lg rounded-md border p-2">
+      <Card className="spreadsheet-options-panel absolute right-0 top-12 z-20 w-[300px] bg-background shadow-lg rounded-md border p-2">
         <CardContent className="p-2">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-semibold">Spreadsheet Options</h3>
@@ -892,9 +934,8 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
     return (
       <div
-        className="fixed z-20 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px]"
+        className="context-menu fixed z-20 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px]"
         style={{ left: contextMenu.x, top: contextMenu.y }}
-        onMouseLeave={() => setContextMenu(null)}
       >
         <button
           className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
@@ -1040,6 +1081,19 @@ const DuckUITable: React.FC<DuckTableProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowStatsPanel(!showStatsPanel);
+                if (!showStatsPanel) setStatsPanelMinimized(false);
+              }}
+              className="h-8 text-xs"
+              title="Show column statistics"
+            >
+              <BarChart3 className="h-3.5 w-3.5 mr-1" />
+              Stats
+            </Button>
             <div className="relative">
               <Button
                 variant="outline"
@@ -1336,6 +1390,16 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                                   }
                                 }
                               }}
+                              onDoubleClick={() => {
+                                if (cell.column.id !== "__row_number__") {
+                                  const cellValue = cell.getValue();
+                                  setViewedCell({
+                                    value: cellValue,
+                                    columnName: cell.column.id,
+                                    rowIndex: virtualRow.index,
+                                  });
+                                }
+                              }}
                             >
                               {flexRender(
                                 cell.column.columnDef.cell,
@@ -1425,7 +1489,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
               className="text-xs border border-border/40 rounded-md h-7 px-2 bg-background"
               title="Rows per page"
             >
-              {[10, 25, 50, 100, 200].map((pageSize) => (
+              {[10, 25, 50, 100, 200, 500, 1000, 5000, 10000].map((pageSize) => (
                 <option key={pageSize} value={pageSize}>
                   {pageSize} rows
                 </option>
@@ -1436,6 +1500,26 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
         {/* Context Menu */}
         <ContextMenu />
+
+        {/* Cell Value Viewer */}
+        {viewedCell && (
+          <CellValueViewer
+            value={viewedCell.value}
+            columnName={viewedCell.columnName}
+            rowIndex={viewedCell.rowIndex}
+            onClose={() => setViewedCell(null)}
+          />
+        )}
+
+        {/* Column Stats Panel */}
+        {showStatsPanel && (
+          <ColumnStatsPanel
+            data={table.getFilteredRowModel().rows.map((r) => r.original)}
+            onClose={() => setShowStatsPanel(false)}
+            isMinimized={statsPanelMinimized}
+            onToggleMinimize={() => setStatsPanelMinimized(!statsPanelMinimized)}
+          />
+        )}
 
         {/* Mobile stats */}
         <div className="md:hidden flex items-center justify-between text-xs text-muted-foreground py-2 border-t border-border/30 mt-2 flex-shrink-0">

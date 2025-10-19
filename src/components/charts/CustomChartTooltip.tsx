@@ -34,12 +34,12 @@ export const CustomChartTooltip: React.FC<CustomChartTooltipProps> = ({
 
   return (
     <div
-      className="rounded-lg border bg-card p-3 shadow-xl backdrop-blur-sm"
+      className="rounded-lg border bg-card p-3 shadow-xl"
       style={{
         borderColor: 'hsl(var(--border))',
         backgroundColor: theme === 'dark'
-          ? 'hsla(var(--card) / 1.0)'
-          : 'hsla(var(--card) / 1.0)',
+          ? 'hsl(var(--card))'
+          : 'hsl(var(--card))',
       }}
     >
       {label && (

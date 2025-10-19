@@ -24,14 +24,19 @@ export default function Home() {
       {/* Desktop Layout - ResizablePanels */}
       <div className="hidden md:block h-full">
         <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel className="overflow-scroll" defaultSize={25}>
+          <ResizablePanel
+            className="overflow-scroll"
+            defaultSize={20}
+            minSize={15}
+            maxSize={35}
+          >
             <DataExplorer />
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel
             className="overflow-scroll"
-            defaultSize={75}
-            minSize={40}
+            defaultSize={80}
+            minSize={50}
           >
             <WorkspaceTabs />
           </ResizablePanel>
