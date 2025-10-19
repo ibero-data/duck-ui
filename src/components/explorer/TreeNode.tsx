@@ -1,5 +1,5 @@
 // TreeNode.tsx
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -9,6 +9,7 @@ import {
   Trash,
   TerminalIcon,
   MoreVertical,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +25,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { useDuckStore } from "@/store";
+import { useDuckStore, type ColumnStats } from "@/store";
+import { ColumnNode } from "./ColumnNode";
 
 export interface TreeNodeData {
   name: string;
@@ -49,10 +51,31 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   refreshData,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [columnStats, setColumnStats] = useState<ColumnStats[]>([]);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
   const toggleOpen = useCallback(() => setIsOpen((open) => !open), []);
 
-  const { createTab, executeQuery, deleteTable, fetchDatabasesAndTablesInfo } =
+  const { createTab, executeQuery, deleteTable, fetchDatabasesAndTablesInfo, fetchTableColumnStats } =
     useDuckStore();
+
+  // Fetch column stats when table is expanded
+  useEffect(() => {
+    const loadColumnStats = async () => {
+      if (isOpen && node.type === "table" && parentDatabaseName && columnStats.length === 0) {
+        setIsLoadingStats(true);
+        try {
+          const stats = await fetchTableColumnStats(parentDatabaseName, node.name);
+          setColumnStats(stats);
+        } catch (error) {
+          console.error("Failed to fetch column stats:", error);
+        } finally {
+          setIsLoadingStats(false);
+        }
+      }
+    };
+
+    loadColumnStats();
+  }, [isOpen, node.type, node.name, parentDatabaseName, columnStats.length, fetchTableColumnStats]);
 
   const getIcon = useMemo(() => {
     switch (node.type) {
@@ -247,6 +270,22 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 Nothing to show
               </div>
             )}
+          </div>
+        )}
+
+        {/* Render column stats for tables */}
+        {isOpen && node.type === "table" && (
+          <div>
+            {isLoadingStats ? (
+              <div className="ml-8 flex items-center gap-2 py-2 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Loading column statistics...</span>
+              </div>
+            ) : columnStats.length > 0 ? (
+              columnStats.map((stats, index) => (
+                <ColumnNode key={index} stats={stats} />
+              ))
+            ) : null}
           </div>
         )}
       </ContextMenu>

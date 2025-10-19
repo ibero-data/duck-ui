@@ -78,12 +78,28 @@ export interface ColumnInfo {
   nullable: boolean;
 }
 
+export interface ColumnStats {
+  column_name: string;
+  column_type: string;
+  min: string | null;
+  max: string | null;
+  approx_unique: string | null;
+  avg: string | null;
+  std: string | null;
+  q25: string | null;
+  q50: string | null;
+  q75: string | null;
+  count: string;
+  null_percentage: string;
+}
+
 export interface TableInfo {
   name: string;
   schema: string;
   columns: ColumnInfo[];
   rowCount: number;
   createdAt: string;
+  columnStats?: ColumnStats[]; // Optional: fetched on demand
 }
 
 export interface DatabaseInfo {
@@ -282,6 +298,7 @@ export interface DuckStoreState {
   clearHistory: () => void;
   cleanup: () => Promise<void>;
   fetchDatabasesAndTablesInfo: () => Promise<void>;
+  fetchTableColumnStats: (databaseName: string, tableName: string) => Promise<ColumnStats[]>;
   exportParquet: (query: string) => Promise<Blob>;
 
   // Connection Management Actions
@@ -1048,6 +1065,45 @@ export const useDuckStore = create<DuckStoreState>()(
             });
           } finally {
             set({ isLoadingDbTablesFetch: false });
+          }
+        },
+
+        // Fetch table column statistics using SUMMARIZE
+        fetchTableColumnStats: async (databaseName, tableName) => {
+          const { currentConnection, connection } = get();
+          const query = `SUMMARIZE SELECT * FROM "${databaseName}"."${tableName}"`;
+
+          try {
+            let result: QueryResult;
+
+            if (currentConnection?.scope === "External" && currentConnection) {
+              result = await executeExternalQuery(query, currentConnection);
+            } else {
+              const wasmConnection = validateConnection(connection);
+              result = await executeWasmQuery(query, wasmConnection);
+            }
+
+            // Transform the result data into ColumnStats array
+            const columnStats: ColumnStats[] = result.data.map((row: any) => ({
+              column_name: row.column_name,
+              column_type: row.column_type,
+              min: row.min,
+              max: row.max,
+              approx_unique: row.approx_unique,
+              avg: row.avg,
+              std: row.std,
+              q25: row.q25,
+              q50: row.q50,
+              q75: row.q75,
+              count: row.count,
+              null_percentage: row.null_percentage,
+            }));
+
+            return columnStats;
+          } catch (error) {
+            console.error("Failed to fetch column stats:", error);
+            toast.error("Failed to load column statistics");
+            return [];
           }
         },
 
