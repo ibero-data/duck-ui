@@ -612,17 +612,18 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
               <div className="space-y-2">
                 <label className="text-xs font-medium">Y-Axis (Select 2-3)</label>
                 <MultiSelect
-                  options={numericColumns.map((col) => ({
+                  options={numericColumns.map((col, idx) => ({
                     label: col,
                     value: col,
                     color: selectedYColumns.includes(col)
                       ? DEFAULT_COLORS[selectedYColumns.indexOf(col) % DEFAULT_COLORS.length]
-                      : undefined,
+                      : DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
                   }))}
                   selected={selectedYColumns}
                   onChange={setSelectedYColumns}
                   placeholder="Select columns..."
                   maxSelected={3}
+                  className="w-full"
                 />
               </div>
 

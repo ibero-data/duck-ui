@@ -69,37 +69,38 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between min-h-9", className)}
+          className={cn("w-full justify-between min-h-10 h-auto", className)}
         >
-          <div className="flex gap-1 flex-wrap flex-1 mr-2">
+          <div className="flex gap-1 overflow-x-auto flex-1 mr-2 py-1 scrollbar-thin">
             {selectedOptions.length > 0 ? (
               selectedOptions.map((option) => (
                 <Badge
                   key={option.value}
                   variant="secondary"
-                  className="mr-1 mb-1 gap-1"
+                  className="shrink-0 gap-1.5 px-2.5 py-1"
                   style={{
                     backgroundColor: option.color
                       ? `${option.color}20`
                       : undefined,
                     borderColor: option.color || undefined,
+                    borderWidth: '1px',
                   }}
                 >
                   {option.color && (
                     <div
-                      className="w-2 h-2 rounded-full"
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: option.color }}
                     />
                   )}
-                  {option.label}
+                  <span className="whitespace-nowrap">{option.label}</span>
                   <X
-                    className="h-3 w-3 cursor-pointer opacity-70 hover:opacity-100"
+                    className="h-3.5 w-3.5 cursor-pointer opacity-70 hover:opacity-100 shrink-0"
                     onClick={(e) => handleRemove(option.value, e)}
                   />
                 </Badge>
               ))
             ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
+              <span className="text-muted-foreground text-sm">{placeholder}</span>
             )}
           </div>
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -124,17 +125,14 @@ export function MultiSelect({
                     disabled={isDisabled}
                     className="cursor-pointer"
                   >
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-2.5 flex-1">
                       {option.color && (
                         <div
-                          className="w-3 h-3 rounded"
+                          className="w-3 h-3 rounded shrink-0"
                           style={{
-                            backgroundColor: isSelected
-                              ? option.color
-                              : "transparent",
-                            border: isSelected
-                              ? "none"
-                              : "1px solid hsl(var(--border))",
+                            backgroundColor: option.color,
+                            opacity: isSelected ? 1 : 0.5,
+                            border: `1px solid ${option.color}`,
                           }}
                         />
                       )}
