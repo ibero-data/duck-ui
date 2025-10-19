@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/tooltip";
 import QueryHistory from "../workspace/QueryHistory";
 import ConnectionSwitcher from "./ConnectionSwitcher";
+import MobileNavDrawer from "./MobileNavDrawer";
 
 const TopBar = () => {
   const { theme, setTheme } = useTheme();
@@ -75,9 +76,12 @@ const TopBar = () => {
   return (
     <>
       <div className="flex items-center justify-between h-14 px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        {/* Left: Logo */}
+        {/* Left: Logo + Mobile Menu */}
         <div className="flex items-center gap-4">
-          {/* Connection Switcher */}
+          {/* Mobile Nav Drawer */}
+          <MobileNavDrawer />
+
+          {/* Connection Switcher (Desktop only) */}
           <div className="hidden md:block">
             <ConnectionSwitcher />
           </div>
@@ -88,80 +92,88 @@ const TopBar = () => {
           {/* Query History */}
           <QueryHistory isExpanded={false} />
 
-          {/* Theme Toggle */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={toggleTheme}>
-                  {theme === "dark" ? (
-                    <Sun className="h-5 w-5" />
-                  ) : (
-                    <Moon className="h-5 w-5" />
-                  )}
+          {/* Theme Toggle (Desktop only) */}
+          <div className="hidden md:block">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={toggleTheme}>
+                    {theme === "dark" ? (
+                      <Sun className="h-5 w-5" />
+                    ) : (
+                      <Moon className="h-5 w-5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span className="text-xs">Toggle theme</span>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
+          {/* Settings Dropdown (Desktop only) */}
+          <div className="hidden md:block">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Settings className="h-5 w-5" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <span className="text-xs">Toggle theme</span>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          {/* Settings Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Settings className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate("/connections")}>
-                <Cable className="mr-2 h-4 w-4" />
-                Manage Connections
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Help Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <ExternalLink className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {externalLinks.map((link) => (
-                <DropdownMenuItem key={link.to} asChild>
-                  <a
-                    href={link.to}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center"
-                  >
-                    <link.icon className="mr-2 h-4 w-4" />
-                    {link.label}
-                  </a>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate("/connections")}>
+                  <Cable className="mr-2 h-4 w-4" />
+                  Manage Connections
                 </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-          {/* Search */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setOpen(true)}
-                >
-                  <Search className="h-5 w-5" />
+          {/* Help Dropdown (Desktop only) */}
+          <div className="hidden md:block">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <ExternalLink className="h-5 w-5" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <span className="text-xs">Search (Cmd/Ctrl + K)</span>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {externalLinks.map((link) => (
+                  <DropdownMenuItem key={link.to} asChild>
+                    <a
+                      href={link.to}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center"
+                    >
+                      <link.icon className="mr-2 h-4 w-4" />
+                      {link.label}
+                    </a>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Search (Desktop only) */}
+          <div className="hidden md:block">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setOpen(true)}
+                  >
+                    <Search className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span className="text-xs">Search (Cmd/Ctrl + K)</span>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       </div>
 

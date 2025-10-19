@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import ConnectionPill from "@/components/common/ConnectionPill";
 import { Badge } from "@/components/ui/badge";
+import FloatingActionButton from "@/components/common/FloatingActionButton";
 
 interface SqlEditorProps {
   tabId: string;
@@ -121,12 +122,14 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   };
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
+    <div className={cn("flex flex-col h-full relative", className)}>
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b">
-        <div className="flex items-center gap-2">
+        {/* Title (always visible) */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {isEditingTitle ? (
             <Input
-              className="text-sm font-medium truncate"
+              className="text-sm font-medium truncate max-w-[200px]"
               value={currentTitle}
               onChange={handleTitleChange}
               onBlur={handleTitleSubmit}
@@ -149,14 +152,16 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
                 variant="ghost"
                 size="icon"
                 onClick={handleTitleEdit}
-                className="group-hover:opacity-100 transition-opacity"
+                className="group-hover:opacity-100 transition-opacity hidden md:flex"
               >
                 <Edit className="h-4 w-4" />
               </Button>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-4">
+
+        {/* Desktop Actions */}
+        <div className="hidden md:flex items-center gap-4">
           <div className="flex gap-2 text-sm text-muted-foreground">
             <ConnectionPill connection={currentConnection} />
             <TooltipProvider>
@@ -209,9 +214,19 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
         </div>
       </div>
 
+      {/* Editor */}
       <div className="flex-1 relative">
         <div ref={editorRef} className="h-full w-full absolute inset-0" />
       </div>
+
+      {/* Mobile FAB */}
+      <FloatingActionButton
+        onClick={handleExecuteQuery}
+        icon={isExecuting ? Loader2 : Play}
+        label={isExecuting ? "Running..." : "Run"}
+        disabled={isExecuting}
+        className={isExecuting ? "animate-pulse" : ""}
+      />
     </div>
   );
 };
