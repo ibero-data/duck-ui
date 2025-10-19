@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, X, Github, BookText, Cable, Sun, Moon } from "lucide-react";
+import { Menu, Github, BookText, Cable, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
