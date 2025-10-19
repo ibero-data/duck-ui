@@ -1071,7 +1071,10 @@ export const useDuckStore = create<DuckStoreState>()(
         // Fetch table column statistics using SUMMARIZE
         fetchTableColumnStats: async (databaseName, tableName) => {
           const { currentConnection, connection } = get();
-          const query = `SUMMARIZE SELECT * FROM "${databaseName}"."${tableName}"`;
+          // For main database or memory, don't use database qualification
+          const query = (databaseName === 'main' || databaseName === 'memory' || databaseName === ':memory:')
+            ? `SUMMARIZE ${tableName}`
+            : `SUMMARIZE "${databaseName}"."${tableName}"`;
 
           try {
             let result: QueryResult;
