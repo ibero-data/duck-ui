@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Download,
   Settings2,
@@ -611,41 +611,19 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
               {/* Y-Axis (Multi-select 2-3 columns) */}
               <div className="space-y-2">
                 <label className="text-xs font-medium">Y-Axis (Select 2-3)</label>
-                <div className="border rounded-md p-2 bg-background max-h-[120px] overflow-y-auto space-y-2">
-                  {numericColumns.length > 0 ? (
-                    numericColumns.map((col) => (
-                      <div key={col} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`y-axis-${col}`}
-                          checked={selectedYColumns.includes(col)}
-                          onCheckedChange={() => handleYColumnToggle(col)}
-                          disabled={!selectedYColumns.includes(col) && selectedYColumns.length >= 3}
-                        />
-                        <label
-                          htmlFor={`y-axis-${col}`}
-                          className="text-sm flex items-center gap-2 cursor-pointer"
-                        >
-                          <div
-                            className="w-3 h-3 rounded"
-                            style={{
-                              backgroundColor: selectedYColumns.includes(col)
-                                ? DEFAULT_COLORS[selectedYColumns.indexOf(col) % DEFAULT_COLORS.length]
-                                : "transparent",
-                              border: selectedYColumns.includes(col)
-                                ? "none"
-                                : "1px solid hsl(var(--border))",
-                            }}
-                          />
-                          {col}
-                        </label>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      No numeric columns found
-                    </div>
-                  )}
-                </div>
+                <MultiSelect
+                  options={numericColumns.map((col) => ({
+                    label: col,
+                    value: col,
+                    color: selectedYColumns.includes(col)
+                      ? DEFAULT_COLORS[selectedYColumns.indexOf(col) % DEFAULT_COLORS.length]
+                      : undefined,
+                  }))}
+                  selected={selectedYColumns}
+                  onChange={setSelectedYColumns}
+                  placeholder="Select columns..."
+                  maxSelected={3}
+                />
               </div>
 
               {/* Actions */}
