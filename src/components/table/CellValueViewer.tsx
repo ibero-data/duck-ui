@@ -20,7 +20,7 @@ export const CellValueViewer: React.FC<CellValueViewerProps> = ({
   const [isMinimized, setIsMinimized] = useState(false);
 
   // Detect value type and format accordingly
-  const { displayValue, valueType, isFormatted } = useMemo(() => {
+  const { displayValue, valueType } = useMemo(() => {
     if (value === null || value === undefined) {
       return { displayValue: "NULL", valueType: "null", isFormatted: false };
     }

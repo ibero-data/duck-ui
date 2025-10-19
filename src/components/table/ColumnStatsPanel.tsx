@@ -140,7 +140,7 @@ const MiniChart: React.FC<{ stats: ColumnStats }> = ({ stats }) => {
           }}
         />
         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-          {chartData.map((entry, index) => (
+          {chartData.map((_entry, index) => (
             <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
           ))}
         </Bar>

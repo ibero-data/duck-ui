@@ -1080,7 +1080,8 @@ export const useDuckStore = create<DuckStoreState>()(
               result = await executeExternalQuery(query, currentConnection);
             } else {
               const wasmConnection = validateConnection(connection);
-              result = await executeWasmQuery(query, wasmConnection);
+              const wasmResult = await wasmConnection.query(query);
+              result = resultToJSON(wasmResult);
             }
 
             // Transform the result data into ColumnStats array

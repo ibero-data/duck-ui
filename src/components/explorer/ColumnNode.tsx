@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { ChevronRight, ChevronDown, Hash, Type, Calendar, ToggleLeft } from "lucide-react";
 import { type ColumnStats } from "@/store";
-import { Progress } from "@/components/ui/progress";
 
 interface ColumnNodeProps {
   stats: ColumnStats;
