@@ -588,10 +588,37 @@ const testOPFSConnection = async (conn: ConnectionProvider): Promise<{
     opfsPath = path.slice(1);
   }
 
-  await db.open({
-    path: `opfs://${opfsPath}`,
-    accessMode: duckdb.DuckDBAccessMode.AUTOMATIC
-  });
+  // Retry logic for OPFS access handle conflicts
+  let retries = 3;
+  let lastError: Error | null = null;
+
+  while (retries > 0) {
+    try {
+      await db.open({
+        path: `opfs://${opfsPath}`,
+        accessMode: duckdb.DuckDBAccessMode.AUTOMATIC
+      });
+      break; // Success, exit retry loop
+    } catch (error) {
+      lastError = error as Error;
+      retries--;
+
+      if (lastError.message.includes('createSyncAccessHandle') && retries > 0) {
+        console.warn(`OPFS access handle conflict, retrying... (${retries} attempts left)`);
+        // Wait longer for any lingering handles to be released
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else if (retries === 0) {
+        // All retries exhausted
+        console.error("OPFS access handle conflict - all retries exhausted. Try refreshing the page.");
+        throw new Error(
+          "Failed to access OPFS file - another instance may be using it. Please refresh the page and try again."
+        );
+      } else {
+        // Non-access-handle error, throw immediately
+        throw error;
+      }
+    }
+  }
 
   const connection = await db.connect();
   // Validate immediately
@@ -1316,6 +1343,19 @@ export const useDuckStore = create<DuckStoreState>()(
             if (connection.scope === "External") {
               await testExternalConnection(connection);
             } else if (connection.scope === "OPFS") {
+              // Cleanup any existing OPFS connection before testing new one
+              const { opfsDb, opfsConnection } = get();
+              if (opfsDb && opfsConnection) {
+                console.log("Cleaning up existing OPFS connection before adding new one...");
+                try {
+                  await opfsConnection.close();
+                  await opfsDb.terminate();
+                  await new Promise(resolve => setTimeout(resolve, 1500));
+                } catch (e) {
+                  console.warn("Cleanup warning:", e);
+                  await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+              }
               await testOPFSConnection(connection);
             }
             set((state) => ({
@@ -1407,11 +1447,13 @@ export const useDuckStore = create<DuckStoreState>()(
                     console.log("Closing previous OPFS connection...");
                     await opfsConnection.close();
                     await opfsDb.terminate();
-                    // Give it a moment to fully release file handles
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    // Give significant time to fully release OPFS file handles
+                    await new Promise(resolve => setTimeout(resolve, 1500));
                     console.log("Previous OPFS connection closed successfully");
                   } catch (e) {
                     console.warn("Failed to cleanup old OPFS connection:", e);
+                    // Still wait even if cleanup failed - handles may still release
+                    await new Promise(resolve => setTimeout(resolve, 1500));
                   }
                 }
 
