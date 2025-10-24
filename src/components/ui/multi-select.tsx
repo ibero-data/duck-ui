@@ -114,8 +114,9 @@ export function MultiSelect({
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = selected.includes(option.value);
-                const isDisabled =
-                  !isSelected && maxSelected && selected.length >= maxSelected;
+                const isDisabled = Boolean(
+                  !isSelected && maxSelected && selected.length >= maxSelected
+                );
 
                 return (
                   <CommandItem

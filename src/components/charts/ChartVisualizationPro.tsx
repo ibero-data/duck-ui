@@ -45,7 +45,7 @@ import { CustomChartTooltip } from "./CustomChartTooltip";
 import { formatNumber, shortenLabel } from "@/lib/chartUtils";
 import { transformData, isNumericColumn, suggestChartTypes } from "@/lib/chartDataTransform";
 import { exportChartAsPNG } from "@/lib/chartExport";
-import type { QueryResult, ChartConfig, ChartType, SeriesConfig } from "@/store";
+import type { QueryResult, ChartConfig, ChartType } from "@/store";
 
 interface ChartVisualizationProProps {
   result: QueryResult;
@@ -154,29 +154,30 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
     }
   };
 
-  const handleYColumnToggle = (column: string) => {
-    setSelectedYColumns((prev) => {
-      const newSelection = prev.includes(column)
-        ? prev.filter((c) => c !== column)
-        : prev.length < 3
-        ? [...prev, column]
-        : prev;
+  // Commented out unused function - may be needed for future multi-column selection feature
+  // const handleYColumnToggle = (column: string) => {
+  //   setSelectedYColumns((prev) => {
+  //     const newSelection = prev.includes(column)
+  //       ? prev.filter((c) => c !== column)
+  //       : prev.length < 3
+  //       ? [...prev, column]
+  //       : prev;
 
-      // Update config with series
-      if (newSelection.length > 0) {
-        const series: SeriesConfig[] = newSelection.map((col, idx) => ({
-          column: col,
-          label: col,
-          color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
-        }));
-        handleConfigChange({ series, yAxis: undefined });
-      } else {
-        handleConfigChange({ series: undefined, yAxis: undefined });
-      }
+  //     // Update config with series
+  //     if (newSelection.length > 0) {
+  //       const series: SeriesConfig[] = newSelection.map((col, idx) => ({
+  //         column: col,
+  //         label: col,
+  //         color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+  //       }));
+  //       handleConfigChange({ series, yAxis: undefined });
+  //     } else {
+  //       handleConfigChange({ series: undefined, yAxis: undefined });
+  //     }
 
-      return newSelection;
-    });
-  };
+  //     return newSelection;
+  //   });
+  // };
 
   // Get numeric columns for Y-axis
   const numericColumns = result.columns.filter((col) =>
