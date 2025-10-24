@@ -313,6 +313,59 @@ export interface DuckStoreState {
 // HELPER FUNCTIONS
 //
 
+// OPFS connection tracking to prevent concurrent access
+const opfsActivePaths = new Set<string>();
+
+// Centralized OPFS connection cleanup with proper handle release
+const cleanupOPFSConnection = async (
+  db: duckdb.AsyncDuckDB | null,
+  connection: duckdb.AsyncDuckDBConnection | null,
+  path?: string
+): Promise<void> => {
+  if (db && connection) {
+    try {
+      await connection.close();
+      await db.terminate();
+      // Critical: Wait for file handles to be fully released by browser
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (path) {
+        opfsActivePaths.delete(path);
+      }
+    } catch (error) {
+      console.error("OPFS cleanup error:", error);
+      // Still wait even if cleanup failed - handles may still release
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (path) {
+        opfsActivePaths.delete(path);
+      }
+    }
+  }
+};
+
+// Exponential backoff retry helper
+const retryWithBackoff = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> => {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+
+      if (attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError || new Error("Operation failed after retries");
+};
+
 // Validate a DuckDB connection.
 const validateConnection = (
   connection: duckdb.AsyncDuckDBConnection | null
@@ -323,37 +376,55 @@ const validateConnection = (
   return connection;
 };
 
+// Type for external query response
+interface ExternalQueryResponse {
+  meta: Array<{ name: string; type: string }>;
+  data: unknown[][];
+  rows?: number;
+}
+
 // Converts a raw result (from an external HTTP endpoint) into a QueryResult.
-const rawResultToJSON = (rawResult: any): QueryResult => {
+const rawResultToJSON = (rawResult: string): QueryResult => {
   try {
-    const parsed = JSON.parse(rawResult);
+    const parsed: unknown = JSON.parse(rawResult);
+
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error("Invalid raw result format: not a valid JSON object");
+    }
+
+    const response = parsed as Partial<ExternalQueryResponse>;
+
     if (
-      !parsed.meta ||
-      !parsed.data ||
-      !Array.isArray(parsed.meta) ||
-      !Array.isArray(parsed.data)
+      !response.meta ||
+      !response.data ||
+      !Array.isArray(response.meta) ||
+      !Array.isArray(response.data)
     ) {
       throw new Error(
         "Invalid raw result format: meta or data are missing or have the wrong format"
       );
     }
-    const columns = parsed.meta.map((m: any) => m.name);
-    const columnTypes = parsed.meta.map((m: any) => m.type);
-    const data = parsed.data.map((row: any) => {
-      const rowObject: Record<string, any> = {};
-      columns.forEach((col: any, index: number) => {
+
+    const columns = response.meta.map(m => m.name);
+    const columnTypes = response.meta.map(m => m.type);
+    const data = response.data.map((row: unknown) => {
+      if (!Array.isArray(row)) {
+        throw new Error("Invalid row format: expected array");
+      }
+      const rowObject: Record<string, unknown> = {};
+      columns.forEach((col, index) => {
         rowObject[col] = row[index];
       });
       return rowObject;
     });
+
     return {
       columns,
       columnTypes,
       data,
-      rowCount: parsed.rows || data.length,
+      rowCount: response.rows || data.length,
     };
   } catch (error) {
-    console.error("Failed to parse raw result:", error);
     throw new Error(
       `Failed to parse raw result: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -364,36 +435,73 @@ const rawResultToJSON = (rawResult: any): QueryResult => {
 
 // Converts a WASM query result into a QueryResult.
 const resultToJSON = (result: any): QueryResult => {
-  const data = result.toArray().map((row: any) => {
+  const schema = result.schema;
+  const fields = schema.fields;
+
+  // Pre-extract column vectors for Decimal types
+  const columnVectors = fields.map((_: any, colIdx: number) => result.getChildAt(colIdx));
+
+  // Use the standard toArray().map() approach, but fix Decimal values from column vectors
+  const data = result.toArray().map((row: any, rowIndex: number) => {
     const jsonRow = row.toJSON();
-    result.schema.fields.forEach((field: any) => {
+
+    // Fix Decimal types by reading directly from column vectors
+    fields.forEach((field: any, columnIndex: number) => {
       const col = field.name;
       const type = field.type.toString();
-      try {
+
+      // Only fix Decimal types - they come as null from toJSON()
+      if (type.includes("Decimal")) {
+        try {
+          // Get the value directly from the column vector
+          const value = columnVectors[columnIndex].get(rowIndex);
+
+          if (value !== null && value !== undefined) {
+            // Convert Decimal object to number
+            // Arrow Decimals store unscaled values - we need to apply the scale
+            if (typeof value === "object" && typeof value.valueOf === "function") {
+              const unscaledValue = Number(value.valueOf());
+              const scale = field.type.scale || 0; // Get scale from Arrow type metadata
+              const scaledValue = unscaledValue / Math.pow(10, scale);
+              jsonRow[col] = scaledValue;
+            } else if (typeof value === "number") {
+              jsonRow[col] = value;
+            } else if (typeof value === "string") {
+              const parsed = parseFloat(value);
+              jsonRow[col] = isNaN(parsed) ? null : parsed;
+            } else {
+              jsonRow[col] = null;
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing Decimal column ${col} at row ${rowIndex}:`, error);
+        }
+      }
+      // Fix Date types
+      else if (type === "Date32<DAY>") {
         let value = jsonRow[col];
-        if (value === null || value === undefined) return;
-        if (type === "Date32<DAY>") {
-          value = new Date(value).toLocaleDateString();
-          jsonRow[col] = value;
+        if (value !== null && value !== undefined) {
+          jsonRow[col] = new Date(value).toLocaleDateString();
         }
-        if (
-          type === "Date64<MILLISECOND>" ||
-          type === "Timestamp<MICROSECOND>"
-        ) {
-          value = new Date(value);
-          jsonRow[col] = value;
+      }
+      // Fix Timestamp types
+      else if (
+        type === "Date64<MILLISECOND>" ||
+        type === "Timestamp<MICROSECOND>"
+      ) {
+        let value = jsonRow[col];
+        if (value !== null && value !== undefined) {
+          jsonRow[col] = new Date(value);
         }
-      } catch (error) {
-        console.error(`Error processing column ${col}:`, error);
       }
     });
+
     return jsonRow;
   });
+
   return {
-    columns: result.schema.fields.map((field: any) => field.name),
-    columnTypes: result.schema.fields.map((field: any) =>
-      field.type.toString()
-    ),
+    columns: fields.map((field: any) => field.name),
+    columnTypes: fields.map((field: any) => field.type.toString()),
     data,
     rowCount: result.numRows,
   };
@@ -467,6 +575,69 @@ const executeExternalQuery = async (
 };
 
 /**
+ * Loads embedded databases from the public/databases directory.
+ */
+const loadEmbeddedDatabases = async (
+  db: duckdb.AsyncDuckDB,
+  connection: duckdb.AsyncDuckDBConnection
+): Promise<void> => {
+  try {
+    // Fetch the manifest file
+    const manifestResponse = await fetch('/databases/manifest.json');
+    if (!manifestResponse.ok) {
+      console.info('No embedded databases manifest found');
+      return;
+    }
+
+    const manifest = await manifestResponse.json();
+    const databases = manifest.databases || [];
+
+    if (databases.length === 0) {
+      console.info('No embedded databases configured');
+      return;
+    }
+
+    console.info(`Loading ${databases.length} embedded database(s)...`);
+
+    // Load each database
+    for (const dbConfig of databases) {
+      if (!dbConfig.autoLoad) {
+        console.info(`Skipping ${dbConfig.name} (autoLoad: false)`);
+        continue;
+      }
+
+      try {
+        console.info(`Loading embedded database: ${dbConfig.name}`);
+
+        // Fetch the database file
+        const dbFileResponse = await fetch(`/databases/${dbConfig.file}`);
+        if (!dbFileResponse.ok) {
+          console.error(`Failed to fetch ${dbConfig.file}: ${dbFileResponse.statusText}`);
+          continue;
+        }
+
+        const arrayBuffer = await dbFileResponse.arrayBuffer();
+        const buffer = new Uint8Array(arrayBuffer);
+
+        // Register the file in DuckDB's virtual file system
+        const fileName = dbConfig.file;
+        await db.registerFileBuffer(fileName, buffer);
+
+        // Attach the database (derive alias from filename without extension)
+        const dbAlias = fileName.replace(/\.db$/i, '').replace(/[^a-zA-Z0-9_]/g, '_');
+        await connection.query(`ATTACH DATABASE '${fileName}' AS ${dbAlias}`);
+
+        console.info(`Successfully loaded embedded database: ${dbConfig.name} as ${dbAlias}`);
+      } catch (error) {
+        console.error(`Error loading embedded database ${dbConfig.name}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Error loading embedded databases:', error);
+  }
+};
+
+/**
  * Initializes a new DuckDB WASM connection.
  */
 const initializeWasmConnection = async (): Promise<{
@@ -501,6 +672,10 @@ const initializeWasmConnection = async (): Promise<{
     connection.query(`INSTALL excel`),
     connection.query(`LOAD excel`),
   ]);
+
+  // Load embedded databases from public/databases/
+  await loadEmbeddedDatabases(db, connection);
+
   return { db, connection };
 };
 
@@ -576,6 +751,19 @@ const testOPFSConnection = async (conn: ConnectionProvider): Promise<{
     throw new Error("Path must be defined for OPFS connections.");
   }
 
+  // Normalize path: remove leading slash and ensure .db extension
+  let opfsPath = path.startsWith('/') ? path.slice(1) : path;
+  if (!opfsPath.endsWith('.db')) {
+    opfsPath = `${opfsPath}.db`;
+  }
+
+  // Check if path is already in use
+  if (opfsActivePaths.has(opfsPath)) {
+    throw new Error(
+      `OPFS file "${opfsPath}" is already open. Please close the existing connection first.`
+    );
+  }
+
   const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
   const worker = new Worker(bundle.mainWorker!);
   const logger = new duckdb.VoidLogger();
@@ -583,48 +771,32 @@ const testOPFSConnection = async (conn: ConnectionProvider): Promise<{
 
   await db.instantiate(bundle.mainModule);
 
-  let opfsPath = path;
-  if (path.startsWith('/')) {
-    opfsPath = path.slice(1);
-  }
-
-  // Retry logic for OPFS access handle conflicts
-  let retries = 3;
-  let lastError: Error | null = null;
-
-  while (retries > 0) {
+  // Use retry with exponential backoff for OPFS access handle conflicts
+  await retryWithBackoff(async () => {
     try {
       await db.open({
         path: `opfs://${opfsPath}`,
         accessMode: duckdb.DuckDBAccessMode.AUTOMATIC
       });
-      break; // Success, exit retry loop
     } catch (error) {
-      lastError = error as Error;
-      retries--;
-
-      if (lastError.message.includes('createSyncAccessHandle') && retries > 0) {
-        console.warn(`OPFS access handle conflict, retrying... (${retries} attempts left)`);
-        // Wait longer for any lingering handles to be released
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      } else if (retries === 0) {
-        // All retries exhausted
-        console.error("OPFS access handle conflict - all retries exhausted. Try refreshing the page.");
+      const err = error as Error;
+      if (err.message.includes('createSyncAccessHandle')) {
         throw new Error(
-          "Failed to access OPFS file - another instance may be using it. Please refresh the page and try again."
+          `OPFS access handle conflict for "${opfsPath}". The file may still be in use. Retrying...`
         );
-      } else {
-        // Non-access-handle error, throw immediately
-        throw error;
       }
+      throw error;
     }
-  }
+  }, 4, 1500); // 4 retries with 1.5s base delay (1.5s, 3s, 6s, 12s)
 
   const connection = await db.connect();
-  // Validate immediately
   validateConnection(connection);
 
-  await connection.query(`show tables`);
+  // Verify connection with a basic query
+  await connection.query(`SHOW TABLES`);
+
+  // Mark path as active
+  opfsActivePaths.add(opfsPath);
 
   return { db, connection };
 };
@@ -710,7 +882,9 @@ const fetchExternalDatabases = async (
             }
           }
 
-          databases.push({ name: dbName, tables });
+          if (tables.length > 0 || dbListResult.data.length === 1) {
+            databases.push({ name: dbName, tables });
+          }
         } catch (e) {
           console.warn(`Failed to fetch tables for database ${dbName}:`, e);
           databases.push({ name: dbName, tables: [] });
@@ -814,15 +988,6 @@ export const useDuckStore = create<DuckStoreState>()(
           const initialConnections: ConnectionProvider[] = [];
 
           // Extract environment variables if available
-          const envVars: Window["env"] = window.env || {
-            DUCK_UI_EXTERNAL_CONNECTION_NAME: "",
-            DUCK_UI_EXTERNAL_HOST: "",
-            DUCK_UI_EXTERNAL_PORT: "",
-            DUCK_UI_EXTERNAL_USER: "",
-            DUCK_UI_EXTERNAL_PASS: "",
-            DUCK_UI_EXTERNAL_DATABASE_NAME: "",
-            DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: false,
-          };
           const {
             DUCK_UI_EXTERNAL_CONNECTION_NAME: externalConnectionName = "",
             DUCK_UI_EXTERNAL_HOST: externalHost = "",
@@ -830,16 +995,7 @@ export const useDuckStore = create<DuckStoreState>()(
             DUCK_UI_EXTERNAL_USER: externalUser = "",
             DUCK_UI_EXTERNAL_PASS: externalPass = "",
             DUCK_UI_EXTERNAL_DATABASE_NAME: externalDatabaseName = "",
-            DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: allowUnsignedExtensions = false,
-          } = envVars;
-
-          // Log config for debugging
-          console.log("DuckDB Config:", {
-            allowUnsignedExtensions,
-            hasExternalConnection: Boolean(
-              externalConnectionName && externalHost && externalPort
-            ),
-          });
+          } = window.env || {};
 
           const wasmConnection: ConnectionProvider = {
             environment: "APP",
@@ -1327,9 +1483,9 @@ export const useDuckStore = create<DuckStoreState>()(
         // Connection Management Actions
         addConnection: async (connection) => {
           try {
-            // set loading state
             set({ isLoadingExternalConnection: true, error: null });
 
+            // Check for duplicate connection names
             if (
               get().connectionList.connections.find(
                 (c) => c.name === connection.name
@@ -1339,44 +1495,38 @@ export const useDuckStore = create<DuckStoreState>()(
                 `A connection with the name "${connection.name}" already exists.`
               );
             }
-            console.log(connection);
+
+            // Test connection based on scope
             if (connection.scope === "External") {
               await testExternalConnection(connection);
             } else if (connection.scope === "OPFS") {
               // Cleanup any existing OPFS connection before testing new one
-              const { opfsDb, opfsConnection } = get();
+              const { opfsDb, opfsConnection, currentConnection } = get();
               if (opfsDb && opfsConnection) {
-                console.log("Cleaning up existing OPFS connection before adding new one...");
-                try {
-                  await opfsConnection.close();
-                  await opfsDb.terminate();
-                  await new Promise(resolve => setTimeout(resolve, 1500));
-                } catch (e) {
-                  console.warn("Cleanup warning:", e);
-                  await new Promise(resolve => setTimeout(resolve, 1500));
-                }
+                await cleanupOPFSConnection(
+                  opfsDb,
+                  opfsConnection,
+                  currentConnection?.path
+                );
               }
               await testOPFSConnection(connection);
             }
+
+            // Add connection to list
             set((state) => ({
               connectionList: {
                 connections: [...state.connectionList.connections, connection],
               },
             }));
+
             toast.success(
               `Connection "${connection.name}" added successfully!`
             );
           } catch (error) {
-            set({
-              error: `Failed to add connection: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
-            });
-            toast.error(
-              `Failed to add connection: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`
-            );
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            set({ error: `Failed to add connection: ${errorMessage}` });
+            toast.error(`Failed to add connection: ${errorMessage}`);
+            throw error; // Re-throw for caller to handle
           } finally {
             set({ isLoadingExternalConnection: false });
           }
@@ -1441,23 +1591,16 @@ export const useDuckStore = create<DuckStoreState>()(
               if (needsNewConnection) {
                 toast.info("Initializing OPFS connection...");
 
-                // IMPORTANT: Cleanup OLD connection BEFORE creating new one
+                // Cleanup old connection before creating new one
                 if (opfsDb && opfsConnection) {
-                  try {
-                    console.log("Closing previous OPFS connection...");
-                    await opfsConnection.close();
-                    await opfsDb.terminate();
-                    // Give significant time to fully release OPFS file handles
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                    console.log("Previous OPFS connection closed successfully");
-                  } catch (e) {
-                    console.warn("Failed to cleanup old OPFS connection:", e);
-                    // Still wait even if cleanup failed - handles may still release
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                  }
+                  await cleanupOPFSConnection(
+                    opfsDb,
+                    opfsConnection,
+                    get().currentConnection?.path
+                  );
                 }
 
-                // Now create the new connection
+                // Create new OPFS connection
                 const opfsInstance = await testOPFSConnection(connectionProvider);
 
                 set({
@@ -1476,7 +1619,6 @@ export const useDuckStore = create<DuckStoreState>()(
                 });
               } else {
                 // Reuse existing OPFS connection (same path)
-                console.log("Reusing existing OPFS connection");
                 set({
                   db: opfsDb,
                   connection: opfsConnection,

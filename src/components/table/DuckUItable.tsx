@@ -297,7 +297,8 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     const dataCols = keys
       .map((key): ColumnDef<DataRow> => {
         return {
-          accessorKey: key,
+          id: key, // Explicit id to avoid TanStack Table misinterpreting numeric keys
+          accessorFn: (row) => row[key], // Use accessorFn instead of accessorKey for direct property access
           minSize: MIN_COLUMN_WIDTH,
           maxSize: MAX_COLUMN_WIDTH,
           header: () => (
@@ -351,9 +352,12 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         };
       })
       .filter((column) => {
+        // Check both accessorKey (old) and id (new) for enabled columns
         const accessorKey = (column as any).accessorKey as string;
+        const columnId = (column as any).id as string;
+        const keyToCheck = columnId || accessorKey;
         return (
-          accessorKey === undefined || enabledColumns[accessorKey] !== false
+          keyToCheck === undefined || enabledColumns[keyToCheck] !== false
         );
       });
 
