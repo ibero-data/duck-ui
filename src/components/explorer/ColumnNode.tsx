@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { ChevronRight, ChevronDown, Hash, Type, Calendar, ToggleLeft } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  Hash,
+  Type,
+  Calendar,
+  ToggleLeft,
+} from "lucide-react";
 import { type ColumnStats } from "@/store";
 
 interface ColumnNodeProps {
@@ -8,7 +15,12 @@ interface ColumnNodeProps {
 
 const getTypeIcon = (type: string) => {
   const upperType = type.toUpperCase();
-  if (upperType.includes("INT") || upperType.includes("DOUBLE") || upperType.includes("FLOAT") || upperType.includes("DECIMAL")) {
+  if (
+    upperType.includes("INT") ||
+    upperType.includes("DOUBLE") ||
+    upperType.includes("FLOAT") ||
+    upperType.includes("DECIMAL")
+  ) {
     return <Hash className="w-3 h-3" />;
   } else if (upperType.includes("DATE") || upperType.includes("TIME")) {
     return <Calendar className="w-3 h-3" />;
@@ -20,7 +32,12 @@ const getTypeIcon = (type: string) => {
 
 const getTypeColor = (type: string) => {
   const upperType = type.toUpperCase();
-  if (upperType.includes("INT") || upperType.includes("DOUBLE") || upperType.includes("FLOAT") || upperType.includes("DECIMAL")) {
+  if (
+    upperType.includes("INT") ||
+    upperType.includes("DOUBLE") ||
+    upperType.includes("FLOAT") ||
+    upperType.includes("DECIMAL")
+  ) {
     return "text-purple-500 bg-purple-500/10";
   } else if (upperType.includes("DATE") || upperType.includes("TIME")) {
     return "text-green-500 bg-green-500/10";
@@ -41,10 +58,10 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
 
   // Safe parsing function that handles both string and number types
   const parseValue = (value: any): number => {
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
       // Remove quotes if present
-      const cleaned = value.replace(/"/g, '');
+      const cleaned = value.replace(/"/g, "");
       return parseFloat(cleaned) || 0;
     }
     return 0;
@@ -55,7 +72,8 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
   const uniqueCount = stats.approx_unique ? parseValue(stats.approx_unique) : 0;
   const totalCount = parseValue(stats.count);
 
-  const isNumeric = stats.column_type.toUpperCase().includes("INT") ||
+  const isNumeric =
+    stats.column_type.toUpperCase().includes("INT") ||
     stats.column_type.toUpperCase().includes("DOUBLE") ||
     stats.column_type.toUpperCase().includes("FLOAT") ||
     stats.column_type.toUpperCase().includes("DECIMAL");
@@ -73,13 +91,19 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
             <ChevronRight className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
           )}
 
-          <div className={`flex-shrink-0 p-1 rounded ${getTypeColor(stats.column_type)}`}>
+          <div
+            className={`flex-shrink-0 p-1 rounded ${getTypeColor(
+              stats.column_type
+            )}`}
+          >
             {getTypeIcon(stats.column_type)}
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium truncate">{stats.column_name}</span>
+              <span className="text-xs font-medium truncate">
+                {stats.column_name}
+              </span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
                 {stats.column_type}
               </span>
@@ -91,7 +115,9 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
                   <div className="flex items-center gap-1">
                     <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                       <div
-                        className={`h-full ${getFillColor(fillPercentage)} transition-all`}
+                        className={`h-full ${getFillColor(
+                          fillPercentage
+                        )} transition-all`}
                         style={{ width: `${fillPercentage}%` }}
                       />
                     </div>
@@ -119,7 +145,9 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
             </div>
             <div className="h-2 bg-background rounded-full overflow-hidden">
               <div
-                className={`h-full ${getFillColor(fillPercentage)} transition-all`}
+                className={`h-full ${getFillColor(
+                  fillPercentage
+                )} transition-all`}
                 style={{ width: `${fillPercentage}%` }}
               />
             </div>
@@ -137,11 +165,18 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Nulls:</span>
-              <span className="font-mono">{((nullPercentage / 100) * totalCount).toFixed(0)}</span>
+              <span className="font-mono">
+                {((nullPercentage / 100) * totalCount).toFixed(0)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Cardinality:</span>
-              <span className="font-mono">{((uniqueCount / totalCount) * 100).toFixed(1)}%</span>
+              <span className="font-mono">
+                {isNaN((uniqueCount / totalCount) * 100)
+                  ? "0.0"
+                  : ((uniqueCount / totalCount) * 100).toFixed(1)}
+                %
+              </span>
             </div>
           </div>
 
@@ -152,20 +187,32 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
               <div className="space-y-1 text-[10px]">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Min:</span>
-                  <span className="font-mono">{parseValue(stats.min!).toLocaleString()}</span>
+                  <span className="font-mono">
+                    {parseValue(stats.min!).toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Max:</span>
-                  <span className="font-mono">{parseValue(stats.max!).toLocaleString()}</span>
+                  <span className="font-mono">
+                    {parseValue(stats.max!).toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Avg:</span>
-                  <span className="font-mono">{parseValue(stats.avg).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono">
+                    {parseValue(stats.avg).toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
                 </div>
                 {stats.std && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Std Dev:</span>
-                    <span className="font-mono">{parseValue(stats.std).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    <span className="font-mono">
+                      {parseValue(stats.std).toLocaleString(undefined, {
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
                   </div>
                 )}
               </div>
@@ -174,18 +221,26 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
                 <>
                   <div className="border-t border-border/50 my-1" />
                   <div className="space-y-1 text-[10px]">
-                    <div className="text-[9px] text-muted-foreground font-medium mb-1">Quartiles</div>
+                    <div className="text-[9px] text-muted-foreground font-medium mb-1">
+                      Quartiles
+                    </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Q1 (25%):</span>
-                      <span className="font-mono text-[9px]">{parseValue(stats.q25).toLocaleString()}</span>
+                      <span className="font-mono text-[9px]">
+                        {parseValue(stats.q25).toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Q2 (50%):</span>
-                      <span className="font-mono text-[9px]">{parseValue(stats.q50).toLocaleString()}</span>
+                      <span className="font-mono text-[9px]">
+                        {parseValue(stats.q50).toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Q3 (75%):</span>
-                      <span className="font-mono text-[9px]">{parseValue(stats.q75).toLocaleString()}</span>
+                      <span className="font-mono text-[9px]">
+                        {parseValue(stats.q75).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </>
@@ -199,12 +254,26 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
               <div className="border-t border-border/50 my-1" />
               <div className="space-y-1 text-[10px]">
                 <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground flex-shrink-0">Min:</span>
-                  <span className="font-mono truncate text-right" title={stats.min}>{stats.min}</span>
+                  <span className="text-muted-foreground flex-shrink-0">
+                    Min:
+                  </span>
+                  <span
+                    className="font-mono truncate text-right"
+                    title={stats.min}
+                  >
+                    {stats.min}
+                  </span>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground flex-shrink-0">Max:</span>
-                  <span className="font-mono truncate text-right" title={stats.max}>{stats.max}</span>
+                  <span className="text-muted-foreground flex-shrink-0">
+                    Max:
+                  </span>
+                  <span
+                    className="font-mono truncate text-right"
+                    title={stats.max}
+                  >
+                    {stats.max}
+                  </span>
                 </div>
               </div>
             </>

@@ -71,19 +71,19 @@ export function MultiSelect({
           aria-expanded={open}
           className={cn("w-full justify-between min-h-10 h-auto", className)}
         >
-          <div className="flex gap-1 overflow-x-auto flex-1 mr-2 py-1 scrollbar-thin">
+          <div className="flex gap-1 overflow-x-auto flex-1 mr-2  scrollbar-thin">
             {selectedOptions.length > 0 ? (
               selectedOptions.map((option) => (
                 <Badge
                   key={option.value}
-                  variant="secondary"
-                  className="shrink-0 gap-1.5 px-2.5 py-1"
+                  className="shrink-0 gap-1.5 font-medium"
                   style={{
                     backgroundColor: option.color
-                      ? `${option.color}20`
+                      ? `${option.color}65`
                       : undefined,
                     borderColor: option.color || undefined,
-                    borderWidth: '1px',
+                    borderWidth: '2px',
+                    boxShadow: option.color ? `0 1px 3px ${option.color}30` : undefined,
                   }}
                 >
                   {option.color && (
@@ -92,7 +92,7 @@ export function MultiSelect({
                       style={{ backgroundColor: option.color }}
                     />
                   )}
-                  <span className="whitespace-nowrap">{option.label}</span>
+                  <span className="whitespace-nowrap text-foreground">{option.label}</span>
                   <X
                     className="h-3.5 w-3.5 cursor-pointer opacity-70 hover:opacity-100 shrink-0"
                     onClick={(e) => handleRemove(option.value, e)}

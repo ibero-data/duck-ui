@@ -82,7 +82,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
       yAxis: "",
       colors: DEFAULT_COLORS,
       showGrid: true,
-      enableAnimations: true,
+      enableAnimations: false,
       legend: { show: true, position: "top" },
     }
   );
@@ -121,7 +121,21 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   };
 
   const applyConfig = () => {
-    onConfigChange(localConfig);
+    // Build series configuration from selected Y columns
+    const series = selectedYColumns.map((col, idx) => ({
+      column: col,
+      label: col,
+      color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+    }));
+
+    // Update config with selected Y columns as series
+    const updatedConfig = {
+      ...localConfig,
+      series: series.length > 0 ? series : undefined,
+      yAxis: series.length === 1 ? selectedYColumns[0] : undefined,
+    };
+
+    onConfigChange(updatedConfig);
     toast.success("Chart configuration applied");
   };
 
@@ -133,9 +147,10 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
       yAxis: "",
       colors: DEFAULT_COLORS,
       showGrid: true,
-      enableAnimations: true,
+      enableAnimations: false,
       legend: { show: true, position: "top" },
     });
+    setSelectedYColumns([]);
     toast.info("Chart cleared");
   };
 

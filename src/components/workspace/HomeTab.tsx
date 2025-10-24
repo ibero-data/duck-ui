@@ -122,6 +122,8 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
 
   //@ts-ignore
   const duck_ui_version = __DUCK_UI_VERSION__ || "Error loading version";
+  //@ts-ignore
+  const duck_ui_release_date = __DUCK_UI_RELEASE_DATE__ || "N/A";
 
   const { theme } = useTheme();
 
@@ -294,7 +296,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
           </TabsContent>
         </Tabs>
         <p className="text-muted-foreground text-center text-xs">
-          Duck-UI Version: {duck_ui_version}
+          Duck-UI Version: {duck_ui_version} - Released on: {duck_ui_release_date}
         </p>
       </div>
     </div>

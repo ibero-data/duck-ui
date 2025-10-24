@@ -120,8 +120,8 @@ const MiniChart: React.FC<{ stats: ColumnStats }> = ({ stats }) => {
     : ["#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe"];
 
   return (
-    <ResponsiveContainer width="100%" height={150}>
-      <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 20, left: 5 }}>
+    <ResponsiveContainer width="100%" height={250}>
+      <BarChart data={chartData} margin={{ top: 15, right: 15, bottom: 20, left: 5 }}>
         <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
         <XAxis
           dataKey="name"
@@ -137,6 +137,7 @@ const MiniChart: React.FC<{ stats: ColumnStats }> = ({ stats }) => {
             border: "1px solid #cbd5e1",
             borderRadius: "6px",
             fontSize: "12px",
+            color: theme === "dark" ? "#65fc2eff" : "#0f172a",
           }}
         />
         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
@@ -259,7 +260,7 @@ export const ColumnStatsPanel: React.FC<ColumnStatsPanelProps> = ({
   }
 
   return (
-    <Card className="fixed bottom-4 left-4 z-30 w-[800px] max-h-[600px] shadow-lg border">
+    <Card className="fixed bottom-4 left-4 z-30 w-7xl shadow-lg border">
       <CardHeader className="p-3 border-b">
         <div className="flex items-center justify-between">
           <div>

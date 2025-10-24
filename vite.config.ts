@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       __DUCK_UI_VERSION__: JSON.stringify(pkg.version),
+      __DUCK_UI_RELEASE_DATE__: JSON.stringify(pkg.release_date),
       ...processEnvValues // Spread the processed variables
     },
   };
