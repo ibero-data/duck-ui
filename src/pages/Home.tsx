@@ -1,3 +1,7 @@
+// file: src/pages/Home.tsx
+// description: Home page component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import DataExplorer from "@/components/explorer/DataExplorer";

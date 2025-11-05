@@ -1,3 +1,7 @@
+// file: src/components/ui/toaster.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,

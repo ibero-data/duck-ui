@@ -1,3 +1,7 @@
+// file: src/components/workspace/QueryHistory.tsx
+// description: Workspace component
+// reference: https://github.com/ibero-data/duck-ui
+
 import React, { useState } from "react";
 import { useDuckStore, QueryHistoryItem } from "@/store";
 import { Button } from "@/components/ui/button";

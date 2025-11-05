@@ -1,3 +1,7 @@
+// file: src/components/ui/separator.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react"
 import * as SeparatorPrimitive from "@radix-ui/react-separator"
 

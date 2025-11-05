@@ -1,3 +1,7 @@
+// file: src/pages/Connections.tsx
+// description: Connections management page component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useDuckStore, ConnectionProvider } from "@/store";

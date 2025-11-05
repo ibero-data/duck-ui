@@ -1,3 +1,7 @@
+// file: src/components/ui/tabs.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 

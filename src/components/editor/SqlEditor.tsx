@@ -1,3 +1,7 @@
+// file: src/components/editor/SqlEditor.tsx
+// description: SQL editor component
+// reference: https://microsoft.github.io/monaco-editor
+
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Play, Loader2, Lightbulb, Command, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";

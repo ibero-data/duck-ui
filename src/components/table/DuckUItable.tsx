@@ -1,3 +1,7 @@
+// file: src/components/table/DuckUItable.tsx
+// description: Table component
+// reference: https://tanstack.com/table
+
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   flexRender,
@@ -215,7 +219,6 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       setEnabledColumns({});
       setUserResizedColumns({});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]); // Keep enabledColumns and userResizedColumns out to preserve user settings
 
   // Effect to initialize columnSizing or update it when userResizedColumns change
@@ -234,7 +237,6 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     } else if (Object.keys(columnSizing).length > 0) {
       setColumnSizing({});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, userResizedColumns]); // columnSizing itself should not be a direct dependency here to avoid loops
 
   // Close column selector and context menu on outside click (Issue #5, #6)

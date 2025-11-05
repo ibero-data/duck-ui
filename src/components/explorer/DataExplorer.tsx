@@ -1,3 +1,7 @@
+// file: src/components/explorer/DataExplorer.tsx
+// description: Data explorer component
+// reference: https://github.com/ibero-data/duck-ui
+
 import React, { useState } from "react";
 import { useDuckStore } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

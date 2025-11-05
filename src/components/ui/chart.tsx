@@ -1,3 +1,7 @@
+// file: src/components/ui/chart.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 

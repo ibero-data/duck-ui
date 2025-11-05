@@ -1,3 +1,7 @@
+// file: src/components/ui/alert.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 

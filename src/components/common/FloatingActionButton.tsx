@@ -1,3 +1,7 @@
+// file: src/components/common/FloatingActionButton.tsx
+// description: Common reusable component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";

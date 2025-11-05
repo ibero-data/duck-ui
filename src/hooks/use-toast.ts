@@ -1,3 +1,7 @@
+// file: src/hooks/use-toast.ts
+// description: Toast notification custom hook
+// reference: https://github.com/ibero-data/duck-ui
+
 "use client"
 
 // Inspired by react-hot-toast library

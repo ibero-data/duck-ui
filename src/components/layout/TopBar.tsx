@@ -1,3 +1,7 @@
+// file: src/components/layout/TopBar.tsx
+// description: Layout component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useTheme } from "@/components/theme/theme-provider";

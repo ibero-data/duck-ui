@@ -1,3 +1,7 @@
+// file: src/lib/chartUtils.ts
+// description: Chart utility functions and helpers
+// reference: https://github.com/ibero-data/duck-ui
+
 /**
  * Format a number with thousand separators
  * @param value - The number to format

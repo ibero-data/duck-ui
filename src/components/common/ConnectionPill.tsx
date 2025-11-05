@@ -1,3 +1,7 @@
+// file: src/components/common/ConnectionPill.tsx
+// description: Common reusable component
+// reference: https://github.com/ibero-data/duck-ui
+
 import {
   Tooltip,
   TooltipContent,

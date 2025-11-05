@@ -1,3 +1,7 @@
+// file: src/components/ui/pagination.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react"
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
 

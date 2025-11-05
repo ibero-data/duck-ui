@@ -1,3 +1,7 @@
+// file: src/components/table/ColumnStatsPanel.tsx
+// description: Table component
+// reference: https://tanstack.com/table
+
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

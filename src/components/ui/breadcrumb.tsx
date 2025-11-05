@@ -1,3 +1,7 @@
+// file: src/components/ui/breadcrumb.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { ChevronRight, MoreHorizontal } from "lucide-react"

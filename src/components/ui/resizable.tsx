@@ -1,3 +1,7 @@
+// file: src/components/ui/resizable.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 "use client"
 
 import { GripVertical } from "lucide-react"

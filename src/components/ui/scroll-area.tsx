@@ -1,3 +1,7 @@
+// file: src/components/ui/scroll-area.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 

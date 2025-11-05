@@ -1,3 +1,7 @@
+// file: src/lib/chartDataTransform.ts
+// description: Chart data transformation utilities
+// reference: https://github.com/ibero-data/duck-ui
+
 /**
  * Advanced data transformation utilities for charting
  * Handles aggregations, grouping, sorting, and filtering

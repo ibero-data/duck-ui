@@ -1,3 +1,7 @@
+// file: src/components/theme/theme-provider.tsx
+// description: Theme management component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "dark" | "light" | "system";

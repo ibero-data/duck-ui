@@ -1,3 +1,7 @@
+// file: src/main.tsx
+// description: Main application entry point
+// reference: https://github.com/ibero-data/duck-ui
+
 import "./index.css";
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";

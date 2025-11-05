@@ -1,3 +1,7 @@
+// file: src/components/theme/mode-toggle.tsx
+// description: Theme management component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { Moon, Sun } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

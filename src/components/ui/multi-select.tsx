@@ -1,3 +1,7 @@
+// file: src/components/ui/multi-select.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react";
 import { X, Check, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

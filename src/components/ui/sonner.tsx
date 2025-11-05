@@ -1,3 +1,7 @@
+// file: src/components/ui/sonner.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import { useTheme } from "@/components/theme/theme-provider";
 import { Toaster as Sonner } from "sonner";
 

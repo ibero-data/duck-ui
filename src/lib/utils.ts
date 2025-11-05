@@ -1,3 +1,7 @@
+// file: src/lib/utils.ts
+// description: Utility functions for the application
+// reference: https://github.com/ibero-data/duck-ui
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 

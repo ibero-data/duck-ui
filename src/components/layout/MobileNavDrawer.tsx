@@ -1,3 +1,7 @@
+// file: src/components/layout/MobileNavDrawer.tsx
+// description: Layout component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { useState } from "react";
 import { Menu, Github, BookText, Cable, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";

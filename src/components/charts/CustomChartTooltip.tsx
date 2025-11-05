@@ -1,3 +1,7 @@
+// file: src/components/charts/CustomChartTooltip.tsx
+// description: Chart visualization component
+// reference: https://echarts.apache.org
+
 import { useTheme } from "@/components/theme/theme-provider";
 
 interface CustomChartTooltipProps {

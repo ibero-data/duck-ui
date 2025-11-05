@@ -1,3 +1,7 @@
+// file: src/components/ui/card.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

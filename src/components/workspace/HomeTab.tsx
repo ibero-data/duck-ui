@@ -1,3 +1,7 @@
+// file: src/components/workspace/HomeTab.tsx
+// description: Workspace component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {

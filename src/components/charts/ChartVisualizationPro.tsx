@@ -1,3 +1,7 @@
+// file: src/components/charts/ChartVisualizationPro.tsx
+// description: Chart visualization component
+// reference: https://echarts.apache.org
+
 /**
  * Professional Chart Visualization Component
  * Features: Multi-series, advanced chart types, customization, export

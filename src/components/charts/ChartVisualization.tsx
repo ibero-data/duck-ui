@@ -1,3 +1,7 @@
+// file: src/components/charts/ChartVisualization.tsx
+// description: Chart visualization component
+// reference: https://echarts.apache.org
+
 import { useState, useEffect } from "react";
 import {
   BarChart,

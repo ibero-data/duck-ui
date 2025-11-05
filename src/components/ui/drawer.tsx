@@ -1,3 +1,7 @@
+// file: src/components/ui/drawer.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 

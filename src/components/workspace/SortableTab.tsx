@@ -1,3 +1,7 @@
+// file: src/components/workspace/SortableTab.tsx
+// description: Workspace component
+// reference: https://github.com/ibero-data/duck-ui
+
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { TabsTrigger } from "@/components/ui/tabs";

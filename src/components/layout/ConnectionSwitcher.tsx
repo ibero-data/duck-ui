@@ -1,3 +1,7 @@
+// file: src/components/layout/ConnectionSwitcher.tsx
+// description: Layout component
+// reference: https://github.com/ibero-data/duck-ui
+
 import * as React from "react";
 import { ChevronDown, Circle, Loader2, Cable } from "lucide-react";
 import {

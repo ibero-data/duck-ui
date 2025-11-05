@@ -1,3 +1,7 @@
+// file: src/components/explorer/FileImporter.tsx
+// description: Data explorer component
+// reference: https://github.com/ibero-data/duck-ui
+
 import React, {
   useCallback,
   useState,

@@ -1,3 +1,7 @@
+// file: src/components/explorer/ColumnNode.tsx
+// description: Data explorer component
+// reference: https://github.com/ibero-data/duck-ui
+
 import React, { useState } from "react";
 import {
   ChevronRight,

@@ -1,3 +1,7 @@
+// file: src/components/ui/context-menu.tsx
+// description: UI component
+// reference: https://ui.shadcn.com
+
 "use client"
 
 import * as React from "react"

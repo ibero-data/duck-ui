@@ -1,3 +1,7 @@
+// file: src/store/index.ts
+// description: Global application state store
+// reference: https://zustand-demo.pmnd.rs
+
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import * as duckdb from "@duckdb/duckdb-wasm";

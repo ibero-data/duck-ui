@@ -1,3 +1,7 @@
+// file: src/lib/chartExport.ts
+// description: Chart export functionality
+// reference: https://github.com/ibero-data/duck-ui
+
 /**
  * Chart export utilities for PNG, SVG formats
  * Uses html2canvas and SVG manipulation for high-quality exports

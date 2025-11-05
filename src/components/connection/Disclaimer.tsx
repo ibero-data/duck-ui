@@ -1,3 +1,7 @@
+// file: src/components/connection/Disclaimer.tsx
+// description: Connection management component
+// reference: https://github.com/ibero-data/duck-ui
+
 import React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
