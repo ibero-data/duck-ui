@@ -4,6 +4,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
+  getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type FilterFn,
@@ -11,6 +12,7 @@ import {
   type ColumnResizeMode,
   type PaginationState,
   type ColumnSizingState,
+  type SortingState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { formatBytes, formatDuration } from "@/lib/utils";
@@ -25,6 +27,8 @@ import {
   MousePointer,
   MoreHorizontal,
   ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
   BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -150,7 +154,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     Record<string, number>
   >({});
   const [columnSelectorFilter, setColumnSelectorFilter] = useState("");
-  // const [sorting, setSorting] = useState<SortingState>([]); // REMOVED
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   // New spreadsheet features
   const [showRowNumbers, setShowRowNumbers] = useState(false);
@@ -301,13 +305,23 @@ const DuckUITable: React.FC<DuckTableProps> = ({
           accessorFn: (row) => row[key], // Use accessorFn instead of accessorKey for direct property access
           minSize: MIN_COLUMN_WIDTH,
           maxSize: MAX_COLUMN_WIDTH,
-          header: () => (
-            // Simplified header
+          enableSorting: true,
+          header: ({ column }) => (
             <div
-              className="h-7 text-xs w-full flex items-center justify-start pl-0"
-              title={key}
+              className="h-7 text-xs w-full flex items-center justify-between pl-0 pr-1 cursor-pointer select-none hover:bg-muted/50"
+              title={`${key} (click to sort)`}
+              onClick={() => column.toggleSorting()}
             >
               <span className="truncate">{key}</span>
+              <span className="ml-1 flex-shrink-0">
+                {column.getIsSorted() === "asc" ? (
+                  <ChevronUp className="h-3 w-3" />
+                ) : column.getIsSorted() === "desc" ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronsUpDown className="h-3 w-3 opacity-30" />
+                )}
+              </span>
             </div>
           ),
           cell: ({ row }) => {
@@ -382,21 +396,21 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       globalFilter,
       pagination,
       columnSizing,
-      // sorting, // REMOVED
+      sorting,
     },
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: setPagination,
     onColumnSizingChange: handleColumnSizeChange,
-    // onSortingChange: setSorting, // REMOVED
+    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    // getSortedRowModel: getSortedRowModel(), // REMOVED
+    getSortedRowModel: getSortedRowModel(),
     enableGlobalFilter: true,
     enableColumnResizing: true,
-    // enableSorting: true, // REMOVED (or set to false)
-    debugTable: false, // Set to true for debugging if needed
+    enableSorting: true,
+    debugTable: false,
   });
 
   const { rows } = table.getRowModel();

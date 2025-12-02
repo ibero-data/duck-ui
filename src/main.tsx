@@ -3,12 +3,13 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Suspense } from "react";
+import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Routes, Route } from "react-router";
 import { useDuckStore } from "./store";
 import Home from "@/pages/Home";
 import { Toaster } from "@/components/ui/sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import NotFound from "./pages/NotFound";
 import Connections from "./pages/Connections";
 
@@ -25,6 +26,25 @@ const LoadingScreen = ({ message }: LoadingScreenProps) => (
     <div className="text-center">
       <Loader2 className="animate-spin m-auto mb-12" size={64} />
       <p className="text-lg">{message}</p>
+    </div>
+  </div>
+);
+
+const ErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => (
+  <div className="h-screen flex items-center justify-center bg-background text-foreground">
+    <div className="text-center max-w-md p-6">
+      <AlertTriangle className="mx-auto mb-4 text-destructive" size={48} />
+      <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+      <p className="text-muted-foreground mb-4 text-sm">
+        {error.message || "An unexpected error occurred while rendering the application."}
+      </p>
+      <button
+        onClick={resetErrorBoundary}
+        className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+      >
+        <RefreshCw size={16} />
+        Try again
+      </button>
     </div>
   </div>
 );
@@ -78,14 +98,16 @@ if (!rootElement) throw new Error("Failed to find root element");
 // Production render
 createRoot(rootElement).render(
   <StrictMode>
-    <AppInitializer>
-      <BrowserRouter>
-        <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-          <Suspense fallback={<LoadingScreen message="Loading application" />}>
-            <App />
-          </Suspense>
-        </ThemeProvider>
-      </BrowserRouter>
-    </AppInitializer>
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <AppInitializer>
+        <BrowserRouter>
+          <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+            <Suspense fallback={<LoadingScreen message="Loading application" />}>
+              <App />
+            </Suspense>
+          </ThemeProvider>
+        </BrowserRouter>
+      </AppInitializer>
+    </ErrorBoundary>
   </StrictMode>
 );

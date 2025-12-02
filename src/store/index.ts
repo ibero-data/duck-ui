@@ -435,76 +435,87 @@ const rawResultToJSON = (rawResult: string): QueryResult => {
 
 // Converts a WASM query result into a QueryResult.
 const resultToJSON = (result: any): QueryResult => {
-  const schema = result.schema;
-  const fields = schema.fields;
+  try {
+    const schema = result.schema;
+    const fields = schema.fields;
 
-  // Pre-extract column vectors for Decimal types
-  const columnVectors = fields.map((_: any, colIdx: number) => result.getChildAt(colIdx));
+    // Pre-extract column vectors for Decimal types
+    const columnVectors = fields.map((_: any, colIdx: number) => result.getChildAt(colIdx));
 
-  // Use the standard toArray().map() approach, but fix Decimal values from column vectors
-  const data = result.toArray().map((row: any, rowIndex: number) => {
-    const jsonRow = row.toJSON();
+    // Use the standard toArray().map() approach, but fix Decimal values from column vectors
+    const data = result.toArray().map((row: any, rowIndex: number) => {
+      const jsonRow = row.toJSON();
 
-    // Fix Decimal types by reading directly from column vectors
-    fields.forEach((field: any, columnIndex: number) => {
-      const col = field.name;
-      const type = field.type.toString();
+      // Fix Decimal types by reading directly from column vectors
+      fields.forEach((field: any, columnIndex: number) => {
+        const col = field.name;
+        const type = field.type.toString();
 
-      // Only fix Decimal types - they come as null from toJSON()
-      if (type.includes("Decimal")) {
-        try {
-          // Get the value directly from the column vector
-          const value = columnVectors[columnIndex].get(rowIndex);
+        // Only fix Decimal types - they come as null from toJSON()
+        if (type.includes("Decimal")) {
+          try {
+            // Get the value directly from the column vector
+            const value = columnVectors[columnIndex].get(rowIndex);
 
-          if (value !== null && value !== undefined) {
-            // Convert Decimal object to number
-            // Arrow Decimals store unscaled values - we need to apply the scale
-            if (typeof value === "object" && typeof value.valueOf === "function") {
-              const unscaledValue = Number(value.valueOf());
-              const scale = field.type.scale || 0; // Get scale from Arrow type metadata
-              const scaledValue = unscaledValue / Math.pow(10, scale);
-              jsonRow[col] = scaledValue;
-            } else if (typeof value === "number") {
-              jsonRow[col] = value;
-            } else if (typeof value === "string") {
-              const parsed = parseFloat(value);
-              jsonRow[col] = isNaN(parsed) ? null : parsed;
-            } else {
-              jsonRow[col] = null;
+            if (value !== null && value !== undefined) {
+              // Convert Decimal object to number
+              // Arrow Decimals store unscaled values - we need to apply the scale
+              if (typeof value === "object" && typeof value.valueOf === "function") {
+                const unscaledValue = Number(value.valueOf());
+                const scale = field.type.scale || 0; // Get scale from Arrow type metadata
+                const scaledValue = unscaledValue / Math.pow(10, scale);
+                jsonRow[col] = scaledValue;
+              } else if (typeof value === "number") {
+                jsonRow[col] = value;
+              } else if (typeof value === "string") {
+                const parsed = parseFloat(value);
+                jsonRow[col] = isNaN(parsed) ? null : parsed;
+              } else {
+                jsonRow[col] = null;
+              }
             }
+          } catch (error) {
+            console.error(`Error processing Decimal column ${col} at row ${rowIndex}:`, error);
           }
-        } catch (error) {
-          console.error(`Error processing Decimal column ${col} at row ${rowIndex}:`, error);
         }
-      }
-      // Fix Date types
-      else if (type === "Date32<DAY>") {
-        let value = jsonRow[col];
-        if (value !== null && value !== undefined) {
-          jsonRow[col] = new Date(value).toLocaleDateString();
+        // Fix Date types
+        else if (type === "Date32<DAY>") {
+          let value = jsonRow[col];
+          if (value !== null && value !== undefined) {
+            jsonRow[col] = new Date(value).toLocaleDateString();
+          }
         }
-      }
-      // Fix Timestamp types
-      else if (
-        type === "Date64<MILLISECOND>" ||
-        type === "Timestamp<MICROSECOND>"
-      ) {
-        let value = jsonRow[col];
-        if (value !== null && value !== undefined) {
-          jsonRow[col] = new Date(value);
+        // Fix Timestamp types
+        else if (
+          type === "Date64<MILLISECOND>" ||
+          type === "Timestamp<MICROSECOND>"
+        ) {
+          let value = jsonRow[col];
+          if (value !== null && value !== undefined) {
+            jsonRow[col] = new Date(value);
+          }
         }
-      }
+      });
+
+      return jsonRow;
     });
 
-    return jsonRow;
-  });
-
-  return {
-    columns: fields.map((field: any) => field.name),
-    columnTypes: fields.map((field: any) => field.type.toString()),
-    data,
-    rowCount: result.numRows,
-  };
+    return {
+      columns: fields.map((field: any) => field.name),
+      columnTypes: fields.map((field: any) => field.type.toString()),
+      data,
+      rowCount: result.numRows,
+    };
+  } catch (error) {
+    console.error("Error converting query result to JSON:", error);
+    return {
+      columns: [],
+      columnTypes: [],
+      data: [],
+      rowCount: 0,
+      error: `Failed to process query results: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
 };
 
 /**

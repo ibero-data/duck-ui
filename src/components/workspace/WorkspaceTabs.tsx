@@ -4,6 +4,7 @@ import { Tabs, TabsList, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Plus, XSquareIcon } from "lucide-react";
+import { useQueryFromURL } from "@/hooks/useQueryFromURL";
 import {
   DndContext,
   closestCenter,
@@ -48,6 +49,9 @@ export default function WorkspaceTabs() {
       initialize().catch(console.error);
     }
   }, [isInitialized, initialize]);
+
+  // Handle loading query from URL parameters
+  useQueryFromURL();
 
   const sensors = useSensors(
     useSensor(PointerSensor),

@@ -10,9 +10,28 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DuckUiTable from "@/components/table/DuckUItable";
 import ChartVisualizationPro from "@/components/charts/ChartVisualizationPro";
-import { FileX2, Table, BarChart3 } from "lucide-react";
+import { FileX2, Table, BarChart3, AlertTriangle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "../ui/skeleton";
+import { ErrorBoundary, FallbackProps } from "react-error-boundary";
+
+const TableErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => (
+  <div className="h-full flex items-center justify-center p-4">
+    <div className="text-center max-w-md">
+      <AlertTriangle className="mx-auto mb-4 text-destructive" size={32} />
+      <h3 className="text-sm font-medium mb-2">Failed to render table</h3>
+      <p className="text-xs text-muted-foreground mb-4">
+        {error.message || "An error occurred while displaying the results."}
+      </p>
+      <button
+        onClick={resetErrorBoundary}
+        className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+      >
+        Try again
+      </button>
+    </div>
+  </div>
+);
 
 interface SqlTabProps {
   tabId: string;
@@ -100,7 +119,9 @@ const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
         </TabsList>
         <TabsContent value="table" className="flex-1 min-h-0">
           <div className="h-full">
-            <DuckUiTable data={currentTab.result.data} />
+            <ErrorBoundary FallbackComponent={TableErrorFallback}>
+              <DuckUiTable data={currentTab.result.data} />
+            </ErrorBoundary>
           </div>
         </TabsContent>
         <TabsContent value="charts" className="flex-1 min-h-0">

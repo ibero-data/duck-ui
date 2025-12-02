@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Play, Loader2, Lightbulb, Command, Edit } from "lucide-react";
+import { Play, Loader2, Lightbulb, Command, Edit, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDuckStore } from "@/store";
 import { useTheme } from "../theme/theme-provider";
@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import ConnectionPill from "@/components/common/ConnectionPill";
 import { Badge } from "@/components/ui/badge";
 import FloatingActionButton from "@/components/common/FloatingActionButton";
+import { copyQueryURL } from "@/hooks/useQueryFromURL";
 
 interface SqlEditorProps {
   tabId: string;
@@ -121,6 +122,24 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     setIsEditingTitle(true);
   };
 
+  const handleShareQuery = async () => {
+    const editor = editorInstanceRef.current?.editor;
+    if (!editor) return;
+
+    const query = editor.getValue().trim();
+    if (!query) {
+      toast.error("No query to share");
+      return;
+    }
+
+    const success = await copyQueryURL(query, false);
+    if (success) {
+      toast.success("Query URL copied to clipboard");
+    } else {
+      toast.error("Failed to copy URL");
+    }
+  };
+
   return (
     <div className={cn("flex flex-col h-full relative", className)}>
       {/* Header */}
@@ -198,6 +217,23 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
               </Tooltip>
             </TooltipProvider>
           </div>
+          <TooltipProvider>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleShareQuery}
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Copy shareable URL</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             onClick={handleExecuteQuery}
             disabled={isExecuting}
