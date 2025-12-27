@@ -10,6 +10,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DuckUiTable from "@/components/table/DuckUItable";
 import ChartVisualizationPro from "@/components/charts/ChartVisualizationPro";
+import DuckBrainPanel from "@/components/duck-brain/DuckBrainPanel";
 import { FileX2, Table, BarChart3, AlertTriangle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "../ui/skeleton";
@@ -38,8 +39,9 @@ interface SqlTabProps {
 }
 
 const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
-  const { tabs, isExecuting, updateTabChartConfig } = useDuckStore();
+  const { tabs, isExecuting, updateTabChartConfig, duckBrain } = useDuckStore();
   const currentTab = tabs.find((tab) => tab.id === tabId);
+  const isPanelOpen = duckBrain.isPanelOpen;
 
   const renderResults = () => {
     if (!currentTab || currentTab.type !== "sql") {
@@ -145,14 +147,29 @@ const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
 
   return (
     <div className="h-full">
-      <ResizablePanelGroup direction="vertical">
-        <ResizablePanel defaultSize={50} minSize={25}>
-          <SqlEditor tabId={tabId} title={currentTab.title} />
+      <ResizablePanelGroup direction="horizontal">
+        {/* Main Editor + Results Panel */}
+        <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
+          <ResizablePanelGroup direction="vertical">
+            <ResizablePanel defaultSize={50} minSize={25}>
+              <SqlEditor tabId={tabId} title={currentTab.title} />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={50} minSize={25}>
+              {renderResults()}
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={50} minSize={25}>
-          {renderResults()}
-        </ResizablePanel>
+
+        {/* Duck Brain Panel */}
+        {isPanelOpen && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+              <DuckBrainPanel tabId={tabId} />
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
     </div>
   );

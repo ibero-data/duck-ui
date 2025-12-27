@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Play, Loader2, Lightbulb, Command, Edit, Share2 } from "lucide-react";
+import { Play, Loader2, Lightbulb, Command, Edit, Share2, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDuckStore } from "@/store";
 import { useTheme } from "../theme/theme-provider";
@@ -32,7 +32,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
   const { theme } = useTheme();
-  const { tabs, executeQuery, isExecuting, updateTabTitle, currentConnection } =
+  const { tabs, executeQuery, isExecuting, updateTabTitle, currentConnection, toggleBrainPanel, duckBrain } =
     useDuckStore();
   const monacoConfig = useMonacoConfig(theme);
 
@@ -231,6 +231,23 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
               </TooltipTrigger>
               <TooltipContent side="bottom">
                 <p>Copy shareable URL</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={toggleBrainPanel}
+                  variant={duckBrain.isPanelOpen ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-9 w-9"
+                >
+                  <Brain className={cn("h-4 w-4", duckBrain.isPanelOpen && "text-primary")} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{duckBrain.isPanelOpen ? "Close Duck Brain" : "Open Duck Brain"}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

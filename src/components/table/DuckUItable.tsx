@@ -30,6 +30,11 @@ import {
   ChevronUp,
   ChevronsUpDown,
   BarChart3,
+  FolderOpen,
+  FileSpreadsheet,
+  FileJson,
+  FileText,
+  FileArchive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +46,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useDuckStore } from "@/store";
 import { CellValueViewer } from "./CellValueViewer";
 import { ColumnStatsPanel } from "./ColumnStatsPanel";
+import { fileSystemService } from "@/lib/fileSystem";
 
 // Define a generic type for the data row
 type DataRow = Record<string, any>;
@@ -181,6 +191,9 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     columnName: string;
     rowIndex: number;
   } | null>(null);
+
+  // Get mounted folders from store
+  const mountedFolders = useDuckStore((state) => state.mountedFolders);
 
   // Column stats panel state
   const [showStatsPanel, setShowStatsPanel] = useState(false);
@@ -770,6 +783,156 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     }
   };
 
+  // Save to folder functions
+  const saveToFolderAsCSV = async (folderId: string, folderName: string) => {
+    if (!data || !data.length) return;
+
+    try {
+      const visibleKeys = table.getVisibleLeafColumns().map((c) => c.id);
+      const headers = visibleKeys.length > 0 ? visibleKeys : data[0] ? Object.keys(data[0]) : [];
+      if (headers.length === 0) return;
+
+      const csvRows = [headers.join(",")];
+      const dataToExport = table.getFilteredRowModel().rows.map((r) => r.original);
+
+      for (const row of dataToExport) {
+        const values = headers.map((header) => {
+          const value = row[header];
+          if (value === null || value === undefined) return "";
+          if (typeof value === "string" && value.includes(","))
+            return `"${value.replace(/"/g, '""')}"`;
+          if (typeof value === "object" || typeof value === "bigint")
+            return `"${safeStringify(value).replace(/"/g, '""')}"`;
+          return String(value);
+        });
+        csvRows.push(values.join(","));
+      }
+
+      const content = csvRows.join("\n");
+      const fileName = `export-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
+
+      await fileSystemService.saveFile(folderId, fileName, content);
+      toast.success(`Saved to ${folderName}/${fileName}`);
+    } catch (error) {
+      console.error("Save to folder failed:", error);
+      toast.error("Failed to save: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+  };
+
+  const saveToFolderAsJSON = async (folderId: string, folderName: string) => {
+    if (!data || !data.length) return;
+
+    try {
+      const dataToExport = table.getFilteredRowModel().rows.map((r) => r.original);
+      const jsonString = JSON.stringify(
+        dataToExport,
+        (_, v) => (typeof v === "bigint" ? v.toString() : v),
+        2
+      );
+
+      const fileName = `export-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.json`;
+      await fileSystemService.saveFile(folderId, fileName, jsonString);
+      toast.success(`Saved to ${folderName}/${fileName}`);
+    } catch (error) {
+      console.error("Save to folder failed:", error);
+      toast.error("Failed to save: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+  };
+
+  const saveToFolderAsXLSX = async (folderId: string, folderName: string) => {
+    if (!data || !data.length) return;
+
+    try {
+      const XLSX = await import("xlsx");
+      const dataToExport = table.getFilteredRowModel().rows.map((r) => {
+        const row: Record<string, any> = {};
+        Object.keys(r.original).forEach((key) => {
+          const val = r.original[key];
+          row[key] = typeof val === "bigint" ? val.toString() : val;
+        });
+        return row;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+
+      // Auto-size columns
+      const maxWidth = 50;
+      const colWidths = Object.keys(dataToExport[0] || {}).map((key) => ({
+        wch: Math.min(
+          maxWidth,
+          Math.max(
+            key.length,
+            ...dataToExport.slice(0, 100).map((row) => String(row[key] || "").length)
+          )
+        ),
+      }));
+      worksheet["!cols"] = colWidths;
+
+      const xlsxBuffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+      const fileName = `export-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`;
+
+      await fileSystemService.saveFile(folderId, fileName, xlsxBuffer);
+      toast.success(`Saved to ${folderName}/${fileName}`);
+    } catch (error) {
+      console.error("Save to folder failed:", error);
+      toast.error("Failed to save: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+  };
+
+  const saveToFolderAsParquet = async (folderId: string, folderName: string) => {
+    if (!data || !data.length) return;
+
+    try {
+      const dataToExport = table.getFilteredRowModel().rows.map((r) => r.original);
+      const { connection, db } = useDuckStore.getState();
+
+      if (!connection || !db) {
+        throw new Error("Database not initialized");
+      }
+
+      const tempFileName = `temp_export_${Date.now()}.parquet`;
+
+      const createValuesClause = () => {
+        if (dataToExport.length === 0) return "";
+        const keys = Object.keys(dataToExport[0]);
+        const values = dataToExport.map((row) => {
+          const rowValues = keys.map((key) => {
+            const val = row[key];
+            if (val === null || val === undefined) return "NULL";
+            if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+            if (typeof val === "bigint") return val.toString();
+            if (typeof val === "object") return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
+            return String(val);
+          });
+          return `(${rowValues.join(", ")})`;
+        });
+        return values.join(", ");
+      };
+
+      const valuesClause = createValuesClause();
+      const keys = Object.keys(dataToExport[0]);
+
+      await connection.query(
+        `COPY (SELECT * FROM (VALUES ${valuesClause}) AS t(${keys.map(k => `"${k}"`).join(", ")})) TO '${tempFileName}' (FORMAT 'parquet')`
+      );
+
+      const buffer = await db.copyFileToBuffer(tempFileName);
+      await db.dropFile(tempFileName);
+
+      const fileName = `export-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.parquet`;
+      // Create new ArrayBuffer copy to satisfy TypeScript
+      const arrayBuffer = new ArrayBuffer(buffer.byteLength);
+      new Uint8Array(arrayBuffer).set(buffer);
+      await fileSystemService.saveFile(folderId, fileName, arrayBuffer);
+      toast.success(`Saved to ${folderName}/${fileName}`);
+    } catch (error) {
+      console.error("Save to folder failed:", error);
+      toast.error("Failed to save: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+  };
+
   const toggleColumnVisibility = (columnId: string) => {
     setEnabledColumns((prev) => ({ ...prev, [columnId]: !prev[columnId] }));
   };
@@ -1182,6 +1345,47 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                   <Download className="mr-2 h-3.5 w-3.5" />
                   Export as Parquet
                 </DropdownMenuItem>
+
+                {/* Save to Folder submenu */}
+                {mountedFolders.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <FolderOpen className="mr-2 h-3.5 w-3.5" />
+                        Save to Folder
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        {mountedFolders.map((folder) => (
+                          <DropdownMenuSub key={folder.id}>
+                            <DropdownMenuSubTrigger>
+                              <FolderOpen className="mr-2 h-3.5 w-3.5" />
+                              {folder.name}
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              <DropdownMenuItem onClick={() => saveToFolderAsCSV(folder.id, folder.name)}>
+                                <FileText className="mr-2 h-3.5 w-3.5" />
+                                Save as CSV
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => saveToFolderAsJSON(folder.id, folder.name)}>
+                                <FileJson className="mr-2 h-3.5 w-3.5" />
+                                Save as JSON
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => saveToFolderAsXLSX(folder.id, folder.name)}>
+                                <FileSpreadsheet className="mr-2 h-3.5 w-3.5" />
+                                Save as Excel (XLSX)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => saveToFolderAsParquet(folder.id, folder.name)}>
+                                <FileArchive className="mr-2 h-3.5 w-3.5" />
+                                Save as Parquet
+                              </DropdownMenuItem>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 

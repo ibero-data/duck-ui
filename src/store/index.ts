@@ -122,6 +122,37 @@ export interface QueryHistoryItem {
   error?: string;
 }
 
+export interface QueryResultArtifact {
+  status: "pending" | "running" | "success" | "error";
+  data?: QueryResult;
+  error?: string;
+  executedAt?: Date;
+}
+
+export type AIProviderType = "webllm" | "openai" | "anthropic";
+
+export interface ProviderConfigs {
+  openai?: { apiKey: string; modelId: string };
+  anthropic?: { apiKey: string; modelId: string };
+}
+
+export interface DuckBrainMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  sql?: string; // Extracted SQL if role is assistant
+  queryResult?: QueryResultArtifact; // Inline query result artifact
+}
+
+// Mounted folder info for store (metadata only - handle stored in IndexedDB)
+export interface MountedFolderInfo {
+  id: string;
+  name: string;
+  addedAt: Date;
+  hasPermission: boolean;
+}
+
 export type EditorTabType = "sql" | "home";
 
 // Advanced Chart Configuration Types
@@ -271,6 +302,27 @@ export interface DuckStoreState {
 
   isLoadingExternalConnection: boolean;
 
+  // Duck Brain AI State
+  duckBrain: {
+    modelStatus: "idle" | "checking" | "downloading" | "loading" | "ready" | "error";
+    downloadProgress: number;
+    downloadStatus: string;
+    isWebGPUSupported: boolean | null;
+    currentModel: string | null;
+    error: string | null;
+    messages: DuckBrainMessage[];
+    isGenerating: boolean;
+    streamingContent: string;
+    isPanelOpen: boolean;
+    // AI Provider settings
+    aiProvider: AIProviderType;
+    providerConfigs: ProviderConfigs;
+  };
+
+  // File System Access State
+  mountedFolders: MountedFolderInfo[];
+  isFileSystemSupported: boolean;
+
   // Actions
   initialize: () => Promise<void>;
   executeQuery: (query: string, tabId?: string) => Promise<QueryResult | void>;
@@ -307,6 +359,28 @@ export interface DuckStoreState {
   deleteConnection: (id: string) => void;
   setCurrentConnection: (connectionId: string) => Promise<void>;
   getConnection: (connectionId: string) => ConnectionProvider | undefined;
+
+  // Duck Brain AI Actions
+  initializeDuckBrain: (modelId?: string) => Promise<void>;
+  generateSQL: (naturalLanguage: string) => Promise<string | null>;
+  toggleBrainPanel: () => void;
+  abortGeneration: () => void;
+  clearBrainMessages: () => void;
+  addBrainMessage: (message: Omit<DuckBrainMessage, "id" | "timestamp">) => void;
+  setStreamingContent: (content: string) => void;
+  setIsGenerating: (isGenerating: boolean) => void;
+  executeQueryInChat: (messageId: string, sql: string) => Promise<QueryResult | null>;
+  updateMessageQueryResult: (messageId: string, queryResult: QueryResultArtifact) => void;
+  // AI Provider actions
+  setAIProvider: (provider: AIProviderType) => void;
+  updateProviderConfig: (provider: "openai" | "anthropic", config: { apiKey: string; modelId: string }) => void;
+  initializeExternalProvider: () => Promise<void>;
+
+  // File System Access Actions
+  initFileSystem: () => Promise<void>;
+  mountFolder: () => Promise<MountedFolderInfo | null>;
+  unmountFolder: (id: string) => Promise<void>;
+  refreshFolderPermissions: () => Promise<void>;
 }
 
 //
@@ -993,6 +1067,26 @@ export const useDuckStore = create<DuckStoreState>()(
         connectionList: {
           connections: [],
         },
+
+        // Duck Brain AI initial state
+        duckBrain: {
+          modelStatus: "idle",
+          downloadProgress: 0,
+          downloadStatus: "",
+          isWebGPUSupported: null,
+          currentModel: null,
+          error: null,
+          messages: [],
+          isGenerating: false,
+          streamingContent: "",
+          isPanelOpen: false,
+          aiProvider: "webllm",
+          providerConfigs: {},
+        },
+
+        // File System Access initial state
+        mountedFolders: [],
+        isFileSystemSupported: typeof window !== "undefined" && "showDirectoryPicker" in window,
 
         // Initialize DuckDB using WASM or External.
         initialize: async () => {
@@ -1691,6 +1785,539 @@ export const useDuckStore = create<DuckStoreState>()(
             (c) => c.id === connectionId
           );
         },
+
+        // Duck Brain AI Actions
+        initializeDuckBrain: async (modelId) => {
+          const { duckBrainService } = await import("@/lib/duckBrain");
+
+          // Subscribe to service state updates
+          duckBrainService.subscribe((serviceState) => {
+            set((state) => ({
+              duckBrain: {
+                ...state.duckBrain,
+                modelStatus: serviceState.status,
+                downloadProgress: serviceState.downloadProgress,
+                downloadStatus: serviceState.downloadStatus,
+                isWebGPUSupported: serviceState.isWebGPUSupported,
+                currentModel: serviceState.currentModel,
+                error: serviceState.error,
+              },
+            }));
+          });
+
+          try {
+            await duckBrainService.initialize(modelId);
+          } catch (error) {
+            toast.error(
+              `Failed to initialize Duck Brain: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
+        },
+
+        generateSQL: async (naturalLanguage) => {
+          const {
+            duckBrainService,
+            buildTextToSQLMessages,
+            formatSchemaForContext,
+            extractSQLFromResponse
+          } = await import("@/lib/duckBrain");
+
+          const { databases, duckBrain } = get();
+          const { aiProvider, providerConfigs } = duckBrain;
+          const isExternalProvider = aiProvider !== "webllm";
+
+          // For WebLLM, check model status
+          if (!isExternalProvider && duckBrain.modelStatus !== "ready") {
+            toast.error("Duck Brain is not ready. Please wait for the model to load.");
+            return null;
+          }
+
+          // For external providers, check API key
+          if (isExternalProvider) {
+            const config = providerConfigs[aiProvider as "openai" | "anthropic"];
+            if (!config?.apiKey) {
+              toast.error(`Please configure your ${aiProvider} API key in Brain settings.`);
+              return null;
+            }
+          }
+
+          // Add user message
+          const userMessage: DuckBrainMessage = {
+            id: crypto.randomUUID(),
+            role: "user",
+            content: naturalLanguage,
+            timestamp: new Date(),
+          };
+
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              messages: [...state.duckBrain.messages, userMessage],
+              isGenerating: true,
+              streamingContent: "",
+            },
+          }));
+
+          try {
+            // Build schema context and include previous query results for iteration
+            const schemaContext = formatSchemaForContext(databases);
+            const messages = buildTextToSQLMessages(
+              naturalLanguage,
+              schemaContext.formatted,
+              duckBrain.messages, // Pass previous messages for results context
+              true
+            );
+
+            let fullResponse = "";
+
+            // Use external provider or WebLLM based on selection
+            if (isExternalProvider) {
+              const { createProvider } = await import("@/lib/duckBrain/providers");
+              const config = providerConfigs[aiProvider as "openai" | "anthropic"]!;
+              const provider = createProvider(aiProvider as "openai" | "anthropic");
+
+              await provider.initialize({
+                apiKey: config.apiKey,
+                modelId: config.modelId,
+              });
+
+              await provider.generateStreaming(
+                messages,
+                {
+                  onToken: (token) => {
+                    fullResponse += token;
+                    set((state) => ({
+                      duckBrain: {
+                        ...state.duckBrain,
+                        streamingContent: fullResponse,
+                      },
+                    }));
+                  },
+                  onComplete: (finalText) => {
+                    const parsed = extractSQLFromResponse(finalText);
+
+                    const assistantMessage: DuckBrainMessage = {
+                      id: crypto.randomUUID(),
+                      role: "assistant",
+                      content: finalText,
+                      timestamp: new Date(),
+                      sql: parsed.sql || undefined,
+                    };
+
+                    set((state) => ({
+                      duckBrain: {
+                        ...state.duckBrain,
+                        messages: [...state.duckBrain.messages, assistantMessage],
+                        isGenerating: false,
+                        streamingContent: "",
+                      },
+                    }));
+                  },
+                  onError: (error) => {
+                    set((state) => ({
+                      duckBrain: {
+                        ...state.duckBrain,
+                        isGenerating: false,
+                        streamingContent: "",
+                        error: error.message,
+                      },
+                    }));
+                    toast.error(`Generation failed: ${error.message}`);
+                  },
+                },
+                { maxTokens: 512, temperature: 0.2 }
+              );
+
+              await provider.cleanup();
+            } else {
+              // WebLLM path
+              await duckBrainService.generateStreaming(
+                messages,
+                {
+                  onToken: (_token, fullText) => {
+                    fullResponse = fullText;
+                    set((state) => ({
+                      duckBrain: {
+                        ...state.duckBrain,
+                        streamingContent: fullText,
+                      },
+                    }));
+                  },
+                  onComplete: (finalText) => {
+                    const parsed = extractSQLFromResponse(finalText);
+
+                    const assistantMessage: DuckBrainMessage = {
+                      id: crypto.randomUUID(),
+                      role: "assistant",
+                      content: finalText,
+                      timestamp: new Date(),
+                      sql: parsed.sql || undefined,
+                    };
+
+                    set((state) => ({
+                      duckBrain: {
+                        ...state.duckBrain,
+                        messages: [...state.duckBrain.messages, assistantMessage],
+                        isGenerating: false,
+                        streamingContent: "",
+                      },
+                    }));
+                  },
+                  onError: (error) => {
+                    set((state) => ({
+                      duckBrain: {
+                        ...state.duckBrain,
+                        isGenerating: false,
+                        streamingContent: "",
+                        error: error.message,
+                      },
+                    }));
+                    toast.error(`Generation failed: ${error.message}`);
+                  },
+                },
+                { maxTokens: 512, temperature: 0.2 }
+              );
+            }
+
+            // Return the parsed SQL
+            const parsed = extractSQLFromResponse(fullResponse);
+            return parsed.sql;
+          } catch (error) {
+            set((state) => ({
+              duckBrain: {
+                ...state.duckBrain,
+                isGenerating: false,
+                streamingContent: "",
+              },
+            }));
+            toast.error(
+              `Failed to generate SQL: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+            return null;
+          }
+        },
+
+        toggleBrainPanel: () => {
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              isPanelOpen: !state.duckBrain.isPanelOpen,
+            },
+          }));
+        },
+
+        abortGeneration: async () => {
+          const { duckBrainService } = await import("@/lib/duckBrain");
+          duckBrainService.abort();
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              isGenerating: false,
+              streamingContent: "",
+            },
+          }));
+        },
+
+        clearBrainMessages: () => {
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              messages: [],
+            },
+          }));
+        },
+
+        addBrainMessage: (message) => {
+          const newMessage: DuckBrainMessage = {
+            ...message,
+            id: crypto.randomUUID(),
+            timestamp: new Date(),
+          };
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              messages: [...state.duckBrain.messages, newMessage],
+            },
+          }));
+        },
+
+        setStreamingContent: (content) => {
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              streamingContent: content,
+            },
+          }));
+        },
+
+        setIsGenerating: (isGenerating) => {
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              isGenerating,
+            },
+          }));
+        },
+
+        updateMessageQueryResult: (messageId, queryResult) => {
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              messages: state.duckBrain.messages.map((m) =>
+                m.id === messageId ? { ...m, queryResult } : m
+              ),
+            },
+          }));
+        },
+
+        executeQueryInChat: async (messageId, sql) => {
+          const { currentConnection, connection, updateMessageQueryResult } = get();
+
+          // Set status to running
+          updateMessageQueryResult(messageId, { status: "running" });
+
+          try {
+            let queryResult: QueryResult;
+
+            if (currentConnection?.scope === "External") {
+              queryResult = await executeExternalQuery(sql, currentConnection);
+            } else {
+              if (!connection) {
+                throw new Error("WASM connection not initialized");
+              }
+              const wasmConnection = validateConnection(connection);
+              const result = await wasmConnection.query(sql);
+              queryResult = resultToJSON(result);
+            }
+
+            // Check for query error
+            if (queryResult.error) {
+              updateMessageQueryResult(messageId, {
+                status: "error",
+                error: queryResult.error,
+              });
+              return null;
+            }
+
+            // Convert BigInt values to Number for serialization
+            const serializeValue = (value: unknown): unknown => {
+              if (typeof value === "bigint") {
+                return Number(value);
+              }
+              if (Array.isArray(value)) {
+                return value.map(serializeValue);
+              }
+              if (value && typeof value === "object") {
+                const result: Record<string, unknown> = {};
+                for (const [k, v] of Object.entries(value)) {
+                  result[k] = serializeValue(v);
+                }
+                return result;
+              }
+              return value;
+            };
+
+            const serializedResult = serializeValue(queryResult) as QueryResult;
+
+            // Update message with successful result
+            updateMessageQueryResult(messageId, {
+              status: "success",
+              data: serializedResult,
+              executedAt: new Date(),
+            });
+
+            return serializedResult;
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : "Query execution failed";
+
+            updateMessageQueryResult(messageId, {
+              status: "error",
+              error: errorMessage,
+            });
+
+            return null;
+          }
+        },
+
+        setAIProvider: (provider) => {
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              aiProvider: provider,
+              // Reset model status when switching providers
+              modelStatus: provider === "webllm" ? "idle" : "ready",
+              error: null,
+            },
+          }));
+        },
+
+        updateProviderConfig: (provider, config) => {
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              providerConfigs: {
+                ...state.duckBrain.providerConfigs,
+                [provider]: config,
+              },
+            },
+          }));
+        },
+
+        initializeExternalProvider: async () => {
+          const { duckBrain } = get();
+          const { aiProvider, providerConfigs } = duckBrain;
+
+          if (aiProvider === "webllm") {
+            return; // Use existing WebLLM initialization
+          }
+
+          const config = providerConfigs[aiProvider];
+          if (!config?.apiKey) {
+            toast.error(`Please configure your ${aiProvider} API key first`);
+            return;
+          }
+
+          set((state) => ({
+            duckBrain: {
+              ...state.duckBrain,
+              modelStatus: "loading",
+              error: null,
+            },
+          }));
+
+          try {
+            const { createProvider } = await import("@/lib/duckBrain/providers");
+            const provider = createProvider(aiProvider);
+            await provider.initialize({
+              apiKey: config.apiKey,
+              modelId: config.modelId,
+            });
+
+            set((state) => ({
+              duckBrain: {
+                ...state.duckBrain,
+                modelStatus: "ready",
+                currentModel: config.modelId,
+              },
+            }));
+
+            toast.success(`${aiProvider} provider connected`);
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Failed to connect";
+            set((state) => ({
+              duckBrain: {
+                ...state.duckBrain,
+                modelStatus: "error",
+                error: errorMessage,
+              },
+            }));
+            toast.error(`Failed to connect: ${errorMessage}`);
+          }
+        },
+
+        // File System Access Actions
+        initFileSystem: async () => {
+          const { fileSystemService, isFileSystemAccessSupported } = await import("@/lib/fileSystem");
+
+          if (!isFileSystemAccessSupported()) {
+            set({ isFileSystemSupported: false });
+            return;
+          }
+
+          try {
+            await fileSystemService.init();
+
+            // Sync mounted folders from IndexedDB to store
+            const folders = fileSystemService.getMountedFolders();
+            const folderInfos: MountedFolderInfo[] = folders.map((f) => ({
+              id: f.id,
+              name: f.name,
+              addedAt: f.addedAt,
+              hasPermission: f.hasPermission,
+            }));
+
+            set({ mountedFolders: folderInfos, isFileSystemSupported: true });
+          } catch (error) {
+            console.error("Failed to initialize file system:", error);
+            toast.error("Failed to initialize file system access");
+          }
+        },
+
+        mountFolder: async () => {
+          const { fileSystemService, isFileSystemAccessSupported } = await import("@/lib/fileSystem");
+
+          if (!isFileSystemAccessSupported()) {
+            toast.error("File System Access API is not supported in this browser");
+            return null;
+          }
+
+          try {
+            await fileSystemService.init();
+            const folder = await fileSystemService.mountFolder();
+
+            const folderInfo: MountedFolderInfo = {
+              id: folder.id,
+              name: folder.name,
+              addedAt: folder.addedAt,
+              hasPermission: folder.hasPermission,
+            };
+
+            set((state) => ({
+              mountedFolders: [...state.mountedFolders, folderInfo],
+            }));
+
+            toast.success(`Folder "${folder.name}" mounted successfully`);
+            return folderInfo;
+          } catch (error) {
+            // User cancelled the picker - not an error
+            if (error instanceof Error && error.name === "AbortError") {
+              return null;
+            }
+            console.error("Failed to mount folder:", error);
+            toast.error("Failed to mount folder");
+            return null;
+          }
+        },
+
+        unmountFolder: async (id) => {
+          const { fileSystemService } = await import("@/lib/fileSystem");
+
+          try {
+            await fileSystemService.unmountFolder(id);
+
+            set((state) => ({
+              mountedFolders: state.mountedFolders.filter((f) => f.id !== id),
+            }));
+
+            toast.success("Folder unmounted");
+          } catch (error) {
+            console.error("Failed to unmount folder:", error);
+            toast.error("Failed to unmount folder");
+          }
+        },
+
+        refreshFolderPermissions: async () => {
+          const { fileSystemService } = await import("@/lib/fileSystem");
+
+          try {
+            await fileSystemService.init();
+            const permissions = await fileSystemService.checkAllPermissions();
+
+            set((state) => ({
+              mountedFolders: state.mountedFolders.map((f) => ({
+                ...f,
+                hasPermission: permissions.get(f.id) ?? false,
+              })),
+            }));
+          } catch (error) {
+            console.error("Failed to refresh permissions:", error);
+          }
+        },
       }),
       {
         name: "duck-ui-storage",
@@ -1702,7 +2329,38 @@ export const useDuckStore = create<DuckStoreState>()(
           currentDatabase: state.currentDatabase,
           currentConnection: state.currentConnection,
           connectionList: state.connectionList,
+          // Persist Duck Brain chat history (but not model state)
+          duckBrain: {
+            messages: state.duckBrain.messages,
+            isPanelOpen: state.duckBrain.isPanelOpen,
+            aiProvider: state.duckBrain.aiProvider,
+            providerConfigs: state.duckBrain.providerConfigs,
+          },
+          // Persist mounted folders metadata (handles stored in IndexedDB)
+          mountedFolders: state.mountedFolders,
         }),
+        // Reset transient states on hydration (e.g., if page reloaded during generation)
+        // The WebLLM engine doesn't persist across reloads, so we must reset all model state
+        onRehydrateStorage: () => (state) => {
+          if (state) {
+            // Reset generation state
+            state.duckBrain.isGenerating = false;
+            state.duckBrain.streamingContent = "";
+            // Reset model state (engine needs to be re-initialized after reload)
+            state.duckBrain.modelStatus = "idle";
+            state.duckBrain.currentModel = null;
+            state.duckBrain.downloadProgress = 0;
+            state.duckBrain.downloadStatus = "";
+            state.duckBrain.error = null;
+            // Ensure provider settings are initialized (for older persisted state)
+            if (!state.duckBrain.aiProvider) {
+              state.duckBrain.aiProvider = "webllm";
+            }
+            if (!state.duckBrain.providerConfigs) {
+              state.duckBrain.providerConfigs = {};
+            }
+          }
+        },
       }
     )
   )

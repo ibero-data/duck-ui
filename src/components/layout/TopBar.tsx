@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Settings,
   Cable,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -124,6 +125,10 @@ const TopBar = () => {
                 <DropdownMenuItem onClick={() => navigate("/connections")}>
                   <Cable className="mr-2 h-4 w-4" />
                   Manage Connections
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/brain")}>
+                  <Brain className="mr-2 h-4 w-4" />
+                  Duck Brain Settings
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

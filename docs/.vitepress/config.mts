@@ -38,6 +38,8 @@ export default defineConfig({
         text: 'Getting Started',
         items: [
           { text: 'Quick Start', link: '/getting-started' },
+          { text: 'Duck Brain AI', link: '/duck-brain' },
+          { text: 'Folder Access', link: '/folder-access' },
           { text: 'Charts', link: '/charts' },
           { text: 'Environment Variables', link: '/environment-variables' },
           { text: 'Troubleshooting', link: '/troubleshooting' }

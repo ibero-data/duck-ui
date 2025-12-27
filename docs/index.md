@@ -44,6 +44,12 @@ features:
   - title: Query Preview
     details: Preview data before importing with schema customization options
 
+  - title: Persistent Folder Access
+    details: Mount folders from your computer and access files directly. Persists across sessions with one-click import to DuckDB.
+
+  - title: Duck Brain AI
+    details: Natural language to SQL using local AI (WebLLM/WebGPU) or cloud providers (OpenAI, Claude). Your data stays private.
+
   - title: Fast & Private
     details: All data processing happens in your browser - your data never leaves your machine
 ---
@@ -72,7 +78,9 @@ Duck-UI is a modern web interface for **DuckDB**, the fast in-process analytical
 ### Key Features
 
 - 🦆 **No Server Required**: DuckDB runs in your browser via WebAssembly
+- 🧠 **AI-Powered**: Natural language to SQL with local or cloud AI (Duck Brain)
 - 📁 **Import Anything**: Load CSV, JSON, Parquet, Arrow files from local storage or URLs
+- 📂 **Folder Access**: Mount folders from your computer - persists across browser sessions
 - 💾 **Persistent Storage**: Save databases using OPFS for data that persists across sessions
 - 🔌 **External Connections**: Connect to remote DuckDB servers when needed
 - ⚡ **Lightning Fast**: Near-native performance thanks to WebAssembly

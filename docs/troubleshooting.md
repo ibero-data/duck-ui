@@ -145,6 +145,175 @@ This guide helps you resolve common issues when using Duck-UI. If you encounter 
    SELECT * FROM read_csv('https://raw.githubusercontent.com/...');
    ```
 
+### File System Access
+
+#### Problem: "File System Access not supported"
+
+**Symptoms**:
+- "Files" section shows unsupported message
+- Add Folder option missing or disabled
+- Folder browser not appearing
+
+**Solutions**:
+
+1. **Browser support**:
+   ```
+   Chrome: 86+ ✅
+   Edge: 86+ ✅
+   Opera: 72+ ✅
+   Firefox: ❌ Not supported
+   Safari: ❌ Not supported
+   ```
+
+2. **Use standard file import**:
+   - Click Explorer menu → Import Data
+   - Select files individually
+   - Works in all browsers
+
+3. **Update browser**:
+   - Ensure Chrome/Edge is version 86 or newer
+   - Check for browser updates
+
+#### Problem: "Permission denied" for mounted folder
+
+**Symptoms**:
+- Folder shows warning icon
+- Can't expand or browse folder contents
+- "Permission denied" error
+
+**Solutions**:
+
+1. **Re-grant permission**:
+   - Click on the folder with the warning icon
+   - Browser will prompt for permission
+   - Click "Allow" or "Grant" to continue
+
+2. **Page was reloaded**:
+   - Browser requires re-permission after reload (security feature)
+   - This is normal behavior, not a bug
+   - Click the folder to trigger the permission prompt
+
+3. **Remove and re-add**:
+   - Right-click folder → Unmount
+   - Add the folder again
+   - Grant fresh permissions
+
+#### Problem: "Large folders are slow to load"
+
+**Solutions**:
+
+1. **Mount specific subfolders**:
+   - Instead of mounting root directory
+   - Add the specific data folder you need
+
+2. **Wait for initial load**:
+   - First load scans for supported files
+   - Subsequent accesses are faster
+
+3. **Use fewer mounted folders**:
+   - Unmount folders you're not using
+   - Keep the sidebar clean
+
+### Duck Brain AI
+
+#### Problem: "WebGPU Not Supported"
+
+**Symptoms**:
+- Can't use local AI
+- Error message about WebGPU
+- Duck Brain panel shows unsupported
+
+**Solutions**:
+
+1. **Browser support**:
+   ```
+   Chrome: 113+ ✅ (WebGPU required)
+   Edge: 113+ ✅ (WebGPU required)
+   Firefox: ❌ Not supported
+   Safari: ❌ Not supported
+   ```
+
+2. **Check WebGPU status**:
+   - Navigate to `chrome://gpu`
+   - Look for "WebGPU" section
+   - Should show "Hardware accelerated"
+
+3. **Enable WebGPU** (if disabled):
+   - Navigate to `chrome://flags`
+   - Search for "WebGPU"
+   - Enable and restart browser
+
+4. **Use cloud AI**:
+   - Go to Settings → Duck Brain
+   - Add OpenAI or Claude API key
+   - Cloud AI works in any browser
+
+#### Problem: "Model download failed"
+
+**Symptoms**:
+- Progress bar stalls
+- Download error message
+- Model never finishes loading
+
+**Solutions**:
+
+1. **Check network**:
+   - Ensure stable internet connection
+   - Try disabling VPN temporarily
+   - Check firewall settings
+
+2. **Clear cache and retry**:
+   - Clear browser cache
+   - Reload page and try again
+
+3. **Try smaller model**:
+   - Llama 3.2 1B is only ~1GB
+   - Faster to download
+
+4. **Check disk space**:
+   - Models are cached locally
+   - Need ~3GB free space
+
+#### Problem: "AI responses are slow"
+
+**Solutions**:
+
+1. **GPU performance**:
+   - Close other GPU-intensive apps
+   - Dedicated GPU is faster than integrated
+
+2. **Try smaller model**:
+   - Llama 3.2 1B is fastest
+   - Trade quality for speed
+
+3. **Use cloud AI**:
+   - Generally faster responses
+   - No local GPU needed
+
+4. **Browser resources**:
+   - Close unused tabs
+   - Restart browser if sluggish
+
+#### Problem: "Cloud AI API key not working"
+
+**Solutions**:
+
+1. **Verify API key**:
+   - Copy key exactly (no extra spaces)
+   - Check key hasn't expired
+
+2. **Check permissions**:
+   - OpenAI: Ensure key has Chat/Completions access
+   - Anthropic: Verify key is active
+
+3. **Check credits/quota**:
+   - Ensure account has available credits
+   - Check usage limits
+
+4. **Generate new key**:
+   - Create fresh API key
+   - Delete old key from settings
+
 ### External Connections
 
 #### Problem: "Cannot connect to external DuckDB server"

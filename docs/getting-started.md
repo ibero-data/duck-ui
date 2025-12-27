@@ -153,6 +153,32 @@ For detailed environment variable documentation, see our [Environment Variables 
 - **Query import**: Create tables from SQL query results
 - **Preview mode**: Preview data before importing
 
+### Persistent Folder Access
+- **Mount folders**: Add folders from your computer directly in Duck-UI
+- **Persists across sessions**: Folder selections are remembered via IndexedDB
+- **Tree view browser**: Navigate your files with an intuitive interface
+- **One-click import**: Right-click any file to import as a DuckDB table
+- **Chrome/Edge only**: Requires File System Access API (Chrome/Edge 86+)
+
+::: tip Browser Support for Folder Access
+Folder access requires Chrome or Edge 86+. Firefox and Safari users can still use the standard file import feature.
+:::
+
+See [Folder Access Documentation](/folder-access) for complete details.
+
+### Duck Brain AI
+- **Natural language to SQL**: Ask questions in plain English
+- **Local AI**: Runs in your browser via WebGPU (Chrome/Edge 113+)
+- **Cloud AI**: Connect to OpenAI, Anthropic, or Gemini
+- **Schema-aware**: Understands your tables and columns
+- **Privacy-first**: Local AI keeps all data in your browser
+
+::: tip WebGPU for Local AI
+Local AI requires WebGPU, available in Chrome/Edge 113+. Cloud AI works in any browser.
+:::
+
+See [Duck Brain Documentation](/duck-brain) for complete details.
+
 ## Development Environment 🛠️
 
 ### Running Locally

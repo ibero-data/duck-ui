@@ -253,9 +253,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         {(isOpen || searchTerm) && node.children && (
           <div>
             {node.children.length > 0 ? (
-              node.children.map((child, index) => (
+              node.children.map((child) => (
                 <TreeNode
-                  key={index}
+                  key={`${node.type === "database" ? node.name : parentDatabaseName}-${child.name}`}
                   node={child}
                   level={level + 1}
                   searchTerm={searchTerm}
@@ -282,8 +282,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 <span>Loading column statistics...</span>
               </div>
             ) : columnStats.length > 0 ? (
-              columnStats.map((stats, index) => (
-                <ColumnNode key={index} stats={stats} />
+              columnStats.map((stats) => (
+                <ColumnNode key={stats.column_name} stats={stats} />
               ))
             ) : null}
           </div>

@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import NotFound from "./pages/NotFound";
 import Connections from "./pages/Connections";
+import Brain from "./pages/Brain";
 
 interface LoadingScreenProps {
   message: string;
@@ -85,6 +86,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/connections" element={<Connections />} />
+          <Route path="/brain" element={<Brain />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

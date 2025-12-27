@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, Github, BookText, Cable, Sun, Moon } from "lucide-react";
+import { Menu, Github, BookText, Cable, Sun, Moon, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -82,6 +82,14 @@ export const MobileNavDrawer = () => {
             >
               <Cable className="mr-2 h-4 w-4" />
               Manage Connections
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => handleNavigation("/brain")}
+            >
+              <Brain className="mr-2 h-4 w-4" />
+              Duck Brain Settings
             </Button>
           </div>
 

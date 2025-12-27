@@ -1,0 +1,578 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
+import { useDuckStore, type AIProviderType } from "@/store";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ArrowLeft,
+  Brain,
+  Download,
+  Check,
+  Loader2,
+  AlertCircle,
+  Cpu,
+  HardDrive,
+  Zap,
+  Trash2,
+  Key,
+  Cloud,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { toast } from "sonner";
+import { AVAILABLE_MODELS, type ModelConfig } from "@/lib/duckBrain";
+import {
+  OPENAI_MODELS,
+  ANTHROPIC_MODELS,
+} from "@/lib/duckBrain/providers/types";
+
+const BrainPage = () => {
+  const navigate = useNavigate();
+  const { duckBrain, initializeDuckBrain, setAIProvider, updateProviderConfig } = useDuckStore();
+  const [isClearing, setIsClearing] = useState(false);
+  const [cacheSize, setCacheSize] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+  const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({});
+  const [isTesting, setIsTesting] = useState(false);
+
+  // Check cache size on mount and sync API key inputs from state
+  useEffect(() => {
+    checkCacheSize();
+    // Sync existing API keys to input state (masked)
+    const inputs: Record<string, string> = {};
+    if (duckBrain.providerConfigs.openai?.apiKey) {
+      inputs.openai = duckBrain.providerConfigs.openai.apiKey;
+    }
+    if (duckBrain.providerConfigs.anthropic?.apiKey) {
+      inputs.anthropic = duckBrain.providerConfigs.anthropic.apiKey;
+    }
+    setApiKeyInputs(inputs);
+  }, []);
+
+  const checkCacheSize = async () => {
+    try {
+      if ("storage" in navigator && "estimate" in navigator.storage) {
+        const estimate = await navigator.storage.estimate();
+        if (estimate.usage) {
+          const sizeInMB = (estimate.usage / (1024 * 1024)).toFixed(1);
+          setCacheSize(`${sizeInMB} MB`);
+        }
+      }
+    } catch {
+      // Ignore errors
+    }
+  };
+
+  const handleClearCache = async () => {
+    setIsClearing(true);
+    try {
+      // Get all IndexedDB databases
+      const databases = await indexedDB.databases();
+      let cleared = 0;
+
+      for (const db of databases) {
+        // Clear WebLLM/MLC related databases
+        if (
+          db.name &&
+          (db.name.includes("webllm") ||
+            db.name.includes("mlc") ||
+            db.name.includes("cache") ||
+            db.name.includes("model"))
+        ) {
+          indexedDB.deleteDatabase(db.name);
+          cleared++;
+        }
+      }
+
+      // Also try to clear Cache API
+      if ("caches" in window) {
+        const cacheNames = await caches.keys();
+        for (const name of cacheNames) {
+          if (
+            name.includes("webllm") ||
+            name.includes("mlc") ||
+            name.includes("model")
+          ) {
+            await caches.delete(name);
+            cleared++;
+          }
+        }
+      }
+
+      toast.success(
+        cleared > 0
+          ? `Cleared ${cleared} cached items. Reload page to see changes.`
+          : "No cached model data found."
+      );
+      checkCacheSize();
+    } catch (err) {
+      console.error("Failed to clear cache:", err);
+      toast.error("Failed to clear cache. Try clearing manually via browser settings.");
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  const handleProviderChange = (provider: AIProviderType) => {
+    setAIProvider(provider);
+  };
+
+  const handleApiKeyChange = (provider: "openai" | "anthropic", value: string) => {
+    setApiKeyInputs((prev) => ({ ...prev, [provider]: value }));
+  };
+
+  const handleSaveApiKey = async (provider: "openai" | "anthropic") => {
+    const apiKey = apiKeyInputs[provider];
+    if (!apiKey) {
+      toast.error("Please enter an API key");
+      return;
+    }
+
+    // Get current model for this provider or use default
+    const currentConfig = duckBrain.providerConfigs[provider];
+    const defaultModel = provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-4-20250514";
+
+    updateProviderConfig(provider, {
+      apiKey,
+      modelId: currentConfig?.modelId || defaultModel,
+    });
+
+    // Test the connection
+    setIsTesting(true);
+    try {
+      const { testProviderConnection } = await import("@/lib/duckBrain/providers");
+      const result = await testProviderConnection(provider, {
+        apiKey,
+        modelId: currentConfig?.modelId || defaultModel,
+      });
+
+      if (result.success) {
+        toast.success(`${provider === "openai" ? "OpenAI" : "Anthropic"} API key saved and verified`);
+      } else {
+        toast.error(`Connection failed: ${result.error}`);
+      }
+    } catch {
+      toast.success("API key saved");
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleModelChange = (provider: "openai" | "anthropic", modelId: string) => {
+    const currentConfig = duckBrain.providerConfigs[provider];
+    updateProviderConfig(provider, {
+      apiKey: currentConfig?.apiKey || "",
+      modelId,
+    });
+  };
+
+  const {
+    modelStatus,
+    currentModel,
+    downloadProgress,
+    downloadStatus,
+    isWebGPUSupported,
+    error,
+    aiProvider = "webllm",
+    providerConfigs = {},
+  } = duckBrain;
+
+  const isDownloading = modelStatus === "downloading" || modelStatus === "loading";
+
+  const handleLoadModel = async (modelId: string) => {
+    try {
+      await initializeDuckBrain(modelId);
+    } catch (err) {
+      console.error("Failed to load model:", err);
+    }
+  };
+
+  const getModelStatus = (model: ModelConfig) => {
+    if (currentModel === model.id) {
+      if (modelStatus === "ready") return "ready";
+      if (isDownloading) return "downloading";
+    }
+    return "available";
+  };
+
+  return (
+    <div className="container mx-auto p-4 space-y-6 overflow-auto h-full max-w-4xl">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Brain className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold">Duck Brain</h1>
+          </div>
+        </div>
+      </div>
+
+      {/* WebGPU Status Alert */}
+      {isWebGPUSupported === false && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>WebGPU Not Supported</strong> - Duck Brain requires WebGPU for
+            local AI inference. Please use Chrome 113+ or Edge 113+.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Provider Selection */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Cloud className="h-5 w-5 text-primary" />
+            <CardTitle>AI Provider</CardTitle>
+          </div>
+          <CardDescription>
+            Choose between local (WebLLM) or cloud-based AI providers. Local runs entirely in your browser, while cloud providers require an API key.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={aiProvider === "webllm" ? "default" : "outline"}
+              onClick={() => handleProviderChange("webllm")}
+              className="flex items-center gap-2"
+            >
+              <Cpu className="h-4 w-4" />
+              Local (WebLLM)
+            </Button>
+            <Button
+              variant={aiProvider === "openai" ? "default" : "outline"}
+              onClick={() => handleProviderChange("openai")}
+              className="flex items-center gap-2"
+            >
+              <Cloud className="h-4 w-4" />
+              OpenAI
+            </Button>
+            <Button
+              variant={aiProvider === "anthropic" ? "default" : "outline"}
+              onClick={() => handleProviderChange("anthropic")}
+              className="flex items-center gap-2"
+            >
+              <Cloud className="h-4 w-4" />
+              Anthropic (Claude)
+            </Button>
+          </div>
+
+          {aiProvider === "webllm" && (
+            <Alert>
+              <Zap className="h-4 w-4" />
+              <AlertDescription>
+                <strong>100% Local AI</strong> - Models run entirely in your browser
+                using WebGPU. No data is sent to any server.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {aiProvider === "openai" && (
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="openai-key" className="flex items-center gap-2">
+                  <Key className="h-4 w-4" />
+                  OpenAI API Key
+                </Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      id="openai-key"
+                      type={showApiKey.openai ? "text" : "password"}
+                      placeholder="sk-..."
+                      value={apiKeyInputs.openai || ""}
+                      onChange={(e) => handleApiKeyChange("openai", e.target.value)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full"
+                      onClick={() => setShowApiKey((prev) => ({ ...prev, openai: !prev.openai }))}
+                    >
+                      {showApiKey.openai ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={() => handleSaveApiKey("openai")}
+                    disabled={isTesting || !apiKeyInputs.openai}
+                  >
+                    {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Model</Label>
+                <Select
+                  value={providerConfigs.openai?.modelId || "gpt-4o-mini"}
+                  onValueChange={(value) => handleModelChange("openai", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OPENAI_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name} - {model.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {providerConfigs.openai?.apiKey && (
+                <Badge variant="secondary" className="bg-green-500/10 text-green-600">
+                  <Check className="h-3 w-3 mr-1" />
+                  API Key Configured
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {aiProvider === "anthropic" && (
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="anthropic-key" className="flex items-center gap-2">
+                  <Key className="h-4 w-4" />
+                  Anthropic API Key
+                </Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      id="anthropic-key"
+                      type={showApiKey.anthropic ? "text" : "password"}
+                      placeholder="sk-ant-..."
+                      value={apiKeyInputs.anthropic || ""}
+                      onChange={(e) => handleApiKeyChange("anthropic", e.target.value)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full"
+                      onClick={() => setShowApiKey((prev) => ({ ...prev, anthropic: !prev.anthropic }))}
+                    >
+                      {showApiKey.anthropic ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={() => handleSaveApiKey("anthropic")}
+                    disabled={isTesting || !apiKeyInputs.anthropic}
+                  >
+                    {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Model</Label>
+                <Select
+                  value={providerConfigs.anthropic?.modelId || "claude-sonnet-4-20250514"}
+                  onValueChange={(value) => handleModelChange("anthropic", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ANTHROPIC_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name} - {model.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {providerConfigs.anthropic?.apiKey && (
+                <Badge variant="secondary" className="bg-green-500/10 text-green-600">
+                  <Check className="h-3 w-3 mr-1" />
+                  API Key Configured
+                </Badge>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Download Progress - Only show for WebLLM */}
+      {aiProvider === "webllm" && isDownloading && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="font-medium">
+                    {modelStatus === "downloading"
+                      ? "Downloading model..."
+                      : "Loading model..."}
+                  </span>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {downloadProgress}%
+                </span>
+              </div>
+              <Progress value={downloadProgress} />
+              <p className="text-xs text-muted-foreground">{downloadStatus}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error Display */}
+      {modelStatus === "error" && error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Available Models - Only for WebLLM */}
+      {aiProvider === "webllm" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Available Local Models</CardTitle>
+            <CardDescription>
+              Select a model to use with Duck Brain. Smaller models are faster but
+              may be less accurate.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              {AVAILABLE_MODELS.map((model) => {
+                const status = getModelStatus(model);
+                const isCurrentlyDownloading =
+                  isDownloading && currentModel === model.id;
+
+                return (
+                  <div
+                    key={model.id}
+                    className={`flex items-start justify-between p-4 rounded-lg border ${
+                      status === "ready"
+                        ? "border-green-500/50 bg-green-500/5"
+                        : "border-border"
+                    }`}
+                  >
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{model.displayName}</span>
+                        {status === "ready" && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-500/10 text-green-600"
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {model.description}
+                      </p>
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <HardDrive className="h-3 w-3" />
+                          {model.size}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Context: {model.contextLength.toLocaleString()} tokens
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 ml-4">
+                      {status === "ready" ? (
+                        <Button variant="outline" size="sm" disabled>
+                          <Check className="h-4 w-4 mr-1" />
+                          Loaded
+                        </Button>
+                      ) : isCurrentlyDownloading ? (
+                        <Button variant="outline" size="sm" disabled>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Loading...
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleLoadModel(model.id)}
+                          disabled={
+                            isDownloading || isWebGPUSupported === false
+                          }
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Load
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Storage Info - Only for WebLLM */}
+      {aiProvider === "webllm" && (
+        <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Storage Information</CardTitle>
+            {cacheSize && (
+              <Badge variant="secondary" className="font-mono">
+                {cacheSize} used
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground space-y-3">
+            <p>
+              Models are cached in your browser's IndexedDB storage. Once
+              downloaded, they load much faster on subsequent visits.
+            </p>
+            <div className="flex items-center justify-between pt-2 border-t">
+              <p className="text-xs">
+                Clear all cached model data to free up storage space.
+              </p>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleClearCache}
+                disabled={isClearing}
+              >
+                {isClearing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Clear Cache
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+export default BrainPage;
