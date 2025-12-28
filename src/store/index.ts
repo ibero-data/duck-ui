@@ -2,6 +2,14 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import * as duckdb from "@duckdb/duckdb-wasm";
 import { toast } from "sonner";
+import {
+  cloudStorageService,
+  type CloudConnection,
+  type CloudSupportStatus,
+} from "@/lib/cloudStorage";
+
+// Re-export cloud storage types for use in components
+export type { CloudConnection, CloudSupportStatus };
 
 // Import WASM bundles
 import duckdb_wasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
@@ -323,6 +331,11 @@ export interface DuckStoreState {
   mountedFolders: MountedFolderInfo[];
   isFileSystemSupported: boolean;
 
+  // Cloud Storage State
+  cloudConnections: CloudConnection[];
+  cloudSupportStatus: CloudSupportStatus | null;
+  isCloudStorageInitialized: boolean;
+
   // Actions
   initialize: () => Promise<void>;
   executeQuery: (query: string, tabId?: string) => Promise<QueryResult | void>;
@@ -381,6 +394,14 @@ export interface DuckStoreState {
   mountFolder: () => Promise<MountedFolderInfo | null>;
   unmountFolder: (id: string) => Promise<void>;
   refreshFolderPermissions: () => Promise<void>;
+
+  // Cloud Storage Actions
+  initCloudStorage: () => Promise<void>;
+  addCloudConnection: (config: Omit<CloudConnection, "id" | "addedAt" | "isConnected">) => Promise<CloudConnection | null>;
+  removeCloudConnection: (id: string) => Promise<void>;
+  connectCloudStorage: (id: string) => Promise<boolean>;
+  disconnectCloudStorage: (id: string) => Promise<void>;
+  testCloudConnection: (id: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 //
@@ -1087,6 +1108,11 @@ export const useDuckStore = create<DuckStoreState>()(
         // File System Access initial state
         mountedFolders: [],
         isFileSystemSupported: typeof window !== "undefined" && "showDirectoryPicker" in window,
+
+        // Cloud Storage initial state
+        cloudConnections: [],
+        cloudSupportStatus: null,
+        isCloudStorageInitialized: false,
 
         // Initialize DuckDB using WASM or External.
         initialize: async () => {
@@ -2318,6 +2344,108 @@ export const useDuckStore = create<DuckStoreState>()(
             console.error("Failed to refresh permissions:", error);
           }
         },
+
+        // Cloud Storage Actions
+        initCloudStorage: async () => {
+          try {
+            await cloudStorageService.init();
+            const connections = cloudStorageService.getConnections();
+            const supportStatus = cloudStorageService.getSupportStatus();
+
+            set({
+              cloudConnections: connections,
+              cloudSupportStatus: supportStatus,
+              isCloudStorageInitialized: true,
+            });
+
+            if (supportStatus && !supportStatus.httpfsAvailable) {
+              console.warn("Cloud storage: httpfs not available in this browser");
+            }
+          } catch (error) {
+            console.error("Failed to initialize cloud storage:", error);
+          }
+        },
+
+        addCloudConnection: async (config) => {
+          try {
+            const conn = await cloudStorageService.addConnection(config);
+
+            set((state) => ({
+              cloudConnections: [...state.cloudConnections, conn],
+            }));
+
+            toast.success(`Cloud connection "${conn.name}" added`);
+            return conn;
+          } catch (error) {
+            console.error("Failed to add cloud connection:", error);
+            toast.error("Failed to add cloud connection");
+            return null;
+          }
+        },
+
+        removeCloudConnection: async (id) => {
+          try {
+            const conn = cloudStorageService.getConnection(id);
+            await cloudStorageService.removeConnection(id);
+
+            set((state) => ({
+              cloudConnections: state.cloudConnections.filter((c) => c.id !== id),
+            }));
+
+            toast.success(`Cloud connection "${conn?.name || id}" removed`);
+          } catch (error) {
+            console.error("Failed to remove cloud connection:", error);
+            toast.error("Failed to remove cloud connection");
+          }
+        },
+
+        connectCloudStorage: async (id) => {
+          try {
+            const success = await cloudStorageService.connect(id);
+
+            if (success) {
+              set((state) => ({
+                cloudConnections: state.cloudConnections.map((c) =>
+                  c.id === id ? { ...c, isConnected: true, lastError: undefined } : c
+                ),
+              }));
+              toast.success("Connected to cloud storage");
+            }
+
+            return success;
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+
+            set((state) => ({
+              cloudConnections: state.cloudConnections.map((c) =>
+                c.id === id ? { ...c, isConnected: false, lastError: errorMsg } : c
+              ),
+            }));
+
+            toast.error(`Failed to connect: ${errorMsg}`);
+            return false;
+          }
+        },
+
+        disconnectCloudStorage: async (id) => {
+          try {
+            await cloudStorageService.disconnect(id);
+
+            set((state) => ({
+              cloudConnections: state.cloudConnections.map((c) =>
+                c.id === id ? { ...c, isConnected: false } : c
+              ),
+            }));
+
+            toast.success("Disconnected from cloud storage");
+          } catch (error) {
+            console.error("Failed to disconnect cloud storage:", error);
+          }
+        },
+
+        testCloudConnection: async (id) => {
+          return cloudStorageService.testConnection(id);
+        },
       }),
       {
         name: "duck-ui-storage",
@@ -2338,6 +2466,17 @@ export const useDuckStore = create<DuckStoreState>()(
           },
           // Persist mounted folders metadata (handles stored in IndexedDB)
           mountedFolders: state.mountedFolders,
+          // Persist cloud connections metadata (credentials NOT persisted for security)
+          cloudConnections: state.cloudConnections.map((c) => ({
+            ...c,
+            // Remove sensitive credentials from persistence
+            accessKeyId: undefined,
+            secretAccessKey: undefined,
+            hmacKeyId: undefined,
+            hmacSecret: undefined,
+            accountKey: undefined,
+            isConnected: false, // Reset connection state
+          })),
         }),
         // Reset transient states on hydration (e.g., if page reloaded during generation)
         // The WebLLM engine doesn't persist across reloads, so we must reset all model state

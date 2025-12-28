@@ -177,6 +177,8 @@ export const transformData = (
 
 /**
  * Detect recommended chart types based on data characteristics
+ * Only suggests chart types that are actually implemented in ChartVisualizationPro
+ * Implemented types: bar, grouped_bar, stacked_bar, line, area, stacked_area, pie, donut, scatter
  */
 export const suggestChartTypes = (
   result: QueryResult,
@@ -207,29 +209,16 @@ export const suggestChartTypes = (
     if (dataSize <= 10) {
       suggestions.push("pie", "donut");
     }
-    if (dataSize >= 20) {
-      suggestions.push("treemap");
-    }
   }
 
   // Numeric both axes
   if (xIsNumeric && yIsNumeric) {
-    suggestions.push("scatter", "bubble", "line");
+    suggestions.push("scatter", "line");
   }
 
   // Multi-series
   if (hasMultipleSeries) {
-    suggestions.push("combo", "grouped_bar", "stacked_bar");
-  }
-
-  // Large datasets
-  if (dataSize > 50) {
-    suggestions.push("heatmap");
-  }
-
-  // Small datasets
-  if (dataSize <= 20 && !xIsNumeric) {
-    suggestions.push("funnel", "gauge");
+    suggestions.push("grouped_bar", "stacked_bar");
   }
 
   return suggestions.length > 0 ? suggestions : ["bar"];

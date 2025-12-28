@@ -14,6 +14,9 @@ import NotFound from "./pages/NotFound";
 import Connections from "./pages/Connections";
 import Brain from "./pages/Brain";
 
+// Import httpfs test utility for console access (window.testHttpfs)
+import "@/lib/cloudStorage/testHttpfs";
+
 interface LoadingScreenProps {
   message: string;
 }

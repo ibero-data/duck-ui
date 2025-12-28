@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import FolderBrowser from "@/components/folders/FolderBrowser";
+import CloudBrowser from "@/components/cloud/CloudBrowser";
 import { type FileEntry, fileSystemService } from "@/lib/fileSystem";
 import { toast } from "sonner";
 
@@ -211,6 +212,11 @@ export default function DataExplorer() {
               />
             </div>
           )}
+
+          {/* Cloud Storage Section */}
+          <div className="border-t pt-3">
+            <CloudBrowser />
+          </div>
         </div>
       </CardContent>
     </Card>

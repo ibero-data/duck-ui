@@ -31,12 +31,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Download,
-  Settings2,
-  X,
   BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -67,6 +65,19 @@ const DEFAULT_COLORS = [
   "#F97316",
 ];
 
+// Chart type display labels
+const CHART_TYPE_LABELS: Record<string, string> = {
+  bar: "Bar Chart",
+  grouped_bar: "Grouped Bar",
+  stacked_bar: "Stacked Bar",
+  line: "Line Chart",
+  area: "Area Chart",
+  stacked_area: "Stacked Area",
+  pie: "Pie Chart",
+  donut: "Donut Chart",
+  scatter: "Scatter Plot",
+};
+
 export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   result,
   chartConfig,
@@ -87,7 +98,6 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
     }
   );
 
-  const [showCustomization, setShowCustomization] = useState(false);
   const [selectedYColumns, setSelectedYColumns] = useState<string[]>([]);
 
   // Auto-select first columns if not set
@@ -226,7 +236,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
                       size="sm"
                       onClick={() => handleConfigChange({ type: type as ChartType })}
                     >
-                      {type.replace("_", " ")}
+                      {CHART_TYPE_LABELS[type] || type}
                     </Button>
                   ))}
                 </div>
@@ -656,102 +666,14 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
                 </div>
               </div>
 
-              {/* Advanced Options */}
+              {/* Export Button */}
               <div className="space-y-2">
-                <label className="text-xs font-medium invisible">Options</label>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="icon" onClick={handleExportPNG}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowCustomization(!showCustomization)}
-                  >
-                    <Settings2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                <label className="text-xs font-medium invisible">Export</label>
+                <Button variant="outline" size="icon" onClick={handleExportPNG}>
+                  <Download className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-
-            {/* Customization Panel */}
-            {showCustomization && (
-              <Card className="border-2 border-primary/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Settings2 className="h-4 w-4" />
-                      Chart Customization
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowCustomization(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium">Show Grid</label>
-                      <Select
-                        value={localConfig.showGrid ? "yes" : "no"}
-                        onValueChange={(value) =>
-                          handleConfigChange({ showGrid: value === "yes" })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="yes">Yes</SelectItem>
-                          <SelectItem value="no">No</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium">Show Values</label>
-                      <Select
-                        value={localConfig.showValues ? "yes" : "no"}
-                        onValueChange={(value) =>
-                          handleConfigChange({ showValues: value === "yes" })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="yes">Yes</SelectItem>
-                          <SelectItem value="no">No</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium">Animations</label>
-                      <Select
-                        value={localConfig.enableAnimations ? "yes" : "no"}
-                        onValueChange={(value) =>
-                          handleConfigChange({ enableAnimations: value === "yes" })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="yes">Yes</SelectItem>
-                          <SelectItem value="no">No</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </CardContent>
       </Card>
