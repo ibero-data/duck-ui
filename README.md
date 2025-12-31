@@ -187,7 +187,7 @@ For any inquiries or support, please contact [Caio Ricciuti](https://github.com/
 This project is sponsored by:
 
 ### [Ibero Data](https://iberodata.es/) 
-<img src="https://www.iberodata.es/logo.png" alt="Ibero Data Logo" title="Ibero Data Logo" width="100">
+<img src="https://iberodata.es/logo.png" alt="Ibero Data Logo" title="Ibero Data Logo" width="100">
 
 ### [qxip](https://qxip.net/?utm_source=duck-ui&utm_medium=sponsorship) 
 

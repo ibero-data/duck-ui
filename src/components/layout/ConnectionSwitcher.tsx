@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router";
 import { useDuckStore } from "@/store";
 
 interface ConnectionSwitcherProps {
@@ -21,15 +20,27 @@ interface ConnectionSwitcherProps {
 export default function ConnectionSwitcher({
   className,
 }: ConnectionSwitcherProps) {
-  const navigate = useNavigate();
   const {
     connectionList,
     currentConnection,
     setCurrentConnection,
     isLoading,
     fetchDatabasesAndTablesInfo,
+    tabs,
+    createTab,
+    setActiveTab,
   } = useDuckStore();
   const [isOpen, setIsOpen] = React.useState(false);
+
+  // Helper to open or focus Connections tab
+  const openConnectionsTab = () => {
+    const existing = tabs.find((t) => t.type === "connections");
+    if (existing) {
+      setActiveTab(existing.id);
+    } else {
+      createTab("connections", "", "Connections");
+    }
+  };
 
   const activeConnection = currentConnection || connectionList.connections[0];
 
@@ -118,7 +129,7 @@ export default function ConnectionSwitcher({
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={() => {
-              navigate("/connections");
+              openConnectionsTab();
               setIsOpen(false);
             }}
           >

@@ -44,6 +44,7 @@ export const SUPPORTED_EXTENSIONS = [
   ".ipc",
   ".duckdb",
   ".db",
+  ".ddb",
   ".xlsx",
   ".xls",
 ];

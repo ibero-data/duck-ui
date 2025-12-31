@@ -666,12 +666,14 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
                 </div>
               </div>
 
-              {/* Export Button */}
+              {/* Export */}
               <div className="space-y-2">
                 <label className="text-xs font-medium invisible">Export</label>
-                <Button variant="outline" size="icon" onClick={handleExportPNG}>
-                  <Download className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button variant="outline" size="icon" onClick={handleExportPNG}>
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

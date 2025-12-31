@@ -36,10 +36,11 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { toast } from "sonner";
+import ImportOptionsPopover, { type ImportOptions } from "@/components/common/ImportOptionsPopover";
 
 interface FolderBrowserProps {
   onFileSelect?: (folderId: string, file: FileEntry) => void;
-  onFileImport?: (folderId: string, file: FileEntry) => void;
+  onFileImport?: (folderId: string, file: FileEntry, options: ImportOptions) => void;
   className?: string;
 }
 
@@ -82,7 +83,7 @@ interface FileNodeProps {
   folderId: string;
   level: number;
   onFileSelect?: (folderId: string, file: FileEntry) => void;
-  onFileImport?: (folderId: string, file: FileEntry) => void;
+  onFileImport?: (folderId: string, file: FileEntry, options: ImportOptions) => void;
 }
 
 const FileNode: React.FC<FileNodeProps> = ({
@@ -166,9 +167,9 @@ const FileNode: React.FC<FileNodeProps> = ({
     }
   };
 
-  const handleImport = () => {
+  const handleImport = (options: ImportOptions) => {
     if (entry.type === "file" && onFileImport) {
-      onFileImport(folderId, entry as FileEntry);
+      onFileImport(folderId, entry as FileEntry, options);
     }
   };
 
@@ -208,24 +209,21 @@ const FileNode: React.FC<FileNodeProps> = ({
             <span className="truncate flex-1">{entry.name}</span>
             {isFile && (
               <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleImport();
-                      }}
-                      className={cn(
-                        "opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity",
-                        "hover:bg-primary/20 text-primary"
-                      )}
-                    >
-                      <Import className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">Import to DuckDB</TooltipContent>
-                </Tooltip>
+                <ImportOptionsPopover
+                  fileName={entry.name}
+                  onImport={handleImport}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn(
+                      "opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity",
+                      "hover:bg-primary/20 text-primary"
+                    )}
+                  >
+                    <Import className="h-3.5 w-3.5" />
+                  </button>
+                </ImportOptionsPopover>
                 <span className="text-[10px] text-muted-foreground min-w-[50px] text-right">
                   {formatSize(fileEntry.size)}
                 </span>
@@ -235,8 +233,11 @@ const FileNode: React.FC<FileNodeProps> = ({
         </ContextMenuTrigger>
         <ContextMenuContent>
           {isFile && (
-            <ContextMenuItem onClick={handleImport}>
-              Import to DuckDB
+            <ContextMenuItem onClick={() => handleImport({
+              tableName: entry.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_]/g, "_").replace(/^[0-9]/, "_$&"),
+              importMode: "table"
+            })}>
+              Quick Import as Table
             </ContextMenuItem>
           )}
         </ContextMenuContent>
@@ -264,7 +265,7 @@ const FileNode: React.FC<FileNodeProps> = ({
 interface MountedFolderNodeProps {
   folder: MountedFolderInfo;
   onFileSelect?: (folderId: string, file: FileEntry) => void;
-  onFileImport?: (folderId: string, file: FileEntry) => void;
+  onFileImport?: (folderId: string, file: FileEntry, options: ImportOptions) => void;
   onUnmount: (id: string) => void;
   onRequestPermission: (id: string) => void;
 }
@@ -432,9 +433,9 @@ const FolderBrowser: React.FC<FolderBrowserProps> = ({
     }
   };
 
-  const handleFileImport = async (folderId: string, file: FileEntry) => {
+  const handleFileImport = async (folderId: string, file: FileEntry, options: ImportOptions) => {
     if (onFileImport) {
-      onFileImport(folderId, file);
+      onFileImport(folderId, file, options);
     }
   };
 

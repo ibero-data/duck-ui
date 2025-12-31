@@ -10,9 +10,7 @@ import { useDuckStore } from "./store";
 import Home from "@/pages/Home";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2, AlertTriangle, RefreshCw } from "lucide-react";
-import NotFound from "./pages/NotFound";
-import Connections from "./pages/Connections";
-import Brain from "./pages/Brain";
+import { Navigate } from "react-router";
 
 // Import httpfs test utility for console access (window.testHttpfs)
 import "@/lib/cloudStorage/testHttpfs";
@@ -88,9 +86,7 @@ const App = () => {
       <div className="flex-1 overflow-hidden">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/connections" element={<Connections />} />
-          <Route path="/brain" element={<Brain />} />
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </div>

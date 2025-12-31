@@ -161,7 +161,7 @@ export interface MountedFolderInfo {
   hasPermission: boolean;
 }
 
-export type EditorTabType = "sql" | "home";
+export type EditorTabType = "sql" | "home" | "brain" | "connections";
 
 // Advanced Chart Configuration Types
 export type ChartType =
@@ -307,6 +307,7 @@ export interface DuckStoreState {
 
   // Data Explorer State (renamed to fix typo)
   isLoadingDbTablesFetch: boolean;
+  schemaFetchError: string | null;
 
   isLoadingExternalConnection: boolean;
 
@@ -1082,6 +1083,7 @@ export const useDuckStore = create<DuckStoreState>()(
         activeTabId: "home",
         isLoading: false,
         isLoadingDbTablesFetch: true,
+        schemaFetchError: null,
         isLoadingExternalConnection: false,
         error: null,
         currentConnection: null,
@@ -1275,13 +1277,18 @@ export const useDuckStore = create<DuckStoreState>()(
               await db.dropFile(fileName);
             } catch {}
             await db.registerFileBuffer(fileName, buffer);
-            if (fileType === "duckdb") {
+            // Handle DuckDB database files (.duckdb, .db, .ddb)
+            if (fileType === "duckdb" || fileType === "db" || fileType === "ddb") {
               await connection.query(
                 `ATTACH DATABASE '${fileName}' AS ${tableName}`
               );
               await get().fetchDatabasesAndTablesInfo();
               return;
             }
+
+            // Determine import mode: "table" (copy data) or "view" (reference file)
+            const importMode = options.importMode || "table";
+            const createType = importMode === "view" ? "VIEW" : "TABLE";
 
             // Enhanced import with format-specific options
             if (fileType.toLowerCase() === "csv") {
@@ -1309,37 +1316,38 @@ export const useDuckStore = create<DuckStoreState>()(
 
               // Build CSV options string
               const optionsString = `
-                header=${headerOption}, 
-                auto_detect=${autoDetectOption}, 
-                all_varchar=${allVarcharOption}, 
-                ignore_errors=${ignoreErrorsOption}, 
+                header=${headerOption},
+                auto_detect=${autoDetectOption},
+                all_varchar=${allVarcharOption},
+                ignore_errors=${ignoreErrorsOption},
                 null_padding=${nullPaddingOption},
                 delim='${delimiterOption}'
               `;
 
               await connection.query(`
-                CREATE OR REPLACE TABLE "${tableName}" AS 
+                CREATE OR REPLACE ${createType} "${tableName}" AS
                 SELECT * FROM read_csv('${fileName}', ${optionsString})
               `);
             } else if (fileType.toLowerCase() === "json") {
               await connection.query(`
-                CREATE OR REPLACE TABLE "${tableName}" AS 
+                CREATE OR REPLACE ${createType} "${tableName}" AS
                 SELECT * FROM read_json('${fileName}', auto_detect=true, ignore_errors=true)
               `);
             } else {
               await connection.query(`
-                CREATE OR REPLACE TABLE "${tableName}" AS 
+                CREATE OR REPLACE ${createType} "${tableName}" AS
                 SELECT * FROM read_${fileType.toLowerCase()}('${fileName}')
               `);
             }
+            // Verification - check for both tables and views
             const verification = await connection.query(`
-              SELECT COUNT(*) AS count 
-              FROM information_schema.tables 
+              SELECT COUNT(*) AS count
+              FROM information_schema.tables
               WHERE table_name = '${tableName}'
                 AND table_schema = '${database}'
             `);
             if (verification.toArray()[0][0] === 0) {
-              throw new Error("Table creation verification failed");
+              throw new Error(`${createType} creation verification failed`);
             }
             await get().fetchDatabasesAndTablesInfo();
           } catch (error) {
@@ -1356,7 +1364,7 @@ export const useDuckStore = create<DuckStoreState>()(
         fetchDatabasesAndTablesInfo: async () => {
           const { currentConnection, connection } = get();
           try {
-            set({ isLoadingDbTablesFetch: true, error: null });
+            set({ isLoadingDbTablesFetch: true, schemaFetchError: null });
             let databases: DatabaseInfo[] = [];
 
             if (currentConnection?.scope === "External") {
@@ -1372,12 +1380,13 @@ export const useDuckStore = create<DuckStoreState>()(
               databases = await fetchWasmDatabases(wasmConnection);
             }
 
-            set({ databases, error: null });
+            set({ databases, schemaFetchError: null });
           } catch (error) {
+            const errorMessage = `Failed to load schema: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`;
             set({
-              error: `Failed to load schema: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
+              schemaFetchError: errorMessage,
             });
           } finally {
             set({ isLoadingDbTablesFetch: false });

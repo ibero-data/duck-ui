@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
 import { useDuckStore, ConnectionProvider } from "@/store";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,9 +35,7 @@ import {
   Database,
   ExternalLink,
   InfoIcon,
-  ArrowLeft,
 } from "lucide-react";
-import { ConnectionDisclaimer } from "@/components/connection/Disclaimer";
 import ConnectionManager from "@/components/connection/ConnectionsModal";
 import {
   Tooltip,
@@ -46,38 +43,27 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-// Define ConnectionFormValues type here for use in Connections component
 import * as z from "zod";
 
 const scopeEnum = z.enum(["External", "OPFS"]);
 const nameSchema = z
   .string()
-  .min(2, {
-    message: "Connection name must be at least 2 characters.",
-  })
-  .max(30, {
-    message: "Connection name must not exceed 30 characters.",
-  });
+  .min(2, { message: "Connection name must be at least 2 characters." })
+  .max(30, { message: "Connection name must not exceed 30 characters." });
 
 const opfsSchema = z.object({
   name: nameSchema,
   scope: z.literal(scopeEnum.enum.OPFS),
-  path: z.string().min(1, {
-    message: "Path is required.",
-  }),
+  path: z.string().min(1, { message: "Path is required." }),
 });
 
 const externalSchema = z.object({
   name: nameSchema,
   scope: z.literal(scopeEnum.enum.External),
-  host: z.string().url({
-    message: "Host must be a valid URL.",
-  }),
+  host: z.string().url({ message: "Host must be a valid URL." }),
   port: z
     .string()
     .refine((val) => !isNaN(parseInt(val, 10)) || val === "", {
-      //Allow empty string
       message: "Port must be a number.",
     })
     .optional(),
@@ -92,8 +78,7 @@ const connectionSchema = z.discriminatedUnion("scope", [opfsSchema, externalSche
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
-const Connections = () => {
-  const navigate = useNavigate();
+const ConnectionsTab = () => {
   const {
     connectionList,
     addConnection,
@@ -102,22 +87,15 @@ const Connections = () => {
     getConnection,
     setCurrentConnection,
     currentConnection,
-    isLoadingExternalConnection, // Get the loading state
+    isLoadingExternalConnection,
     isLoading,
   } = useDuckStore();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
-    null
-  );
-  const [deleteConfirmationId, setDeleteConfirmationId] = useState<
-    string | null
-  >(null);
-  const [isAddConnectionDialogOpen, setIsAddConnectionDialogOpen] =
-    useState(false);
-  const [editingConnection, setEditingConnection] = useState<
-    ConnectionFormValues | undefined
-  >(undefined);
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(null);
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
+  const [isAddConnectionDialogOpen, setIsAddConnectionDialogOpen] = useState(false);
+  const [editingConnection, setEditingConnection] = useState<ConnectionFormValues | undefined>(undefined);
 
   const handleAddConnection = async (values: ConnectionFormValues) => {
     const connectionData: ConnectionProvider = {
@@ -129,9 +107,7 @@ const Connections = () => {
     await addConnection(connectionData);
   };
 
-  const handleUpdateConnection = async (
-    values: ConnectionFormValues
-  ): Promise<void> => {
+  const handleUpdateConnection = async (values: ConnectionFormValues): Promise<void> => {
     if (!editingConnectionId) return;
 
     const connectionData: ConnectionProvider = {
@@ -162,7 +138,6 @@ const Connections = () => {
         scope: connection.scope as "External" | "OPFS",
       };
 
-      // Add scope-specific fields
       if (connection.scope === "OPFS") {
         setEditingConnection({
           ...baseConnection,
@@ -187,59 +162,45 @@ const Connections = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 space-y-6 overflow-auto h-full">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/")}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold">Connections</h1>
-        </div>
+    <div className="p-4 space-y-6 overflow-auto h-full">
+      {/* Add Connection Button */}
+      <div className="flex justify-end">
         <Button
           onClick={() => setIsAddConnectionDialogOpen(true)}
           className="flex items-center gap-2"
           variant="outline"
           disabled={isLoadingExternalConnection}
         >
-          <Plus />
+          <Plus className="h-4 w-4" />
           Add Connection
         </Button>
-
-        {/* Use ConnectionManager for adding connections */}
-        <ConnectionManager
-          open={isAddConnectionDialogOpen}
-          onOpenChange={setIsAddConnectionDialogOpen}
-          onSubmit={handleAddConnection}
-          isEditMode={false} // Ensure it's in add mode
-        />
-
-        {/* Use ConnectionManager for editing connections */}
-        <ConnectionManager
-          open={isEditing}
-          onOpenChange={(open) => {
-            setIsEditing(open);
-            if (!open) {
-              setEditingConnectionId(null);
-              setEditingConnection(undefined);
-            }
-          }}
-          onSubmit={handleUpdateConnection}
-          initialValues={editingConnection}
-          isEditMode={true} // Set to edit mode
-        />
       </div>
-      <ConnectionDisclaimer />
+
+      <ConnectionManager
+        open={isAddConnectionDialogOpen}
+        onOpenChange={setIsAddConnectionDialogOpen}
+        onSubmit={handleAddConnection}
+        isEditMode={false}
+      />
+
+      <ConnectionManager
+        open={isEditing}
+        onOpenChange={(open) => {
+          setIsEditing(open);
+          if (!open) {
+            setEditingConnectionId(null);
+            setEditingConnection(undefined);
+          }
+        }}
+        onSubmit={handleUpdateConnection}
+        initialValues={editingConnection}
+        isEditMode={true}
+      />
 
       <Card>
         <CardHeader>
           <CardTitle>Available Connections</CardTitle>
-          <CardDescription>
-            List of all configured database connections
-          </CardDescription>
+          <CardDescription>List of all configured database connections</CardDescription>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[calc(100vh-400px)]">
@@ -250,7 +211,7 @@ const Connections = () => {
                   <TableHead>Scope</TableHead>
                   <TableHead>Host</TableHead>
                   <TableHead>Database</TableHead>
-                  <TableHead>Enviorment</TableHead>
+                  <TableHead>Environment</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -275,19 +236,17 @@ const Connections = () => {
                     </TableCell>
                     <TableCell>{connection.scope}</TableCell>
                     <TableCell>
-                      {connection.host ||
-                        (connection.scope === "WASM" ? "Local" : "-")}
+                      {connection.host || (connection.scope === "WASM" ? "Local" : "-")}
                     </TableCell>
                     <TableCell>
                       {connection.database ||
-                        (connection.scope === "WASM"
-                          ? "memory"
-                          : connection.database)}
+                        (connection.scope === "WASM" ? "memory" : connection.database)}
                     </TableCell>
                     <TableCell>{connection.environment}</TableCell>
 
                     <TableCell className="text-right">
-                      {connection.environment === "BUILT_IN" || connection.environment === "ENV" ? (
+                      {connection.environment === "BUILT_IN" ||
+                      connection.environment === "ENV" ? (
                         <div className="justify-end flex gap-2 p-2 rounded-md">
                           <TooltipProvider>
                             <Tooltip>
@@ -296,9 +255,8 @@ const Connections = () => {
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p className="text-sm max-w-[200px] !text-center">
-                                  This connection is built-in or was set via
-                                  docker environment variables and cannot be
-                                  modified or deleted.
+                                  This connection is built-in or was set via docker
+                                  environment variables and cannot be modified or deleted.
                                 </p>
                               </TooltipContent>
                             </Tooltip>
@@ -309,15 +267,10 @@ const Connections = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={
-                              connection.id === currentConnection?.id ||
-                              isLoading
-                            }
+                            disabled={connection.id === currentConnection?.id || isLoading}
                             onClick={() => handleConnect(connection.id)}
                           >
-                            {connection.id === currentConnection?.id
-                              ? "Connected"
-                              : "Connect"}
+                            {connection.id === currentConnection?.id ? "Connected" : "Connect"}
                           </Button>
                           <Button
                             variant="ghost"
@@ -330,32 +283,20 @@ const Connections = () => {
                           <AlertDialog
                             open={deleteConfirmationId === connection.id}
                             onOpenChange={(isOpen) =>
-                              setDeleteConfirmationId(
-                                isOpen ? connection.id : null
-                              )
+                              setDeleteConfirmationId(isOpen ? connection.id : null)
                             }
                           >
                             <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={isLoading}
-                              >
-                                <Trash2
-                                  size={16}
-                                  className="text-destructive"
-                                />
+                              <Button variant="ghost" size="sm" disabled={isLoading}>
+                                <Trash2 size={16} className="text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Delete Connection
-                                </AlertDialogTitle>
+                                <AlertDialogTitle>Delete Connection</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete the connection
-                                  "{connection.name}"? This action cannot be
-                                  undone.
+                                  Are you sure you want to delete the connection "
+                                  {connection.name}"? This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -386,4 +327,4 @@ const Connections = () => {
   );
 };
 
-export default Connections;
+export default ConnectionsTab;

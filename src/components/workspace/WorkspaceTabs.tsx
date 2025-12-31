@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/context-menu";
 import HomeTab from "@/components/workspace/HomeTab";
 import SqlTab from "@/components/workspace/SqlTab";
+import BrainTab from "@/components/workspace/BrainTab";
+import ConnectionsTab from "@/components/workspace/ConnectionsTab";
 import SortableTab from "@/components/workspace/SortableTab";
 import { useDuckStore } from "@/store";
 
@@ -148,6 +150,10 @@ export default function WorkspaceTabs() {
                 <HomeTab />
               ) : tab.type === "sql" ? (
                 <SqlTab tabId={tab.id} />
+              ) : tab.type === "brain" ? (
+                <BrainTab />
+              ) : tab.type === "connections" ? (
+                <ConnectionsTab />
               ) : null}
             </TabsContent>
           ))}

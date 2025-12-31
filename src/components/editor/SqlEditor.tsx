@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import ConnectionPill from "@/components/common/ConnectionPill";
 import { Badge } from "@/components/ui/badge";
 import FloatingActionButton from "@/components/common/FloatingActionButton";
 import { copyQueryURL } from "@/hooks/useQueryFromURL";
@@ -32,7 +31,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
   const { theme } = useTheme();
-  const { tabs, executeQuery, isExecuting, updateTabTitle, currentConnection, toggleBrainPanel, duckBrain } =
+  const { tabs, executeQuery, isExecuting, updateTabTitle, toggleBrainPanel, duckBrain } =
     useDuckStore();
   const monacoConfig = useMonacoConfig(theme);
 
@@ -182,7 +181,6 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-4">
           <div className="flex gap-2 text-sm text-muted-foreground">
-            <ConnectionPill connection={currentConnection} />
             <TooltipProvider>
               <Tooltip delayDuration={200}>
                 <TooltipTrigger className="hover:bg-muted/50 p-2 rounded-md transition-colors">

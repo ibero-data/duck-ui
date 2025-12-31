@@ -1,14 +1,14 @@
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { TabsTrigger } from "@/components/ui/tabs";
-import { X, Home, Terminal, GripVertical } from "lucide-react";
+import { X, Home, Terminal, GripVertical, Brain, Cable } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useDuckStore } from "@/store";
+import { useDuckStore, type EditorTabType } from "@/store";
 
 interface Tab {
   id: string;
   title: string;
-  type: "sql" | "home";
+  type: EditorTabType;
   content: string | { database?: string; table?: string };
 }
 
@@ -38,6 +38,9 @@ function SortableTab({ tab, isActive }: SortableTabProps) {
     width: tab.type === "home" ? "100px" : "150px",
   };
 
+  // Closable tabs (everything except home)
+  const isClosable = tab.type !== "home";
+
   const handleMiddleClick = (e: React.MouseEvent) => {
     if (e.button === 1 && tab.id !== "home") {
       e.preventDefault();
@@ -63,7 +66,7 @@ function SortableTab({ tab, isActive }: SortableTabProps) {
       onAuxClick={handleMiddleClick}
       onKeyDown={handleKeyDown}
     >
-      {tab.type === "sql" && (
+      {isClosable && (
         <div
           className="absolute left-0 top-0 h-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing z-50"
           {...attributes}
@@ -81,7 +84,7 @@ function SortableTab({ tab, isActive }: SortableTabProps) {
           "transition-colors duration-200",
           "hover:bg-primary/40",
           tab.id === "home" ? "cursor-default" : "cursor-pointer",
-          tab.type === "sql" ? "pl-7" : "pl-3", // Add padding for drag handle
+          isClosable ? "pl-7" : "pl-3", // Add padding for drag handle
           isExecuting ? "pointer-events-none opacity-50" : ""
         )}
       >
@@ -91,10 +94,14 @@ function SortableTab({ tab, isActive }: SortableTabProps) {
               <Home className="h-4 w-4" />
             ) : tab.type === "sql" ? (
               <Terminal className="h-4 w-4" />
+            ) : tab.type === "brain" ? (
+              <Brain className="h-4 w-4" />
+            ) : tab.type === "connections" ? (
+              <Cable className="h-4 w-4" />
             ) : null}
           </div>
           <span className="truncate text-xs">{tab.title}</span>
-          {tab.type === "sql" && (
+          {isClosable && (
             <div className="ml-auto flex items-center space-x-1 text-xs text-gray-500">
               <span
                 className="cursor-pointer hover:bg-red-500/10 p-1 rounded transition-colors"

@@ -16,11 +16,11 @@ import {
   ExternalLink,
   Loader2,
   TestTubeDiagonal,
+  Server,
 } from "lucide-react";
 import { useDuckStore } from "@/store";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
-import TopBar from "@/components/layout/TopBar";
 import Logo from "/logo.png";
 import LogoLight from "/logo-light.png";
 import { useTheme } from "@/components/theme/theme-provider";
@@ -37,6 +37,12 @@ const quickStartActions = [
     icon: <TestTubeDiagonal className="w-5 h-5" />,
     description: "Explore example query set to feel the power of DuckDB.",
     action: "examples",
+  },
+  {
+    title: "Connect Local DuckDB",
+    icon: <Server className="w-5 h-5" />,
+    description: "Query your own DuckDB instance via HTTP server extension.",
+    action: "connect",
   },
 ];
 
@@ -65,7 +71,7 @@ const resourceCards = [
 ];
 
 const HomeTab = () => {
-  const { createTab, queryHistory, error } = useDuckStore();
+  const { createTab, queryHistory, error, tabs, setActiveTab } = useDuckStore();
   const [recentItems, setRecentItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -84,6 +90,16 @@ const HomeTab = () => {
     }).format(date);
   };
 
+  // Helper to open or focus a singleton tab (same pattern as Sidebar)
+  const openOrFocusTab = (type: "connections" | "brain", title: string) => {
+    const existing = tabs.find((t) => t.type === type);
+    if (existing) {
+      setActiveTab(existing.id);
+    } else {
+      createTab(type, "", title);
+    }
+  };
+
   const handleNewAction = (type: string, query?: string) => {
     if (type === "sql") {
       createTab("sql", query);
@@ -96,6 +112,10 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
 `,
         "Duck UI Explore"
       );
+    }
+    if (type === "connect") {
+      // Open Connections tab instead of modal
+      openOrFocusTab("connections", "Connections");
     }
   };
 
@@ -129,7 +149,6 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar />
       <div className="p-8 space-y-10 w-full max-w-[1400px] mx-auto overflow-auto flex-1">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -150,7 +169,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
           {quickStartActions.map((action, index) => (
             <motion.div
@@ -170,7 +189,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
                   </div>
                   <p className="font-bold text-lg">{action.title}</p>
                 </div>
-                <p className="text-sm text-muted-foreground text-left leading-relaxed">
+                <p className="text-sm text-muted-foreground w-full truncate">
                   {action.description}
                 </p>
               </Button>

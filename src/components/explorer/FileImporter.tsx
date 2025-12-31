@@ -18,12 +18,14 @@ import {
   AlertTriangle,
   RefreshCw,
   Link as LinkIcon,
+  Link2,
   Code,
   ArrowLeft,
   Check,
   ChevronDown,
   ChevronUp,
   Eye,
+  Table,
 } from "lucide-react";
 import { useDuckStore, type QueryResult } from "@/store";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -64,8 +66,8 @@ import { toast } from "sonner";
 const ACCEPTED_FILE_TYPES = {
   "text/csv": [".csv"],
   "application/json": [".json"],
-  "application/octet-stream": [".parquet", ".arrow"],
-  "application/vnd.duckdb": [".duckdb"],
+  "application/octet-stream": [".parquet", ".arrow", ".db", ".ddb"],
+  "application/vnd.duckdb": [".duckdb", ".db", ".ddb"],
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
     ".xlsx",
   ],
@@ -78,6 +80,8 @@ const SUPPORTED_FILE_EXTENSIONS = [
   "parquet",
   "arrow",
   "duckdb",
+  "db",
+  "ddb",
   "xlsx",
 ] as const;
 const MAX_CONCURRENT_UPLOADS = 3;
@@ -718,6 +722,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
     Record<string, CsvImportOptions>
   >({});
   const [isDragActive, setIsDragActive] = useState(false);
+  const [importMode, setImportMode] = useState<"table" | "view">("table");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -956,8 +961,10 @@ const FileImporter: React.FC<FileImporterProps> = ({
             ?.toLowerCase() as FileExtension;
           const arrayBuffer = await file.arrayBuffer();
 
-          // Add options for CSV files
-          const importOptions: Record<string, any> = {};
+          // Add options for import
+          const importOptions: Record<string, any> = {
+            importMode, // "table" or "view"
+          };
           if (fileType === "csv" && csvOptions[file.name]) {
             importOptions.csv = csvOptions[file.name];
           }
@@ -1182,18 +1189,21 @@ const FileImporter: React.FC<FileImporterProps> = ({
         }
 
         let query = "";
+        const createType = importMode === "view" ? "VIEW" : "TABLE";
+        const resultType = importMode === "view" ? "view" : "table";
+
         if (extension === "csv") {
-          query = `CREATE OR REPLACE TABLE ${previewTableName} AS SELECT ${columnSelection} FROM read_csv('${url}', auto_detect=true, ignore_errors=true, header=true)`;
+          query = `CREATE OR REPLACE ${createType} ${previewTableName} AS SELECT ${columnSelection} FROM read_csv('${url}', auto_detect=true, ignore_errors=true, header=true)`;
         } else if (extension === "json") {
-          query = `CREATE OR REPLACE TABLE ${previewTableName} AS SELECT ${columnSelection} FROM read_json('${url}', auto_detect=true, ignore_errors=true)`;
+          query = `CREATE OR REPLACE ${createType} ${previewTableName} AS SELECT ${columnSelection} FROM read_json('${url}', auto_detect=true, ignore_errors=true)`;
         } else if (extension === "parquet") {
-          query = `CREATE OR REPLACE TABLE ${previewTableName} AS SELECT ${columnSelection} FROM read_parquet('${url}')`;
+          query = `CREATE OR REPLACE ${createType} ${previewTableName} AS SELECT ${columnSelection} FROM read_parquet('${url}')`;
         } else {
           throw new Error(`Unsupported file type: .${extension}`);
         }
 
         await executeQuery(query);
-        toast.success(`Successfully imported to table '${previewTableName}'`);
+        toast.success(`Successfully created ${resultType} '${previewTableName}'`);
 
         // Reset state and close sheet
         handleBackFromPreview();
@@ -1277,20 +1287,23 @@ const FileImporter: React.FC<FileImporterProps> = ({
 
       let query = "";
 
-      // Build import query based on file type
+      // Build import query based on file type and import mode
+      const createType = importMode === "view" ? "VIEW" : "TABLE";
+      const resultType = importMode === "view" ? "view" : "table";
+
       if (extension === "csv") {
-        query = `CREATE OR REPLACE TABLE ${urlTableName} AS SELECT * FROM read_csv('${url}', auto_detect=true, ignore_errors=true, header=true)`;
+        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_csv('${url}', auto_detect=true, ignore_errors=true, header=true)`;
       } else if (extension === "json") {
-        query = `CREATE OR REPLACE TABLE ${urlTableName} AS SELECT * FROM read_json('${url}', auto_detect=true, ignore_errors=true)`;
+        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_json('${url}', auto_detect=true, ignore_errors=true)`;
       } else if (extension === "parquet") {
-        query = `CREATE OR REPLACE TABLE ${urlTableName} AS SELECT * FROM read_parquet('${url}')`;
+        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_parquet('${url}')`;
       } else {
         throw new Error(`Unsupported file type: .${extension}. Supported: CSV, JSON, Parquet`);
       }
 
       await executeQuery(query);
 
-      toast.success(`Successfully imported from URL to table '${urlTableName}'`);
+      toast.success(`Successfully created ${resultType} '${urlTableName}' from URL`);
       setUrlInput("");
       setUrlTableName("");
       setIsSheetOpen(false);
@@ -1337,13 +1350,15 @@ const FileImporter: React.FC<FileImporterProps> = ({
 
     try {
       const userQuery = queryInput.trim();
+      const createType = importMode === "view" ? "VIEW" : "TABLE";
+      const resultType = importMode === "view" ? "view" : "table";
 
-      // Wrap user query in CREATE TABLE statement
-      const wrappedQuery = `CREATE OR REPLACE TABLE ${queryTableName} AS ${userQuery}`;
+      // Wrap user query in CREATE statement
+      const wrappedQuery = `CREATE OR REPLACE ${createType} ${queryTableName} AS ${userQuery}`;
 
       await executeQuery(wrappedQuery);
 
-      toast.success(`Successfully created table '${queryTableName}' from query result`);
+      toast.success(`Successfully created ${resultType} '${queryTableName}' from query result`);
       setQueryInput("");
       setQueryTableName("");
       setIsSheetOpen(false);
@@ -1641,7 +1656,35 @@ const FileImporter: React.FC<FileImporterProps> = ({
 
           {hasFilesToImport && (
             <div className="space-y-4">
-              <h3 className="font-medium text-lg">Files to Import</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-lg">Files to Import</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Mode:</span>
+                  <div className="flex rounded-md border">
+                    <Button
+                      variant={importMode === "table" ? "default" : "ghost"}
+                      size="sm"
+                      className="rounded-r-none h-7 text-xs"
+                      onClick={() => setImportMode("table")}
+                    >
+                      Import (Table)
+                    </Button>
+                    <Button
+                      variant={importMode === "view" ? "default" : "ghost"}
+                      size="sm"
+                      className="rounded-l-none h-7 text-xs"
+                      onClick={() => setImportMode("view")}
+                    >
+                      Link (View)
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              {importMode === "view" && (
+                <p className="text-xs text-muted-foreground">
+                  Views reference the original file without copying data. Queries re-read the file each time, using less memory but may be slower.
+                </p>
+              )}
               <div className="space-y-3">
                 {files.map((file) => {
                   const fileType = file.name.split(".").pop()?.toLowerCase();
@@ -1784,7 +1827,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="url-table-name">Table Name</Label>
+                  <Label htmlFor="url-table-name">Name</Label>
                   <Input
                     id="url-table-name"
                     value={urlTableName}
@@ -1792,8 +1835,38 @@ const FileImporter: React.FC<FileImporterProps> = ({
                     placeholder="my_table"
                     disabled={isUrlImporting || isPreviewing}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Import Mode</Label>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant={importMode === "table" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setImportMode("table")}
+                      disabled={isUrlImporting || isPreviewing}
+                    >
+                      <Table className="h-4 w-4 mr-1.5" />
+                      Table
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={importMode === "view" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setImportMode("view")}
+                      disabled={isUrlImporting || isPreviewing}
+                    >
+                      <Link2 className="h-4 w-4 mr-1.5" />
+                      View
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Name for the table that will be created
+                    {importMode === "view"
+                      ? "View references URL directly (fresh data, less memory)"
+                      : "Table copies data into DuckDB (faster queries)"}
                   </p>
                 </div>
 
@@ -1892,7 +1965,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="query-table-name">Table Name</Label>
+                  <Label htmlFor="query-table-name">Name</Label>
                   <Input
                     id="query-table-name"
                     value={queryTableName}
@@ -1900,8 +1973,38 @@ const FileImporter: React.FC<FileImporterProps> = ({
                     placeholder="my_table"
                     disabled={isQueryImporting}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Save As</Label>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant={importMode === "table" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setImportMode("table")}
+                      disabled={isQueryImporting}
+                    >
+                      <Table className="h-4 w-4 mr-1.5" />
+                      Table
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={importMode === "view" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setImportMode("view")}
+                      disabled={isQueryImporting}
+                    >
+                      <Link2 className="h-4 w-4 mr-1.5" />
+                      View
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Name for the table that will be created from the query result
+                    {importMode === "view"
+                      ? "View re-runs query each time (always fresh)"
+                      : "Table stores result (faster queries)"}
                   </p>
                 </div>
 

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
 import { useDuckStore, type AIProviderType } from "@/store";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,8 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft,
-  Brain,
   Download,
   Check,
   Loader2,
@@ -44,8 +41,7 @@ import {
   ANTHROPIC_MODELS,
 } from "@/lib/duckBrain/providers/types";
 
-const BrainPage = () => {
-  const navigate = useNavigate();
+const BrainTab = () => {
   const { duckBrain, initializeDuckBrain, setAIProvider, updateProviderConfig } = useDuckStore();
   const [isClearing, setIsClearing] = useState(false);
   const [cacheSize, setCacheSize] = useState<string | null>(null);
@@ -53,10 +49,8 @@ const BrainPage = () => {
   const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({});
   const [isTesting, setIsTesting] = useState(false);
 
-  // Check cache size on mount and sync API key inputs from state
   useEffect(() => {
     checkCacheSize();
-    // Sync existing API keys to input state (masked)
     const inputs: Record<string, string> = {};
     if (duckBrain.providerConfigs.openai?.apiKey) {
       inputs.openai = duckBrain.providerConfigs.openai.apiKey;
@@ -84,12 +78,10 @@ const BrainPage = () => {
   const handleClearCache = async () => {
     setIsClearing(true);
     try {
-      // Get all IndexedDB databases
       const databases = await indexedDB.databases();
       let cleared = 0;
 
       for (const db of databases) {
-        // Clear WebLLM/MLC related databases
         if (
           db.name &&
           (db.name.includes("webllm") ||
@@ -102,7 +94,6 @@ const BrainPage = () => {
         }
       }
 
-      // Also try to clear Cache API
       if ("caches" in window) {
         const cacheNames = await caches.keys();
         for (const name of cacheNames) {
@@ -146,7 +137,6 @@ const BrainPage = () => {
       return;
     }
 
-    // Get current model for this provider or use default
     const currentConfig = duckBrain.providerConfigs[provider];
     const defaultModel = provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-4-20250514";
 
@@ -155,7 +145,6 @@ const BrainPage = () => {
       modelId: currentConfig?.modelId || defaultModel,
     });
 
-    // Test the connection
     setIsTesting(true);
     try {
       const { testProviderConnection } = await import("@/lib/duckBrain/providers");
@@ -214,20 +203,7 @@ const BrainPage = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 space-y-6 overflow-auto h-full max-w-4xl">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <Brain className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Duck Brain</h1>
-          </div>
-        </div>
-      </div>
-
+    <div className="p-4 space-y-6 overflow-auto h-full">
       {/* WebGPU Status Alert */}
       {isWebGPUSupported === false && (
         <Alert variant="destructive">
@@ -247,7 +223,7 @@ const BrainPage = () => {
             <CardTitle>AI Provider</CardTitle>
           </div>
           <CardDescription>
-            Choose between local (WebLLM) or cloud-based AI providers. Local runs entirely in your browser, while cloud providers require an API key.
+            Choose between local (WebLLM) or cloud-based AI providers.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -274,7 +250,7 @@ const BrainPage = () => {
               className="flex items-center gap-2"
             >
               <Cloud className="h-4 w-4" />
-              Anthropic (Claude)
+              Anthropic
             </Button>
           </div>
 
@@ -282,8 +258,7 @@ const BrainPage = () => {
             <Alert>
               <Zap className="h-4 w-4" />
               <AlertDescription>
-                <strong>100% Local AI</strong> - Models run entirely in your browser
-                using WebGPU. No data is sent to any server.
+                <strong>100% Local AI</strong> - Models run entirely in your browser.
               </AlertDescription>
             </Alert>
           )}
@@ -419,14 +394,10 @@ const BrainPage = () => {
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   <span className="font-medium">
-                    {modelStatus === "downloading"
-                      ? "Downloading model..."
-                      : "Loading model..."}
+                    {modelStatus === "downloading" ? "Downloading model..." : "Loading model..."}
                   </span>
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {downloadProgress}%
-                </span>
+                <span className="text-sm text-muted-foreground">{downloadProgress}%</span>
               </div>
               <Progress value={downloadProgress} />
               <p className="text-xs text-muted-foreground">{downloadStatus}</p>
@@ -449,24 +420,20 @@ const BrainPage = () => {
           <CardHeader>
             <CardTitle>Available Local Models</CardTitle>
             <CardDescription>
-              Select a model to use with Duck Brain. Smaller models are faster but
-              may be less accurate.
+              Select a model to use with Duck Brain.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
               {AVAILABLE_MODELS.map((model) => {
                 const status = getModelStatus(model);
-                const isCurrentlyDownloading =
-                  isDownloading && currentModel === model.id;
+                const isCurrentlyDownloading = isDownloading && currentModel === model.id;
 
                 return (
                   <div
                     key={model.id}
                     className={`flex items-start justify-between p-4 rounded-lg border ${
-                      status === "ready"
-                        ? "border-green-500/50 bg-green-500/5"
-                        : "border-border"
+                      status === "ready" ? "border-green-500/50 bg-green-500/5" : "border-border"
                     }`}
                   >
                     <div className="space-y-1 flex-1">
@@ -474,18 +441,13 @@ const BrainPage = () => {
                         <Cpu className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">{model.displayName}</span>
                         {status === "ready" && (
-                          <Badge
-                            variant="secondary"
-                            className="bg-green-500/10 text-green-600"
-                          >
+                          <Badge variant="secondary" className="bg-green-500/10 text-green-600">
                             <Check className="h-3 w-3 mr-1" />
                             Active
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {model.description}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{model.description}</p>
                       <div className="flex items-center gap-4 mt-2">
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <HardDrive className="h-3 w-3" />
@@ -513,9 +475,7 @@ const BrainPage = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleLoadModel(model.id)}
-                          disabled={
-                            isDownloading || isWebGPUSupported === false
-                          }
+                          disabled={isDownloading || isWebGPUSupported === false}
                         >
                           <Download className="h-4 w-4 mr-1" />
                           Load
@@ -533,46 +493,41 @@ const BrainPage = () => {
       {/* Storage Info - Only for WebLLM */}
       {aiProvider === "webllm" && (
         <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Storage Information</CardTitle>
-            {cacheSize && (
-              <Badge variant="secondary" className="font-mono">
-                {cacheSize} used
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm text-muted-foreground space-y-3">
-            <p>
-              Models are cached in your browser's IndexedDB storage. Once
-              downloaded, they load much faster on subsequent visits.
-            </p>
-            <div className="flex items-center justify-between pt-2 border-t">
-              <p className="text-xs">
-                Clear all cached model data to free up storage space.
-              </p>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleClearCache}
-                disabled={isClearing}
-              >
-                {isClearing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
-                )}
-                Clear Cache
-              </Button>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Storage Information</CardTitle>
+              {cacheSize && (
+                <Badge variant="secondary" className="font-mono">
+                  {cacheSize} used
+                </Badge>
+              )}
             </div>
-          </div>
-        </CardContent>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-muted-foreground space-y-3">
+              <p>Models are cached in your browser's IndexedDB storage.</p>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <p className="text-xs">Clear all cached model data to free up storage.</p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleClearCache}
+                  disabled={isClearing}
+                >
+                  {isClearing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Clear Cache
+                </Button>
+              </div>
+            </div>
+          </CardContent>
         </Card>
       )}
     </div>
   );
 };
 
-export default BrainPage;
+export default BrainTab;
