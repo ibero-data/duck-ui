@@ -12,6 +12,7 @@ import { AnthropicProvider } from "./anthropic.provider";
 export function createProvider(type: AIProviderType): AIProvider {
   switch (type) {
     case "openai":
+    case "openai-compatible":
       return new OpenAIProvider();
     case "anthropic":
       return new AnthropicProvider();

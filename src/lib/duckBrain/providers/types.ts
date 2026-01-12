@@ -1,6 +1,6 @@
 import type { ChatCompletionMessageParam } from "@mlc-ai/web-llm";
 
-export type AIProviderType = "webllm" | "openai" | "anthropic" | "gemini";
+export type AIProviderType = "webllm" | "openai" | "anthropic" | "gemini" | "openai-compatible";
 
 export interface ProviderConfig {
   apiKey?: string;

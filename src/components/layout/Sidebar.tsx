@@ -129,7 +129,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   <img
                     src={theme === "dark" ? Logo : LogoLight}
                     alt="Duck-UI"
-                    className="h-6 w-6"
+                    className="h-6"
                   />
                 </button>
               </TooltipTrigger>

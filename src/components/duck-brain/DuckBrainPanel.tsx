@@ -72,6 +72,11 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
         const model = ANTHROPIC_MODELS.find((m) => m.id === config.modelId);
         return { name: model?.name || "Claude Sonnet 4", isCloud: true };
       }
+    } else if (aiProvider === "openai-compatible") {
+      const config = providerConfigs["openai-compatible"];
+      if (config?.baseUrl && config?.modelId) {
+        return { name: config.modelId, isCloud: true };
+      }
     }
     // Default to local model
     const localModel = AVAILABLE_MODELS.find((m) => m.id === duckBrain.currentModel);
@@ -106,6 +111,14 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
       providers.push({
         value: "anthropic",
         label: model?.name || "Claude Sonnet 4",
+      });
+    }
+
+    // Add OpenAI-Compatible if configured
+    if (providerConfigs["openai-compatible"]?.baseUrl && providerConfigs["openai-compatible"]?.modelId) {
+      providers.push({
+        value: "openai-compatible",
+        label: providerConfigs["openai-compatible"].modelId,
       });
     }
 
@@ -169,7 +182,8 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
   // Check if external provider is configured
   const hasExternalProvider =
     (aiProvider === "openai" && providerConfigs.openai?.apiKey) ||
-    (aiProvider === "anthropic" && providerConfigs.anthropic?.apiKey);
+    (aiProvider === "anthropic" && providerConfigs.anthropic?.apiKey) ||
+    (aiProvider === "openai-compatible" && providerConfigs["openai-compatible"]?.baseUrl && providerConfigs["openai-compatible"]?.modelId);
 
   // Render idle state (not initialized) - only for WebLLM without external provider
   if ((modelStatus === "idle" || modelStatus === "checking") && !hasExternalProvider) {

@@ -137,11 +137,12 @@ export interface QueryResultArtifact {
   executedAt?: Date;
 }
 
-export type AIProviderType = "webllm" | "openai" | "anthropic";
+export type AIProviderType = "webllm" | "openai" | "anthropic" | "openai-compatible";
 
 export interface ProviderConfigs {
   openai?: { apiKey: string; modelId: string };
   anthropic?: { apiKey: string; modelId: string };
+  "openai-compatible"?: { baseUrl: string; modelId: string; apiKey?: string };
 }
 
 export interface DuckBrainMessage {
@@ -387,7 +388,7 @@ export interface DuckStoreState {
   updateMessageQueryResult: (messageId: string, queryResult: QueryResultArtifact) => void;
   // AI Provider actions
   setAIProvider: (provider: AIProviderType) => void;
-  updateProviderConfig: (provider: "openai" | "anthropic", config: { apiKey: string; modelId: string }) => void;
+  updateProviderConfig: (provider: "openai" | "anthropic" | "openai-compatible", config: { apiKey?: string; modelId: string; baseUrl?: string }) => void;
   initializeExternalProvider: () => Promise<void>;
 
   // File System Access Actions
@@ -1869,12 +1870,20 @@ export const useDuckStore = create<DuckStoreState>()(
             return null;
           }
 
-          // For external providers, check API key
+          // For external providers, check configuration
           if (isExternalProvider) {
-            const config = providerConfigs[aiProvider as "openai" | "anthropic"];
-            if (!config?.apiKey) {
-              toast.error(`Please configure your ${aiProvider} API key in Brain settings.`);
-              return null;
+            if (aiProvider === "openai-compatible") {
+              const config = providerConfigs["openai-compatible"];
+              if (!config?.baseUrl || !config?.modelId) {
+                toast.error("Please configure the Base URL and Model ID in Brain settings.");
+                return null;
+              }
+            } else {
+              const config = providerConfigs[aiProvider as "openai" | "anthropic"];
+              if (!config?.apiKey) {
+                toast.error(`Please configure your ${aiProvider} API key in Brain settings.`);
+                return null;
+              }
             }
           }
 
@@ -1910,12 +1919,13 @@ export const useDuckStore = create<DuckStoreState>()(
             // Use external provider or WebLLM based on selection
             if (isExternalProvider) {
               const { createProvider } = await import("@/lib/duckBrain/providers");
-              const config = providerConfigs[aiProvider as "openai" | "anthropic"]!;
-              const provider = createProvider(aiProvider as "openai" | "anthropic");
+              const config = providerConfigs[aiProvider as "openai" | "anthropic" | "openai-compatible"]!;
+              const provider = createProvider(aiProvider as "openai" | "anthropic" | "openai-compatible");
 
               await provider.initialize({
-                apiKey: config.apiKey,
+                apiKey: "apiKey" in config ? config.apiKey : undefined,
                 modelId: config.modelId,
+                baseUrl: "baseUrl" in config ? config.baseUrl : undefined,
               });
 
               await provider.generateStreaming(
@@ -2192,12 +2202,17 @@ export const useDuckStore = create<DuckStoreState>()(
         },
 
         updateProviderConfig: (provider, config) => {
+          // Build the appropriate config object based on provider
+          const providerConfig = provider === "openai-compatible"
+            ? { baseUrl: config.baseUrl || "", modelId: config.modelId, apiKey: config.apiKey }
+            : { apiKey: config.apiKey || "", modelId: config.modelId };
+
           set((state) => ({
             duckBrain: {
               ...state.duckBrain,
               providerConfigs: {
                 ...state.duckBrain.providerConfigs,
-                [provider]: config,
+                [provider]: providerConfig,
               },
             },
           }));
@@ -2211,10 +2226,19 @@ export const useDuckStore = create<DuckStoreState>()(
             return; // Use existing WebLLM initialization
           }
 
-          const config = providerConfigs[aiProvider];
-          if (!config?.apiKey) {
-            toast.error(`Please configure your ${aiProvider} API key first`);
-            return;
+          const config = providerConfigs[aiProvider as "openai" | "anthropic" | "openai-compatible"];
+
+          // Validate config based on provider type
+          if (aiProvider === "openai-compatible") {
+            if (!config || !("baseUrl" in config) || !config.baseUrl || !config.modelId) {
+              toast.error("Please configure the Base URL and Model ID first");
+              return;
+            }
+          } else {
+            if (!config || !("apiKey" in config) || !config.apiKey) {
+              toast.error(`Please configure your ${aiProvider} API key first`);
+              return;
+            }
           }
 
           set((state) => ({
@@ -2229,8 +2253,9 @@ export const useDuckStore = create<DuckStoreState>()(
             const { createProvider } = await import("@/lib/duckBrain/providers");
             const provider = createProvider(aiProvider);
             await provider.initialize({
-              apiKey: config.apiKey,
+              apiKey: "apiKey" in config ? config.apiKey : undefined,
               modelId: config.modelId,
+              baseUrl: "baseUrl" in config ? config.baseUrl : undefined,
             });
 
             set((state) => ({
@@ -2241,7 +2266,8 @@ export const useDuckStore = create<DuckStoreState>()(
               },
             }));
 
-            toast.success(`${aiProvider} provider connected`);
+            const providerName = aiProvider === "openai-compatible" ? "OpenAI-Compatible API" : aiProvider;
+            toast.success(`${providerName} provider connected`);
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Failed to connect";
             set((state) => ({

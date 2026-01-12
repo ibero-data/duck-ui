@@ -33,6 +33,8 @@ import {
   Cloud,
   Eye,
   EyeOff,
+  Server,
+  Link,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_MODELS, type ModelConfig } from "@/lib/duckBrain";
@@ -49,6 +51,11 @@ const BrainTab = () => {
   const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({});
   const [isTesting, setIsTesting] = useState(false);
 
+  // OpenAI-compatible provider inputs
+  const [compatibleBaseUrl, setCompatibleBaseUrl] = useState("");
+  const [compatibleModelId, setCompatibleModelId] = useState("");
+  const [compatibleApiKey, setCompatibleApiKey] = useState("");
+
   useEffect(() => {
     checkCacheSize();
     const inputs: Record<string, string> = {};
@@ -59,6 +66,14 @@ const BrainTab = () => {
       inputs.anthropic = duckBrain.providerConfigs.anthropic.apiKey;
     }
     setApiKeyInputs(inputs);
+
+    // Initialize openai-compatible inputs
+    const compatibleConfig = duckBrain.providerConfigs["openai-compatible"];
+    if (compatibleConfig) {
+      setCompatibleBaseUrl(compatibleConfig.baseUrl || "");
+      setCompatibleModelId(compatibleConfig.modelId || "");
+      setCompatibleApiKey(compatibleConfig.apiKey || "");
+    }
   }, []);
 
   const checkCacheSize = async () => {
@@ -173,6 +188,44 @@ const BrainTab = () => {
     });
   };
 
+  const handleSaveCompatibleConfig = async () => {
+    if (!compatibleBaseUrl) {
+      toast.error("Please enter a Base URL");
+      return;
+    }
+    if (!compatibleModelId) {
+      toast.error("Please enter a Model ID");
+      return;
+    }
+
+    setIsTesting(true);
+    try {
+      const { testProviderConnection } = await import("@/lib/duckBrain/providers");
+      const result = await testProviderConnection("openai-compatible", {
+        baseUrl: compatibleBaseUrl,
+        modelId: compatibleModelId,
+        apiKey: compatibleApiKey || undefined,
+      });
+
+      if (result.success) {
+        // Only save config if connection test succeeds
+        updateProviderConfig("openai-compatible", {
+          baseUrl: compatibleBaseUrl,
+          modelId: compatibleModelId,
+          apiKey: compatibleApiKey || undefined,
+        });
+        toast.success("Connected successfully!");
+      } else {
+        toast.error(`Connection failed: ${result.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Connection failed";
+      toast.error(errorMessage);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const {
     modelStatus,
     currentModel,
@@ -251,6 +304,14 @@ const BrainTab = () => {
             >
               <Cloud className="h-4 w-4" />
               Anthropic
+            </Button>
+            <Button
+              variant={aiProvider === "openai-compatible" ? "default" : "outline"}
+              onClick={() => handleProviderChange("openai-compatible")}
+              className="flex items-center gap-2"
+            >
+              <Server className="h-4 w-4" />
+              OpenAI-Compatible
             </Button>
           </div>
 
@@ -378,6 +439,91 @@ const BrainTab = () => {
                 <Badge variant="secondary" className="bg-green-500/10 text-green-600">
                   <Check className="h-3 w-3 mr-1" />
                   API Key Configured
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {aiProvider === "openai-compatible" && (
+            <div className="space-y-4 pt-2">
+              <Alert>
+                <Server className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>OpenAI-Compatible API</strong> - Connect to Ollama, LocalAI, vLLM, DeepSeek, and other services that implement the OpenAI chat completions API.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <Label htmlFor="compatible-base-url" className="flex items-center gap-2">
+                  <Link className="h-4 w-4" />
+                  Base URL <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="compatible-base-url"
+                  type="url"
+                  placeholder="http://localhost:11434/v1"
+                  value={compatibleBaseUrl}
+                  onChange={(e) => setCompatibleBaseUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The API endpoint URL (e.g., http://localhost:11434/v1 for Ollama)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="compatible-model-id" className="flex items-center gap-2">
+                  <Cpu className="h-4 w-4" />
+                  Model ID <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="compatible-model-id"
+                  type="text"
+                  placeholder="llama3.2"
+                  value={compatibleModelId}
+                  onChange={(e) => setCompatibleModelId(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The model name as recognized by your API (e.g., llama3.2, deepseek-coder)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="compatible-api-key" className="flex items-center gap-2">
+                  <Key className="h-4 w-4" />
+                  API Key <span className="text-muted-foreground text-xs">(optional)</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="compatible-api-key"
+                    type={showApiKey["openai-compatible"] ? "text" : "password"}
+                    placeholder="Optional - only if your server requires authentication"
+                    value={compatibleApiKey}
+                    onChange={(e) => setCompatibleApiKey(e.target.value)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full"
+                    onClick={() => setShowApiKey((prev) => ({ ...prev, "openai-compatible": !prev["openai-compatible"] }))}
+                  >
+                    {showApiKey["openai-compatible"] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleSaveCompatibleConfig}
+                disabled={isTesting || !compatibleBaseUrl || !compatibleModelId}
+                className="w-full"
+              >
+                {isTesting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {isTesting ? "Testing Connection..." : "Test & Save"}
+              </Button>
+
+              {providerConfigs["openai-compatible"]?.baseUrl && providerConfigs["openai-compatible"]?.modelId && (
+                <Badge variant="secondary" className="bg-green-500/10 text-green-600">
+                  <Check className="h-3 w-3 mr-1" />
+                  Configured: {providerConfigs["openai-compatible"].modelId}
                 </Badge>
               )}
             </div>

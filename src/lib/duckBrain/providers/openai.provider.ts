@@ -26,25 +26,51 @@ export class OpenAIProvider implements AIProvider {
     this.initializing = true;
     this.error = undefined;
 
+    const isCustomEndpoint = config.baseUrl && config.baseUrl !== "https://api.openai.com/v1";
+
     try {
-      if (!config.apiKey) {
+      // API key is required for OpenAI, optional for custom endpoints (e.g., Ollama)
+      if (!config.apiKey && !isCustomEndpoint) {
         throw new Error("OpenAI API key is required");
       }
 
-      this.apiKey = config.apiKey;
-      this.modelId = config.modelId || "gpt-4o-mini";
+      this.apiKey = config.apiKey || "";
+      this.modelId = config.modelId || (isCustomEndpoint ? "llama3.2" : "gpt-4o-mini");
       this.baseUrl = config.baseUrl || "https://api.openai.com/v1";
 
-      // Test the connection with a simple models list request
-      const response = await fetch(`${this.baseUrl}/models`, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-      });
+      // Test the connection
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (this.apiKey) {
+        headers.Authorization = `Bearer ${this.apiKey}`;
+      }
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error?.message || `API error: ${response.status}`);
+      if (isCustomEndpoint) {
+        // For custom endpoints, test with a minimal chat completion request
+        // since /v1/models may not exist on all compatible APIs
+        const testResponse = await fetch(`${this.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: this.modelId,
+            messages: [{ role: "user", content: "test" }],
+            max_tokens: 1,
+          }),
+        });
+
+        if (!testResponse.ok) {
+          const error = await testResponse.json().catch(() => ({}));
+          throw new Error(error.error?.message || `Connection failed: ${testResponse.status}`);
+        }
+      } else {
+        // For OpenAI, use the models endpoint
+        const response = await fetch(`${this.baseUrl}/models`, { headers });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error?.message || `API error: ${response.status}`);
+        }
       }
 
       this.ready = true;
@@ -70,12 +96,16 @@ export class OpenAIProvider implements AIProvider {
     let fullText = "";
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (this.apiKey) {
+        headers.Authorization = `Bearer ${this.apiKey}`;
+      }
+
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+        headers,
         body: JSON.stringify({
           model: this.modelId,
           messages: messages.map((m) => ({
@@ -150,12 +180,16 @@ export class OpenAIProvider implements AIProvider {
       throw new Error("OpenAI provider not initialized");
     }
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
+
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
+      headers,
       body: JSON.stringify({
         model: this.modelId,
         messages: messages.map((m) => ({
