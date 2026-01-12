@@ -30,6 +30,7 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Getting Started', link: '/getting-started' },
+      { text: 'Ecosystem', link: '/ecosystem' },
       { text: 'Donate', link: 'https://buymeacoffee.com/caioricciuti' }
     ],
 
@@ -48,6 +49,7 @@ export default defineConfig({
       {
         text: 'About',
         items: [
+          { text: 'Ecosystem', link: '/ecosystem' },
           { text: 'Changelog', link: 'https://github.com/ibero-data/duck-ui/releases' },
           { text: 'Acknowledgments', link: '/acknowledgments' },
           { text: 'License', link: '/license' }
@@ -60,7 +62,7 @@ export default defineConfig({
     ],
 
     footer: {
-      message: 'Released under the Apache 2.0 License.',
+      message: 'Released under the Apache 2.0 License. | <a href="https://iberodata.es" target="_blank">Ibero Data</a> · <a href="https://ch-ui.com" target="_blank">CH-UI</a> · <a href="https://yaat.io" target="_blank">YAAT</a>',
       copyright: 'Copyright © 2025 Caio Ricciuti and Ibero Data'
     },
 

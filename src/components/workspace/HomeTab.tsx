@@ -17,6 +17,9 @@ import {
   Loader2,
   TestTubeDiagonal,
   Server,
+  Building2,
+  Cloud,
+  BarChart3,
 } from "lucide-react";
 import { useDuckStore } from "@/store";
 import { motion } from "framer-motion";
@@ -67,6 +70,33 @@ const resourceCards = [
     description: "Learn how to make the most of Duck-UI.",
     link: "https://duckui.com",
     action: "Learn More",
+  },
+];
+
+const iberoDataProducts = [
+  {
+    title: "Ibero Data",
+    description: "Data engineering & analytics solutions",
+    link: "https://iberodata.es?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
+    Icon: Building2,
+  },
+  {
+    title: "CH-UI",
+    description: "Modern UI for ClickHouse databases",
+    link: "https://ch-ui.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
+    Icon: Database,
+  },
+  {
+    title: "CH-UI Cloud",
+    description: "Managed ClickHouse interface in the cloud",
+    link: "https://cloud.ch-ui.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
+    Icon: Cloud,
+  },
+  {
+    title: "YAAT",
+    description: "Simple, privacy-friendly web analytics",
+    link: "https://yaat.io?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
+    Icon: BarChart3,
   },
 ];
 
@@ -212,6 +242,12 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
             >
               Resources
             </TabsTrigger>
+            <TabsTrigger
+              value="iberodata"
+              className="data-[state=active]:text-primary px-6"
+            >
+              Ibero Data
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="recent" className="space-y-6">
@@ -313,7 +349,51 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
               ))}
             </div>
           </TabsContent>
+
+          <TabsContent value="iberodata" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {iberoDataProducts.map((product, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <Card className="hover:bg-accent/50 transition-colors h-full">
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium flex items-center space-x-2">
+                        <div className="p-2 rounded-full bg-primary/10">
+                          <product.Icon className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="text-muted-foreground">
+                          {product.title}
+                        </span>
+                      </CardTitle>
+                      <CardDescription className="text-xs text-muted-foreground">
+                        {product.description}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardFooter>
+                      <a
+                        href={product.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                        >
+                          Visit
+                        </Button>
+                      </a>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </TabsContent>
         </Tabs>
+
         <p className="text-muted-foreground text-center text-xs">
           Duck-UI Version: {duck_ui_version} - Released on: {duck_ui_release_date}
         </p>
