@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+    base: process.env.DUCK_UI_BASEPATH ?? '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
