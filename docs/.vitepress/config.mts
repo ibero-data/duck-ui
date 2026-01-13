@@ -19,7 +19,7 @@ export default defineConfig({
       'script',
       {
         defer: '',
-        src: 'https://yaat.io/s.js'
+        src: 'https://yaat.io/s/yaat.js',
       }
     ]
   ],
