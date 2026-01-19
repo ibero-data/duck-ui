@@ -644,6 +644,7 @@ const executeExternalQuery = async (
   // Build headers based on auth mode
   const headers: Record<string, string> = {
     "Content-Type": "application/x-www-form-urlencoded",
+    format: "JSONCompact",
   };
 
   if (connection.authMode === "api_key" && connection.apiKey) {
