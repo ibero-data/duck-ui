@@ -483,28 +483,67 @@ interface ExternalQueryResponse {
 // Converts a raw result (from an external HTTP endpoint) into a QueryResult.
 const rawResultToJSON = (rawResult: string): QueryResult => {
   try {
-    const parsed: unknown = JSON.parse(rawResult);
+    // Try parsing as single JSON first (standard format)
+    let parsed: Partial<ExternalQueryResponse>;
 
-    if (!parsed || typeof parsed !== 'object') {
-      throw new Error("Invalid raw result format: not a valid JSON object");
-    }
+    try {
+      parsed = JSON.parse(rawResult);
+    } catch (singleJsonError) {
+      // If single JSON fails, try NDJSON (newline-delimited JSON)
+      // DuckDB httpserver may return multiple JSON objects, one per line
+      const lines = rawResult.trim().split('\n').filter(line => line.trim());
 
-    const response = parsed as Partial<ExternalQueryResponse>;
+      if (lines.length === 0) {
+        throw new Error("Empty response");
+      }
 
-    if (
-      !response.meta ||
-      !response.data ||
-      !Array.isArray(response.meta) ||
-      !Array.isArray(response.data)
-    ) {
-      throw new Error(
-        "Invalid raw result format: meta or data are missing or have the wrong format"
+      // Parse each line as JSON
+      const objects = lines.map((line, idx) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          throw new Error(`Failed to parse line ${idx + 1}: ${line.substring(0, 50)}...`);
+        }
+      });
+
+      // Find the result object (has meta and data)
+      const resultObj = objects.find(
+        (obj): obj is ExternalQueryResponse =>
+          obj && typeof obj === 'object' && 'meta' in obj && 'data' in obj
       );
+
+      if (resultObj) {
+        parsed = resultObj;
+      } else {
+        // If no single result object, try to merge (meta from one, data from others)
+        const metaObj = objects.find(obj => obj?.meta);
+        const dataObj = objects.find(obj => obj?.data);
+
+        if (metaObj && dataObj) {
+          parsed = {
+            meta: metaObj.meta,
+            data: dataObj.data,
+            rows: dataObj.rows || dataObj.data?.length || 0,
+          };
+        } else {
+          throw singleJsonError; // Re-throw original error
+        }
+      }
     }
 
-    const columns = response.meta.map(m => m.name);
-    const columnTypes = response.meta.map(m => m.type);
-    const data = response.data.map((row: unknown) => {
+    // Validate required fields
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error("Invalid response: not a valid JSON object");
+    }
+
+    if (!parsed.meta || !parsed.data || !Array.isArray(parsed.meta) || !Array.isArray(parsed.data)) {
+      throw new Error("Invalid response: meta or data missing or wrong format");
+    }
+
+    // Convert to QueryResult format
+    const columns = parsed.meta.map(m => m.name);
+    const columnTypes = parsed.meta.map(m => m.type);
+    const data = parsed.data.map((row: unknown) => {
       if (!Array.isArray(row)) {
         throw new Error("Invalid row format: expected array");
       }
@@ -519,13 +558,11 @@ const rawResultToJSON = (rawResult: string): QueryResult => {
       columns,
       columnTypes,
       data,
-      rowCount: response.rows || data.length,
+      rowCount: parsed.rows || data.length,
     };
   } catch (error) {
     throw new Error(
-      `Failed to parse raw result: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
+      `Failed to parse raw result: ${error instanceof Error ? error.message : "Unknown error"}`
     );
   }
 };
