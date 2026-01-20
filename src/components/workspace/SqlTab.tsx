@@ -22,7 +22,7 @@ const TableErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => (
       <AlertTriangle className="mx-auto mb-4 text-destructive" size={32} />
       <h3 className="text-sm font-medium mb-2">Failed to render table</h3>
       <p className="text-xs text-muted-foreground mb-4">
-        {error.message || "An error occurred while displaying the results."}
+        {error instanceof Error ? error.message : "An error occurred while displaying the results."}
       </p>
       <button
         onClick={resetErrorBoundary}

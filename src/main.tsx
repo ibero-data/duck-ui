@@ -38,7 +38,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => (
       <AlertTriangle className="mx-auto mb-4 text-destructive" size={48} />
       <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
       <p className="text-muted-foreground mb-4 text-sm">
-        {error.message || "An unexpected error occurred while rendering the application."}
+        {error instanceof Error ? error.message : "An unexpected error occurred while rendering the application."}
       </p>
       <button
         onClick={resetErrorBoundary}
