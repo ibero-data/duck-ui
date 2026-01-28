@@ -101,7 +101,7 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <AppInitializer>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
             <Suspense fallback={<LoadingScreen message="Loading application" />}>
               <App />
