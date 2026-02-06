@@ -37,7 +37,6 @@ export default function SavedQueriesPanel({ onClose }: SavedQueriesPanelProps) {
 
   useEffect(() => {
     if (!currentProfileId) return;
-    setLoading(true);
     getSavedQueries(currentProfileId)
       .then(setQueries)
       .catch(console.error)

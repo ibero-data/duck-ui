@@ -67,6 +67,7 @@ export const createSchemaSlice: StateCreator<
         result = resultToJSON(wasmResult);
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const columnStats: ColumnStats[] = result.data.map((row: any) => ({
         column_name: row.column_name,
         column_type: row.column_type,
@@ -131,7 +132,7 @@ export const createSchemaSlice: StateCreator<
       const buffer = new Uint8Array(fileContent);
       try {
         await db.dropFile(fileName);
-      } catch {}
+      } catch { /* file may not exist */ }
       await db.registerFileBuffer(fileName, buffer);
       // Handle DuckDB database files (.duckdb, .db, .ddb)
       if (fileType === "duckdb" || fileType === "db" || fileType === "ddb") {

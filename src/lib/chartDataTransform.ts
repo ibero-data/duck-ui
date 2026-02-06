@@ -6,12 +6,12 @@
 import type { QueryResult } from "@/store";
 import type { DataTransform, AggregationType, SeriesConfig } from "@/store";
 
-export type TransformedData = Record<string, any>[];
+export type TransformedData = Record<string, unknown>[];
 
 /**
  * Check if a column contains numeric values
  */
-export const isNumericColumn = (data: Record<string, any>[], column: string): boolean => {
+export const isNumericColumn = (data: Record<string, unknown>[], column: string): boolean => {
   if (data.length === 0) return false;
 
   // Sample first few non-null values
@@ -29,7 +29,7 @@ export const isNumericColumn = (data: Record<string, any>[], column: string): bo
 /**
  * Check if a column contains date/time values
  */
-export const isDateColumn = (data: Record<string, any>[], column: string): boolean => {
+export const isDateColumn = (data: Record<string, unknown>[], column: string): boolean => {
   if (data.length === 0) return false;
 
   const value = data[0][column];
@@ -45,7 +45,7 @@ export const isDateColumn = (data: Record<string, any>[], column: string): boole
 /**
  * Aggregate values based on aggregation type
  */
-export const aggregate = (values: any[], aggregationType: AggregationType): number => {
+export const aggregate = (values: unknown[], aggregationType: AggregationType): number => {
   const numericValues = values.map((v) => Number(v)).filter((v) => !isNaN(v));
 
   if (numericValues.length === 0) return 0;
@@ -71,16 +71,17 @@ export const aggregate = (values: any[], aggregationType: AggregationType): numb
  * Group data by a column and aggregate values
  */
 export const groupByColumn = (
-  data: Record<string, any>[],
+  data: Record<string, unknown>[],
   groupByColumn: string,
   valueColumn: string,
   aggregationType: AggregationType
 ): TransformedData => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const grouped = new Map<string | number, any[]>();
 
   // Group values
   data.forEach((row) => {
-    const key = row[groupByColumn];
+    const key = row[groupByColumn] as string | number;
     if (key === null || key === undefined) return;
 
     if (!grouped.has(key)) {
@@ -280,7 +281,7 @@ function adjustColorBrightness(hex: string, percent: number): string {
 /**
  * Format value for display in charts
  */
-export const formatChartValue = (value: any, format?: string): string => {
+export const formatChartValue = (value: unknown, format?: string): string => {
   if (value === null || value === undefined) return "";
 
   if (typeof value === "number") {

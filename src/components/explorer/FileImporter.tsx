@@ -250,25 +250,22 @@ const FileDetails: React.FC<FileDetailsProps> = ({
   csvOptions,
   onCsvOptionsChange,
 }) => {
-  const [tableNameError, setTableNameError] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const fileType = file.name.split(".").pop()?.toLowerCase() || "";
   const lastModified = new Date(file.lastModified);
   const isCsvFile = fileType === "csv";
 
-  useEffect(() => {
+  const tableNameError = useMemo(() => {
     try {
       tableNameSchema.parse(tableName);
-      setTableNameError(null);
+      return null;
     } catch (error) {
-      setTableNameError(
-        error instanceof z.ZodError ? error.issues[0].message : "Invalid table name"
-      );
+      return error instanceof z.ZodError ? error.issues[0].message : "Invalid table name";
     }
   }, [tableName]);
 
   // Handle CSV option changes
-  const handleCsvOptionChange = (key: keyof CsvImportOptions, value: any) => {
+  const handleCsvOptionChange = (key: keyof CsvImportOptions, value: string | boolean | number | undefined) => {
     if (onCsvOptionsChange && csvOptions) {
       onCsvOptionsChange({
         ...csvOptions,
@@ -819,7 +816,7 @@ const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen
           const arrayBuffer = await file.arrayBuffer();
 
           // Add options for import
-          const importOptions: Record<string, any> = {
+          const importOptions: Record<string, unknown> = {
             importMode, // "table" or "view"
           };
           if (fileType === "csv" && csvOptions[file.name]) {

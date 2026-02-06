@@ -4,7 +4,7 @@
  * Powered by uPlot (canvas-based, lightweight)
  */
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useRef, useMemo } from "react";
 import uPlot from "uplot";
 import { Button } from "@/components/ui/button";
 import {
@@ -170,31 +170,21 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   const { theme } = useTheme();
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const [localConfig, setLocalConfig] = useState<ChartConfig>(
-    chartConfig || {
+  const [localConfig, setLocalConfig] = useState<ChartConfig>(() => {
+    if (chartConfig) return chartConfig;
+    const numCols = result.columns.filter((col) => isNumericColumn(result.data, col));
+    return {
       type: "bar",
-      xAxis: "",
-      yAxis: "",
+      xAxis: result.columns[0] || "",
+      yAxis: numCols[0] || result.columns[1] || "",
       colors: DEFAULT_COLORS,
       showGrid: true,
       enableAnimations: false,
       legend: { show: true, position: "top" },
-    },
-  );
+    };
+  });
 
   const [selectedYColumns, setSelectedYColumns] = useState<string[]>([]);
-
-  // Auto-select first columns if not set
-  useEffect(() => {
-    if (result.columns.length > 0 && !localConfig.xAxis) {
-      const numCols = result.columns.filter((col) => isNumericColumn(result.data, col));
-      setLocalConfig({
-        ...localConfig,
-        xAxis: result.columns[0] || "",
-        yAxis: numCols[0] || result.columns[1] || "",
-      });
-    }
-  }, [result.columns]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Transform data based on configuration
   const transformedData = useMemo(() => {
@@ -394,7 +384,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
           size: 6,
           fill: (u: uPlot, i: number) =>
             (typeof u.series[i].stroke === "function"
-              ? (u.series[i].stroke as Function)(u, i)
+              ? (u.series[i].stroke as (self: uPlot, seriesIdx: number) => string)(u, i)
               : u.series[i].stroke) as string,
           stroke: "transparent",
           width: 0,

@@ -225,7 +225,7 @@ export const printChart = (chartElement: HTMLElement): void => {
  * Generate shareable URL with chart configuration
  */
 export const generateShareableURL = (
-  chartConfig: Record<string, any>,
+  chartConfig: Record<string, unknown>,
   querySQL?: string
 ): string => {
   const params = new URLSearchParams();
@@ -245,7 +245,7 @@ export const generateShareableURL = (
  * Parse chart configuration from URL
  */
 export const parseChartFromURL = (): {
-  chartConfig?: Record<string, any>;
+  chartConfig?: Record<string, unknown>;
   query?: string;
 } | null => {
   try {

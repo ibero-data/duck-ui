@@ -61,8 +61,7 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({ isExpanded, mode = "sheet" 
     return <CheckCircle2 className="w-4 h-4 text-green-500" />;
   };
 
-  // Shared history list content
-  const HistoryContent = () => (
+  const historyContent = (
     <>
       {queryHistory.length === 0 ? (
         <Alert>
@@ -126,8 +125,7 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({ isExpanded, mode = "sheet" 
     </>
   );
 
-  // Shared clear history button
-  const ClearHistoryButton = () => (
+  const clearHistoryButton = (
     <>
       {queryHistory.length > 0 && (
         <AlertDialog>
@@ -159,10 +157,10 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({ isExpanded, mode = "sheet" 
     return (
       <div className="flex flex-col h-full">
         <ScrollArea className="flex-1 px-3">
-          <HistoryContent />
+          {historyContent}
         </ScrollArea>
         <div className="p-3 border-t flex justify-end">
-          <ClearHistoryButton />
+          {clearHistoryButton}
         </div>
       </div>
     );
@@ -201,11 +199,11 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({ isExpanded, mode = "sheet" 
         </SheetHeader>
 
         <ScrollArea className="h-[calc(100vh-12rem)] mt-4 pr-4">
-          <HistoryContent />
+          {historyContent}
         </ScrollArea>
 
         <SheetFooter className="absolute bottom-4 right-4">
-          <ClearHistoryButton />
+          {clearHistoryButton}
         </SheetFooter>
       </SheetContent>
     </Sheet>

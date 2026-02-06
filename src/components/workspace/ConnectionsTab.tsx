@@ -57,6 +57,7 @@ const externalSchema = z.object({
   apiKey: z.string().optional(),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const connectionSchema = z.discriminatedUnion("scope", [opfsSchema, externalSchema]);
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;

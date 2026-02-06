@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useTheme } from "@/components/theme/theme-provider";
 
-type DataRow = Record<string, any>;
+type DataRow = Record<string, unknown>;
 
 interface ColumnStats {
   columnName: string;
@@ -15,7 +15,7 @@ interface ColumnStats {
   min?: number | string;
   max?: number | string;
   avg?: number;
-  topValues?: { value: any; count: number }[];
+  topValues?: { value: unknown; count: number }[];
 }
 
 interface ColumnStatsPanelProps {
@@ -70,7 +70,7 @@ const calculateColumnStats = (data: DataRow[], columnName: string): ColumnStats 
 
   // Calculate top values (for categorical data)
   if (dataType === "string" || dataType === "boolean" || uniqueCount <= 20) {
-    const valueCounts = new Map<any, number>();
+    const valueCounts = new Map<string, number>();
     nonNullValues.forEach((value) => {
       const key = String(value);
       valueCounts.set(key, (valueCounts.get(key) || 0) + 1);

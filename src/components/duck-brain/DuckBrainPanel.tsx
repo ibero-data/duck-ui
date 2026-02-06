@@ -133,7 +133,7 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
         if (result) {
           toast.success(`Query returned ${result.rowCount} rows`);
         }
-      } catch (error) {
+      } catch {
         // Error is already handled in the store and shown in ResultsArtifact
       }
     },

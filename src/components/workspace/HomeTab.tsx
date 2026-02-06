@@ -118,6 +118,7 @@ const HomeTab = () => {
     currentProfileId,
     savedQueriesVersion,
   } = useDuckStore();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [recentItems, setRecentItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
@@ -197,9 +198,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
     return query.length > length ? `${query.slice(0, length)}...` : query;
   };
 
-  //@ts-ignore
   const duck_ui_version = __DUCK_UI_VERSION__ || "Error loading version";
-  //@ts-ignore
   const duck_ui_release_date = __DUCK_UI_RELEASE_DATE__ || "N/A";
 
   const { theme } = useTheme();

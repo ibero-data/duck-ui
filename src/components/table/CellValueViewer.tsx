@@ -5,7 +5,7 @@ import { Copy, X, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
 interface CellValueViewerProps {
-  value: any;
+  value: unknown;
   columnName: string;
   rowIndex: number;
   onClose: () => void;
@@ -20,6 +20,7 @@ export const CellValueViewer: React.FC<CellValueViewerProps> = ({
   const [isMinimized, setIsMinimized] = useState(false);
 
   // Detect value type and format accordingly
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const { displayValue, valueType } = useMemo(() => {
     if (value === null || value === undefined) {
       return { displayValue: "NULL", valueType: "null", isFormatted: false };
@@ -33,7 +34,7 @@ export const CellValueViewer: React.FC<CellValueViewerProps> = ({
           valueType: "json",
           isFormatted: true,
         };
-      } catch (e) {
+      } catch {
         return {
           displayValue: String(value),
           valueType: "object",
@@ -53,7 +54,7 @@ export const CellValueViewer: React.FC<CellValueViewerProps> = ({
             isFormatted: true,
           };
         }
-      } catch (e) {
+      } catch {
         // Not JSON, return as string
       }
 

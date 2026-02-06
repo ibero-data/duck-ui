@@ -30,7 +30,7 @@ export async function isOpfsAvailable(): Promise<boolean> {
     // Probe by trying to create and delete a test file
     const testHandle = await root.getFileHandle(".duck-ui-opfs-test", { create: true });
     // If we get here, OPFS basic access works. Check sync access handle support.
-    const syncHandle = await (testHandle as any).createSyncAccessHandle();
+    const syncHandle = await (testHandle as unknown as { createSyncAccessHandle: () => Promise<{ close: () => void }> }).createSyncAccessHandle();
     syncHandle.close();
     await root.removeEntry(".duck-ui-opfs-test");
     opfsAvailable = true;

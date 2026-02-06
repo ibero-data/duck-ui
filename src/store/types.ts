@@ -319,6 +319,7 @@ export interface SchemaSlice {
     tableName: string,
     fileType: string,
     database?: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     options?: Record<string, any>
   ) => Promise<void>;
 }

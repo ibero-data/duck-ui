@@ -152,19 +152,22 @@ export const rawResultToJSON = (rawResult: string): QueryResult => {
 /**
  * Converts a WASM query result into a QueryResult.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const resultToJSON = (result: any): QueryResult => {
   try {
     const schema = result.schema;
     const fields = schema.fields;
 
     // Pre-extract column vectors for Decimal types
-    const columnVectors = fields.map((_: any, colIdx: number) => result.getChildAt(colIdx));
+    const columnVectors = fields.map((_: unknown, colIdx: number) => result.getChildAt(colIdx));
 
     // Use the standard toArray().map() approach, but fix Decimal values from column vectors
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = result.toArray().map((row: any, rowIndex: number) => {
       const jsonRow = row.toJSON();
 
       // Fix Decimal types by reading directly from column vectors
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       fields.forEach((field: any, columnIndex: number) => {
         const col = field.name;
         const type = field.type.toString();
@@ -216,7 +219,9 @@ export const resultToJSON = (result: any): QueryResult => {
     });
 
     return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       columns: fields.map((field: any) => field.name),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       columnTypes: fields.map((field: any) => field.type.toString()),
       data,
       rowCount: result.numRows,

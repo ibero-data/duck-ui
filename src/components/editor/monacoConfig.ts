@@ -131,7 +131,7 @@ export const createEditor = (
           linesBetweenQueries: 2,
         });
         ed.setValue(formatted);
-      } catch (err) {
+      } catch {
         toast.error("Failed to format SQL");
       }
     },
@@ -209,9 +209,9 @@ monaco.languages.registerDocumentFormattingEditProvider("sql", {
 interface AutocompleteItem {
   suggestion: string;
 }
-const queryNative = async <T>(connection: any, query: string): Promise<T[]> => {
+const queryNative = async <T>(connection: { query: (sql: string) => Promise<{ toArray: () => unknown[] }> }, query: string): Promise<T[]> => {
   const results = await connection.query(query);
-  return results.toArray().map((row: any) => row as T);
+  return results.toArray().map((row: unknown) => row as T);
 };
 
 monaco.languages.registerCompletionItemProvider("sql", {

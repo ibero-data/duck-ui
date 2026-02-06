@@ -419,7 +419,7 @@ const FolderBrowser: React.FC<FolderBrowserProps> = ({ onFileSelect, onFileImpor
       } else {
         toast.error("Permission denied");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to request permission");
     }
   };

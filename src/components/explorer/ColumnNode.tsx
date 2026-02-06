@@ -50,7 +50,7 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Safe parsing function that handles both string and number types
-  const parseValue = (value: any): number => {
+  const parseValue = (value: string | number): number => {
     if (typeof value === "number") return value;
     if (typeof value === "string") {
       // Remove quotes if present

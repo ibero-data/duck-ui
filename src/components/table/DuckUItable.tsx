@@ -58,6 +58,7 @@ import { ColumnStatsPanel } from "./ColumnStatsPanel";
 import { fileSystemService } from "@/lib/fileSystem";
 
 // Define a generic type for the data row
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DataRow = Record<string, any>;
 
 // Types for cell selection
@@ -70,7 +71,7 @@ interface DuckTableProps {
   executionTime?: number | null;
   responseSize?: number | null;
   initialPageSize?: number;
-  columnRenderers?: Record<string, (value: any) => React.ReactNode>;
+  columnRenderers?: Record<string, (value: unknown) => React.ReactNode>;
   tableHeight?: string | number;
 }
 
@@ -90,13 +91,13 @@ const DEFAULT_MIN_AUTO_WIDTH = 80;
 const DEFAULT_SAMPLE_SIZE = 100;
 
 // Safe JSON stringify that handles BigInt
-const safeStringify = (value: any): string => {
+const safeStringify = (value: unknown): string => {
   if (value === null || value === undefined) return "null";
   if (typeof value === "bigint") return value.toString();
   if (typeof value === "object") {
     try {
       return JSON.stringify(value, (_, v) => (typeof v === "bigint" ? v.toString() : v));
-    } catch (e) {
+    } catch {
       return String(value);
     }
   }
@@ -174,7 +175,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
   // Cell value viewer state
   const [viewedCell, setViewedCell] = useState<{
-    value: any;
+    value: unknown;
     columnName: string;
     rowIndex: number;
   } | null>(null);
@@ -360,8 +361,8 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       })
       .filter((column) => {
         // Check both accessorKey (old) and id (new) for enabled columns
-        const accessorKey = (column as any).accessorKey as string;
-        const columnId = (column as any).id as string;
+        const accessorKey = (column as unknown as { accessorKey?: string }).accessorKey;
+        const columnId = (column as unknown as { id?: string }).id;
         const keyToCheck = columnId || accessorKey;
         return keyToCheck === undefined || enabledColumns[keyToCheck] !== false;
       });
@@ -437,7 +438,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         e.preventDefault();
 
         // Get selected cells data organized by row and column
-        const cellsByPosition = new Map<string, any>();
+        const cellsByPosition = new Map<string, unknown>();
         const rowIndices = new Set<number>();
         const columnIds = new Set<string>();
 
@@ -630,7 +631,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
       const dataToExport = table.getFilteredRowModel().rows.map((r) => {
         // Handle BigInt for XLSX
-        const row: Record<string, any> = {};
+        const row: Record<string, unknown> = {};
         Object.keys(r.original).forEach((key) => {
           const val = r.original[key];
           row[key] = typeof val === "bigint" ? val.toString() : val;
@@ -794,7 +795,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     try {
       const XLSX = await import("xlsx");
       const dataToExport = table.getFilteredRowModel().rows.map((r) => {
-        const row: Record<string, any> = {};
+        const row: Record<string, unknown> = {};
         Object.keys(r.original).forEach((key) => {
           const val = r.original[key];
           row[key] = typeof val === "bigint" ? val.toString() : val;
@@ -900,12 +901,10 @@ const DuckUITable: React.FC<DuckTableProps> = ({
   };
 
   const ColumnSelector = () => {
-    if (!data || !data.length || !data[0]) return null;
-    const allColumnKeys = Object.keys(data[0]);
-    const visibleCount = Object.values(enabledColumns).filter(Boolean).length;
-    const totalCount = allColumnKeys.length;
+    const allColumnKeys = data?.[0] ? Object.keys(data[0]) : [];
 
     // Memoize column keys to prevent re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const stableColumnKeys = useMemo(() => allColumnKeys, [JSON.stringify(allColumnKeys)]);
 
     // Simplified filtering for column selector
@@ -915,6 +914,10 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         key.toLowerCase().includes(columnSelectorFilter.toLowerCase())
       );
     }, [stableColumnKeys, columnSelectorFilter]);
+
+    if (!data || !data.length || !data[0]) return null;
+    const visibleCount = Object.values(enabledColumns).filter(Boolean).length;
+    const totalCount = allColumnKeys.length;
 
     return (
       <Card className="column-selector-panel absolute right-0 top-12 z-20 w-[350px] bg-background shadow-lg rounded-md border p-2">

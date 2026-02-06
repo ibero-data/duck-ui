@@ -9,15 +9,18 @@ export const fetchWasmDatabases = async (
 ): Promise<DatabaseInfo[]> => {
   const dbListResult = await connection.query(`PRAGMA database_list`);
   return Promise.all(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dbListResult.toArray().map(async (db: any) => {
       const dbName = db.name.toString();
       const tablesResult = await connection.query(
         `SELECT table_name FROM information_schema.tables WHERE table_catalog = '${dbName}'`
       );
       const tables: TableInfo[] = await Promise.all(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tablesResult.toArray().map(async (tbl: any) => {
           const tableName = tbl.table_name.toString();
           const columnsResult = await connection.query(`DESCRIBE "${dbName}"."${tableName}"`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const columns: ColumnInfo[] = columnsResult.toArray().map((col: any) => ({
             name: col.column_name.toString(),
             type: col.column_type.toString(),

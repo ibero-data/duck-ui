@@ -33,7 +33,7 @@ export async function testHttpfsSupport(): Promise<HttpfsTestResult[]> {
       FROM duckdb_extensions()
       WHERE extension_name IN ('httpfs', 'aws', 'azure', 's3')
     `);
-    const extensions = extResult.toArray().map((r: any) => r.toJSON());
+    const extensions = extResult.toArray().map((r: { toJSON: () => unknown }) => r.toJSON());
     results.push({
       test: "Available Extensions",
       success: true,
@@ -88,7 +88,7 @@ export async function testHttpfsSupport(): Promise<HttpfsTestResult[]> {
       WHERE function_name LIKE '%http%' OR function_name LIKE '%s3%'
       LIMIT 10
     `);
-    const funcs = funcsResult.toArray().map((r: any) => r.toJSON());
+    const funcs = funcsResult.toArray().map((r: { toJSON: () => unknown }) => r.toJSON());
     results.push({
       test: "HTTPFS Functions",
       success: funcs.length > 0,
@@ -198,7 +198,7 @@ export async function testHttpfsSupport(): Promise<HttpfsTestResult[]> {
 
 // Expose to window for easy console access
 if (typeof window !== "undefined") {
-  (window as any).testHttpfs = testHttpfsSupport;
+  (window as unknown as Record<string, unknown>).testHttpfs = testHttpfsSupport;
 }
 
 export default testHttpfsSupport;
