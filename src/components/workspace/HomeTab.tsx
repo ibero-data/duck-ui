@@ -1,12 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Github,
@@ -20,6 +14,8 @@ import {
   Building2,
   Cloud,
   BarChart3,
+  Bookmark,
+  Logs,
 } from "lucide-react";
 import { useDuckStore } from "@/store";
 import { motion } from "framer-motion";
@@ -27,6 +23,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Logo from "/logo.png";
 import LogoLight from "/logo-light.png";
 import { useTheme } from "@/components/theme/theme-provider";
+import { formatDistanceToNow } from "date-fns";
+import {
+  getSavedQueries,
+  type SavedQuery,
+} from "@/services/persistence/repositories/savedQueryRepository";
 
 const quickStartActions = [
   {
@@ -95,19 +96,45 @@ const iberoDataProducts = [
   {
     title: "YAAT",
     description: "Simple, privacy-friendly web analytics",
-    link: "https://yaat.io?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
+    link: "https://github.com/ibero-data/yaat",
     Icon: BarChart3,
+  },
+    {
+    title: "Glintlog",
+    description: "Self-hosted log aggregation. Single binary. Zero dependencies.",
+    link: "https://glintlog.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
+    Icon: Logs,
   },
 ];
 
 const HomeTab = () => {
-  const { createTab, queryHistory, error, tabs, setActiveTab } = useDuckStore();
+  const {
+    createTab,
+    queryHistory,
+    error,
+    tabs,
+    setActiveTab,
+    currentProfile,
+    currentProfileId,
+    savedQueriesVersion,
+  } = useDuckStore();
   const [recentItems, setRecentItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
+  const [savedLoading, setSavedLoading] = useState(false);
 
   useEffect(() => {
     getUsersRecentItems();
   }, []);
+
+  useEffect(() => {
+    if (!currentProfileId) return;
+    setSavedLoading(true);
+    getSavedQueries(currentProfileId)
+      .then(setSavedQueries)
+      .catch(console.error)
+      .finally(() => setSavedLoading(false));
+  }, [currentProfileId, savedQueriesVersion]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -185,13 +212,9 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
           animate={{ opacity: 1, y: 0 }}
           className="space-y-3 flex items-center space-x-4"
         >
-          <img
-            src={theme === "dark" ? Logo : LogoLight}
-            alt="Logo"
-            className="h-12"
-          />
+          <img src={theme === "dark" ? Logo : LogoLight} alt="Logo" className="h-12" />
           <h1 className="text-4xl font-bold tracking-tight">
-            Welcome to Duck-UI
+            {currentProfile ? `Welcome, ${currentProfile.name}` : "Welcome to Duck-UI"}
           </h1>
         </motion.div>
 
@@ -207,6 +230,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.1 }}
+              className="truncate"
             >
               <Button
                 variant="outline"
@@ -217,7 +241,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
                   <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                     {action.icon}
                   </div>
-                  <p className="font-bold text-lg">{action.title}</p>
+                  <p className="font-bold text-lg truncate">{action.title}</p>
                 </div>
                 <p className="text-sm text-muted-foreground w-full truncate">
                   {action.description}
@@ -237,15 +261,16 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
               {loading && <Loader2 className="w-3 h-3 animate-spin" />}
             </TabsTrigger>
             <TabsTrigger
-              value="resources"
-              className="data-[state=active]:text-primary px-6"
+              value="saved"
+              className="flex items-center gap-2 data-[state=active]:text-primary px-6"
             >
+              <Bookmark className="w-3 h-3" />
+              Saved Queries
+            </TabsTrigger>
+            <TabsTrigger value="resources" className="data-[state=active]:text-primary px-6">
               Resources
             </TabsTrigger>
-            <TabsTrigger
-              value="iberodata"
-              className="data-[state=active]:text-primary px-6"
-            >
+            <TabsTrigger value="iberodata" className="data-[state=active]:text-primary px-6">
               Ibero Data
             </TabsTrigger>
           </TabsList>
@@ -266,9 +291,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
                 ))}
               </div>
             ) : error ? (
-              <Card className="p-4 text-center text-muted-foreground">
-                {error}
-              </Card>
+              <Card className="p-4 text-center text-muted-foreground">{error}</Card>
             ) : recentItems.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground border-dashed">
                 No recent queries found
@@ -307,6 +330,61 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
             )}
           </TabsContent>
 
+          <TabsContent value="saved" className="space-y-6">
+            {savedLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="space-y-2">
+                    <CardHeader>
+                      <Skeleton className="h-4 w-[250px]" />
+                      <Skeleton className="h-4 w-[200px]" />
+                    </CardHeader>
+                    <CardFooter>
+                      <Skeleton className="h-4 w-[150px]" />
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : savedQueries.length === 0 ? (
+              <Card className="p-8 text-center text-muted-foreground border-dashed">
+                <Bookmark className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                <p>No saved queries yet</p>
+                <p className="text-xs mt-1">Save a query from the editor toolbar</p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {savedQueries.map((query, index) => (
+                  <motion.div
+                    key={query.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Card
+                      className="hover:bg-accent/50 cursor-pointer transition-colors"
+                      onClick={() => createTab("sql", query.sql_text, query.name)}
+                    >
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium flex items-center space-x-2">
+                          <Bookmark className="w-4 h-4 text-muted-foreground" />
+                          <span className="truncate">{query.name}</span>
+                        </CardTitle>
+                        <CardDescription className="text-xs font-mono text-muted-foreground truncate">
+                          {query.sql_text.length > 50
+                            ? query.sql_text.slice(0, 50) + "..."
+                            : query.sql_text}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardFooter className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(query.updated_at), { addSuffix: true })}
+                      </CardFooter>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="resources" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {resourceCards.map((card, index) => (
@@ -322,24 +400,15 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
                         <div className="p-2 rounded-full bg-primary/10">
                           <card.Icon className="w-4 h-4 text-primary" />
                         </div>
-                        <span className="text-muted-foreground">
-                          {card.title}
-                        </span>
+                        <span className="text-muted-foreground">{card.title}</span>
                       </CardTitle>
                       <CardDescription className="text-xs text-muted-foreground">
                         {card.description}
                       </CardDescription>
                     </CardHeader>
                     <CardFooter>
-                      <a
-                        href={card.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                        >
+                      <a href={card.link} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" className="w-full justify-start">
                           {card.action}
                         </Button>
                       </a>
@@ -365,24 +434,15 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
                         <div className="p-2 rounded-full bg-primary/10">
                           <product.Icon className="w-4 h-4 text-primary" />
                         </div>
-                        <span className="text-muted-foreground">
-                          {product.title}
-                        </span>
+                        <span className="text-muted-foreground">{product.title}</span>
                       </CardTitle>
                       <CardDescription className="text-xs text-muted-foreground">
                         {product.description}
                       </CardDescription>
                     </CardHeader>
                     <CardFooter>
-                      <a
-                        href={product.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                        >
+                      <a href={product.link} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" className="w-full justify-start">
                           Visit
                         </Button>
                       </a>

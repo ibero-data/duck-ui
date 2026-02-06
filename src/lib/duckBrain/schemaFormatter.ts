@@ -42,14 +42,10 @@ export function formatSchemaForContext(
         break;
       }
 
-      const tableName =
-        db.name === "memory" ? table.name : `${db.name}.${table.name}`;
+      const tableName = db.name === "memory" ? table.name : `${db.name}.${table.name}`;
       const columns = table.columns.slice(0, maxColumnsPerTable);
       const columnDefs = columns
-        .map(
-          (col) =>
-            `  ${col.name} ${col.type}${col.nullable ? "" : " NOT NULL"}`
-        )
+        .map((col) => `  ${col.name} ${col.type}${col.nullable ? "" : " NOT NULL"}`)
         .join(",\n");
 
       parts.push(`CREATE TABLE ${tableName} (`);
@@ -57,9 +53,7 @@ export function formatSchemaForContext(
       parts.push(");");
 
       if (table.columns.length > maxColumnsPerTable) {
-        parts.push(
-          `-- ... and ${table.columns.length - maxColumnsPerTable} more columns`
-        );
+        parts.push(`-- ... and ${table.columns.length - maxColumnsPerTable} more columns`);
       }
 
       if (table.rowCount > 0) {
@@ -79,9 +73,7 @@ export function formatSchemaForContext(
   let formatted = parts.join("\n");
 
   if (formatted.length > maxContextLength) {
-    formatted =
-      formatted.slice(0, maxContextLength) +
-      "\n-- [Schema truncated for context limit]";
+    formatted = formatted.slice(0, maxContextLength) + "\n-- [Schema truncated for context limit]";
     truncated = true;
   }
 

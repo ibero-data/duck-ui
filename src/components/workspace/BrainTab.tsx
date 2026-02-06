@@ -1,13 +1,7 @@
 import { useState, useEffect } from "react";
 import { useDuckStore, type AIProviderType } from "@/store";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -38,10 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_MODELS, type ModelConfig } from "@/lib/duckBrain";
-import {
-  OPENAI_MODELS,
-  ANTHROPIC_MODELS,
-} from "@/lib/duckBrain/providers/types";
+import { OPENAI_MODELS, ANTHROPIC_MODELS } from "@/lib/duckBrain/providers/types";
 
 const BrainTab = () => {
   const { duckBrain, initializeDuckBrain, setAIProvider, updateProviderConfig } = useDuckStore();
@@ -112,11 +103,7 @@ const BrainTab = () => {
       if ("caches" in window) {
         const cacheNames = await caches.keys();
         for (const name of cacheNames) {
-          if (
-            name.includes("webllm") ||
-            name.includes("mlc") ||
-            name.includes("model")
-          ) {
+          if (name.includes("webllm") || name.includes("mlc") || name.includes("model")) {
             await caches.delete(name);
             cleared++;
           }
@@ -169,7 +156,9 @@ const BrainTab = () => {
       });
 
       if (result.success) {
-        toast.success(`${provider === "openai" ? "OpenAI" : "Anthropic"} API key saved and verified`);
+        toast.success(
+          `${provider === "openai" ? "OpenAI" : "Anthropic"} API key saved and verified`
+        );
       } else {
         toast.error(`Connection failed: ${result.error}`);
       }
@@ -262,8 +251,8 @@ const BrainTab = () => {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>WebGPU Not Supported</strong> - Duck Brain requires WebGPU for
-            local AI inference. Please use Chrome 113+ or Edge 113+.
+            <strong>WebGPU Not Supported</strong> - Duck Brain requires WebGPU for local AI
+            inference. Please use Chrome 113+ or Edge 113+.
           </AlertDescription>
         </Alert>
       )}
@@ -346,7 +335,11 @@ const BrainTab = () => {
                       className="absolute right-0 top-0 h-full"
                       onClick={() => setShowApiKey((prev) => ({ ...prev, openai: !prev.openai }))}
                     >
-                      {showApiKey.openai ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showApiKey.openai ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                   <Button
@@ -404,9 +397,15 @@ const BrainTab = () => {
                       variant="ghost"
                       size="icon"
                       className="absolute right-0 top-0 h-full"
-                      onClick={() => setShowApiKey((prev) => ({ ...prev, anthropic: !prev.anthropic }))}
+                      onClick={() =>
+                        setShowApiKey((prev) => ({ ...prev, anthropic: !prev.anthropic }))
+                      }
                     >
-                      {showApiKey.anthropic ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showApiKey.anthropic ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                   <Button
@@ -449,7 +448,8 @@ const BrainTab = () => {
               <Alert>
                 <Server className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>OpenAI-Compatible API</strong> - Connect to Ollama, LocalAI, vLLM, DeepSeek, and other services that implement the OpenAI chat completions API.
+                  <strong>OpenAI-Compatible API</strong> - Connect to Ollama, LocalAI, vLLM,
+                  DeepSeek, and other services that implement the OpenAI chat completions API.
                 </AlertDescription>
               </Alert>
 
@@ -504,9 +504,18 @@ const BrainTab = () => {
                     variant="ghost"
                     size="icon"
                     className="absolute right-0 top-0 h-full"
-                    onClick={() => setShowApiKey((prev) => ({ ...prev, "openai-compatible": !prev["openai-compatible"] }))}
+                    onClick={() =>
+                      setShowApiKey((prev) => ({
+                        ...prev,
+                        "openai-compatible": !prev["openai-compatible"],
+                      }))
+                    }
                   >
-                    {showApiKey["openai-compatible"] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showApiKey["openai-compatible"] ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -520,12 +529,13 @@ const BrainTab = () => {
                 {isTesting ? "Testing Connection..." : "Test & Save"}
               </Button>
 
-              {providerConfigs["openai-compatible"]?.baseUrl && providerConfigs["openai-compatible"]?.modelId && (
-                <Badge variant="secondary" className="bg-green-500/10 text-green-600">
-                  <Check className="h-3 w-3 mr-1" />
-                  Configured: {providerConfigs["openai-compatible"].modelId}
-                </Badge>
-              )}
+              {providerConfigs["openai-compatible"]?.baseUrl &&
+                providerConfigs["openai-compatible"]?.modelId && (
+                  <Badge variant="secondary" className="bg-green-500/10 text-green-600">
+                    <Check className="h-3 w-3 mr-1" />
+                    Configured: {providerConfigs["openai-compatible"].modelId}
+                  </Badge>
+                )}
             </div>
           )}
         </CardContent>
@@ -565,9 +575,7 @@ const BrainTab = () => {
         <Card>
           <CardHeader>
             <CardTitle>Available Local Models</CardTitle>
-            <CardDescription>
-              Select a model to use with Duck Brain.
-            </CardDescription>
+            <CardDescription>Select a model to use with Duck Brain.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">

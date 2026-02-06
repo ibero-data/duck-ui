@@ -55,8 +55,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const toggleOpen = useCallback(() => setIsOpen((open) => !open), []);
 
-  const { createTab, executeQuery, deleteTable, fetchDatabasesAndTablesInfo, fetchTableColumnStats } =
-    useDuckStore();
+  const {
+    createTab,
+    executeQuery,
+    deleteTable,
+    fetchDatabasesAndTablesInfo,
+    fetchTableColumnStats,
+  } = useDuckStore();
 
   // Fetch column stats when table is expanded
   useEffect(() => {
@@ -170,18 +175,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         },
       ],
     }),
-    [
-      parentDatabaseName,
-      node.name,
-      handleQueryData,
-      handleDeleteTable,
-      handleShowSchema,
-    ]
+    [parentDatabaseName, node.name, handleQueryData, handleDeleteTable, handleShowSchema]
   );
 
-  const matchesSearch = node.name
-    .toLowerCase()
-    .includes(searchTerm.toLowerCase());
+  const matchesSearch = node.name.toLowerCase().includes(searchTerm.toLowerCase());
   const childrenMatchSearch = node.children?.some(
     (child) =>
       child.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -217,8 +214,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               </div>
             </div>
             <div className="flex items-center">
-              {contextMenuOptions[node.type as keyof typeof contextMenuOptions]
-                .length > 0 && (
+              {contextMenuOptions[node.type as keyof typeof contextMenuOptions].length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="icon" variant="ghost" className="h-6 w-6">
@@ -226,14 +222,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    {contextMenuOptions[
-                      node.type as keyof typeof contextMenuOptions
-                    ].map((option, index) => (
-                      <DropdownMenuItem key={index} onSelect={option.action}>
-                        {option.icon}
-                        {option.label}
-                      </DropdownMenuItem>
-                    ))}
+                    {contextMenuOptions[node.type as keyof typeof contextMenuOptions].map(
+                      (option, index) => (
+                        <DropdownMenuItem key={index} onSelect={option.action}>
+                          {option.icon}
+                          {option.label}
+                        </DropdownMenuItem>
+                      )
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -241,14 +237,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          {contextMenuOptions[node.type as keyof typeof contextMenuOptions].map(
-            (option, index) => (
-              <ContextMenuItem key={index} onSelect={option.action}>
-                {option.icon}
-                {option.label}
-              </ContextMenuItem>
-            )
-          )}
+          {contextMenuOptions[node.type as keyof typeof contextMenuOptions].map((option, index) => (
+            <ContextMenuItem key={index} onSelect={option.action}>
+              {option.icon}
+              {option.label}
+            </ContextMenuItem>
+          ))}
         </ContextMenuContent>
         {(isOpen || searchTerm) && node.children && (
           <div>
@@ -259,16 +253,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                   node={child}
                   level={level + 1}
                   searchTerm={searchTerm}
-                  parentDatabaseName={
-                    node.type === "database" ? node.name : parentDatabaseName
-                  }
+                  parentDatabaseName={node.type === "database" ? node.name : parentDatabaseName}
                   refreshData={refreshData}
                 />
               ))
             ) : (
-              <div className="ml-6 pl-4 text-xs italic text-muted-foreground">
-                Nothing to show
-              </div>
+              <div className="ml-6 pl-4 text-xs italic text-muted-foreground">Nothing to show</div>
             )}
           </div>
         )}
@@ -282,9 +272,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 <span>Loading column statistics...</span>
               </div>
             ) : columnStats.length > 0 ? (
-              columnStats.map((stats) => (
-                <ColumnNode key={stats.column_name} stats={stats} />
-              ))
+              columnStats.map((stats) => <ColumnNode key={stats.column_name} stats={stats} />)
             ) : null}
           </div>
         )}

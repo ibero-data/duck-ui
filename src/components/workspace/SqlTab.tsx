@@ -2,11 +2,7 @@
 import React from "react";
 import { useDuckStore } from "@/store";
 import SqlEditor from "@/components/editor/SqlEditor";
-import {
-  ResizablePanel,
-  ResizablePanelGroup,
-  ResizableHandle,
-} from "@/components/ui/resizable";
+import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DuckUiTable from "@/components/table/DuckUItable";
 import ChartVisualizationPro from "@/components/charts/ChartVisualizationPro";
@@ -131,9 +127,7 @@ const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
             <ChartVisualizationPro
               result={currentTab.result}
               chartConfig={currentTab.chartConfig}
-              onConfigChange={(config) =>
-                updateTabChartConfig(tabId, config)
-              }
+              onConfigChange={(config) => updateTabChartConfig(tabId, config)}
             />
           </div>
         </TabsContent>

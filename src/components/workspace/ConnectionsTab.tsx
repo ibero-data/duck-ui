@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useDuckStore, ConnectionProvider } from "@/store";
+import { generateUUID } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -10,13 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,21 +23,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  Database,
-  ExternalLink,
-  InfoIcon,
-} from "lucide-react";
+import { Plus, Edit2, Trash2, Database, ExternalLink, InfoIcon } from "lucide-react";
 import ConnectionManager from "@/components/connection/ConnectionsModal";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import * as z from "zod";
 
 const scopeEnum = z.enum(["External", "OPFS"]);
@@ -95,12 +78,14 @@ const ConnectionsTab = () => {
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(null);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [isAddConnectionDialogOpen, setIsAddConnectionDialogOpen] = useState(false);
-  const [editingConnection, setEditingConnection] = useState<ConnectionFormValues | undefined>(undefined);
+  const [editingConnection, setEditingConnection] = useState<ConnectionFormValues | undefined>(
+    undefined
+  );
 
   const handleAddConnection = async (values: ConnectionFormValues) => {
     const connectionData: ConnectionProvider = {
       ...values,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       port: values.scope === "External" && values.port ? parseInt(values.port, 10) : undefined,
       environment: "APP",
     };
@@ -220,9 +205,7 @@ const ConnectionsTab = () => {
                   <TableRow key={connection.id}>
                     <TableCell
                       className={
-                        connection.id === currentConnection?.id
-                          ? "border-l-4 border-green-500"
-                          : ""
+                        connection.id === currentConnection?.id ? "border-l-4 border-green-500" : ""
                       }
                     >
                       <div className="flex items-center gap-2">
@@ -245,8 +228,7 @@ const ConnectionsTab = () => {
                     <TableCell>{connection.environment}</TableCell>
 
                     <TableCell className="text-right">
-                      {connection.environment === "BUILT_IN" ||
-                      connection.environment === "ENV" ? (
+                      {connection.environment === "BUILT_IN" || connection.environment === "ENV" ? (
                         <div className="justify-end flex gap-2 p-2 rounded-md">
                           <TooltipProvider>
                             <Tooltip>
@@ -255,8 +237,8 @@ const ConnectionsTab = () => {
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p className="text-sm max-w-[200px] !text-center">
-                                  This connection is built-in or was set via docker
-                                  environment variables and cannot be modified or deleted.
+                                  This connection is built-in or was set via docker environment
+                                  variables and cannot be modified or deleted.
                                 </p>
                               </TooltipContent>
                             </Tooltip>
@@ -295,8 +277,8 @@ const ConnectionsTab = () => {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Connection</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete the connection "
-                                  {connection.name}"? This action cannot be undone.
+                                  Are you sure you want to delete the connection "{connection.name}
+                                  "? This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

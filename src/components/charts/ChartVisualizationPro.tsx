@@ -1,28 +1,11 @@
 /**
  * Professional Chart Visualization Component
  * Features: Multi-series, advanced chart types, customization, export
+ * Powered by uPlot (canvas-based, lightweight)
  */
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  AreaChart,
-  Area,
-  ScatterChart,
-  Scatter,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
+import uPlot from "uplot";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -33,16 +16,14 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { MultiSelect } from "@/components/ui/multi-select";
-import {
-  Download,
-  BarChart3,
-} from "lucide-react";
+import { Download, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/components/theme/theme-provider";
-import { CustomChartTooltip } from "./CustomChartTooltip";
 import { formatNumber, shortenLabel } from "@/lib/chartUtils";
 import { transformData, isNumericColumn, suggestChartTypes } from "@/lib/chartDataTransform";
 import { exportChartAsPNG } from "@/lib/chartExport";
+import UPlotChart from "./UPlotChart";
+import { tooltipPlugin } from "./tooltipPlugin";
 import type { QueryResult, ChartConfig, ChartType } from "@/store";
 
 interface ChartVisualizationProProps {
@@ -78,6 +59,109 @@ const CHART_TYPE_LABELS: Record<string, string> = {
   scatter: "Scatter Plot",
 };
 
+// ── SVG Pie/Donut Chart ──────────────────────────────────────────────────────
+
+function PieChart({
+  data,
+  xKey,
+  yKey,
+  colors,
+  isDonut,
+  innerRadius = 0.45,
+  showValues,
+  theme,
+  legendShow,
+}: {
+  data: Record<string, unknown>[];
+  xKey: string;
+  yKey: string;
+  colors: string[];
+  isDonut: boolean;
+  innerRadius?: number;
+  showValues?: boolean;
+  theme: string;
+  legendShow?: boolean;
+}) {
+  const total = data.reduce((sum, row) => sum + (Number(row[yKey]) || 0), 0);
+  if (total === 0) return <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>;
+
+  const slices: { label: string; value: number; pct: number; color: string }[] = [];
+  let cumAngle = -Math.PI / 2;
+  const arcs: { d: string; color: string; midAngle: number; pct: number; label: string }[] = [];
+
+  data.forEach((row, i) => {
+    const value = Number(row[yKey]) || 0;
+    const pct = value / total;
+    const angle = pct * 2 * Math.PI;
+    const startAngle = cumAngle;
+    const endAngle = cumAngle + angle;
+    const midAngle = startAngle + angle / 2;
+    const color = colors[i % colors.length];
+
+    slices.push({ label: String(row[xKey]), value, pct, color });
+
+    const outerR = 1;
+    const innerR = isDonut ? innerRadius : 0;
+    const largeArc = angle > Math.PI ? 1 : 0;
+
+    const x1 = Math.cos(startAngle) * outerR;
+    const y1 = Math.sin(startAngle) * outerR;
+    const x2 = Math.cos(endAngle) * outerR;
+    const y2 = Math.sin(endAngle) * outerR;
+    const ix1 = Math.cos(endAngle) * innerR;
+    const iy1 = Math.sin(endAngle) * innerR;
+    const ix2 = Math.cos(startAngle) * innerR;
+    const iy2 = Math.sin(startAngle) * innerR;
+
+    const d = isDonut
+      ? `M ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} L ${ix1} ${iy1} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2} Z`
+      : `M 0 0 L ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+
+    arcs.push({ d, color, midAngle, pct, label: String(row[xKey]) });
+    cumAngle = endAngle;
+  });
+
+  const strokeColor = theme === "dark" ? "#1a1a1a" : "#fff";
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4">
+      <svg viewBox="-1.2 -1.2 2.4 2.4" className="w-full max-w-[280px] max-h-[280px] flex-shrink-0">
+        {arcs.map((arc, i) => (
+          <g key={i}>
+            <path d={arc.d} fill={arc.color} stroke={strokeColor} strokeWidth={0.02} />
+            {showValues && arc.pct >= 0.05 && (
+              <text
+                x={Math.cos(arc.midAngle) * (isDonut ? 0.72 : 0.6)}
+                y={Math.sin(arc.midAngle) * (isDonut ? 0.72 : 0.6)}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="white"
+                fontSize="0.12"
+                fontWeight="600"
+              >
+                {`${(arc.pct * 100).toFixed(0)}%`}
+              </text>
+            )}
+          </g>
+        ))}
+      </svg>
+      {legendShow && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center text-xs">
+          {slices.map((s, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="text-muted-foreground truncate max-w-[120px]">{s.label}</span>
+              <span className="font-medium">{formatNumber(s.value)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────────────────────
+
 export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   result,
   chartConfig,
@@ -95,7 +179,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
       showGrid: true,
       enableAnimations: false,
       legend: { show: true, position: "top" },
-    }
+    },
   );
 
   const [selectedYColumns, setSelectedYColumns] = useState<string[]>([]);
@@ -103,42 +187,31 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   // Auto-select first columns if not set
   useEffect(() => {
     if (result.columns.length > 0 && !localConfig.xAxis) {
-      const numericColumns = result.columns.filter((col) =>
-        isNumericColumn(result.data, col)
-      );
-
+      const numCols = result.columns.filter((col) => isNumericColumn(result.data, col));
       setLocalConfig({
         ...localConfig,
         xAxis: result.columns[0] || "",
-        yAxis: numericColumns[0] || result.columns[1] || "",
+        yAxis: numCols[0] || result.columns[1] || "",
       });
     }
-  }, [result.columns]);
+  }, [result.columns]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Transform data based on configuration
   const transformedData = useMemo(() => {
-    return transformData(
-      result,
-      localConfig.transform,
-      localConfig.xAxis,
-      localConfig.yAxis || localConfig.series
-    );
+    return transformData(result, localConfig.transform, localConfig.xAxis, localConfig.yAxis || localConfig.series);
   }, [result, localConfig.transform, localConfig.xAxis, localConfig.yAxis, localConfig.series]);
 
   const handleConfigChange = (updates: Partial<ChartConfig>) => {
-    const newConfig = { ...localConfig, ...updates };
-    setLocalConfig(newConfig);
+    setLocalConfig({ ...localConfig, ...updates });
   };
 
   const applyConfig = () => {
-    // Build series configuration from selected Y columns
     const series = selectedYColumns.map((col, idx) => ({
       column: col,
       label: col,
       color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
     }));
 
-    // Update config with selected Y columns as series
     const updatedConfig = {
       ...localConfig,
       series: series.length > 0 ? series : undefined,
@@ -169,61 +242,193 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
       toast.error("No chart to export");
       return;
     }
-
     try {
       const fileName = `chart-${Date.now()}.png`;
-      await exportChartAsPNG(chartRef.current, fileName);
+      const bg = theme === "dark" ? "#1a1a1a" : "#ffffff";
+      await exportChartAsPNG(chartRef.current, fileName, bg);
       toast.success("Chart exported as PNG");
     } catch (error) {
       toast.error(`Failed to export chart: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
-  // Commented out unused function - may be needed for future multi-column selection feature
-  // const handleYColumnToggle = (column: string) => {
-  //   setSelectedYColumns((prev) => {
-  //     const newSelection = prev.includes(column)
-  //       ? prev.filter((c) => c !== column)
-  //       : prev.length < 3
-  //       ? [...prev, column]
-  //       : prev;
-
-  //     // Update config with series
-  //     if (newSelection.length > 0) {
-  //       const series: SeriesConfig[] = newSelection.map((col, idx) => ({
-  //         column: col,
-  //         label: col,
-  //         color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
-  //       }));
-  //       handleConfigChange({ series, yAxis: undefined });
-  //     } else {
-  //       handleConfigChange({ series: undefined, yAxis: undefined });
-  //     }
-
-  //     return newSelection;
-  //   });
-  // };
-
   // Get numeric columns for Y-axis
-  const numericColumns = result.columns.filter((col) =>
-    isNumericColumn(result.data, col)
-  );
+  const numericColumns = result.columns.filter((col) => isNumericColumn(result.data, col));
 
   // Suggested chart types
   const suggestedTypes = useMemo(() => {
     return suggestChartTypes(result, localConfig.xAxis, localConfig.yAxis || localConfig.series);
   }, [result, localConfig.xAxis, localConfig.yAxis, localConfig.series]);
 
+  // ── Build uPlot options + data ──────────────────────────────────────────────
+
+  const { uPlotOptions, uPlotData } = useMemo(() => {
+    if (
+      !chartConfig ||
+      !chartConfig.xAxis ||
+      (!chartConfig.yAxis && (!chartConfig.series || chartConfig.series.length === 0))
+    ) {
+      return { uPlotOptions: null, uPlotData: null };
+    }
+
+    // Prepare row-based chart data
+    const chartData = transformedData.map((row) => {
+      const newRow: Record<string, unknown> = { ...row };
+      if (chartConfig.yAxis) newRow[chartConfig.yAxis] = Number(row[chartConfig.yAxis]) || 0;
+      if (chartConfig.series) {
+        chartConfig.series.forEach((s) => {
+          newRow[s.column] = Number(row[s.column]) || 0;
+        });
+      }
+      return newRow;
+    });
+
+    // Determine Y keys
+    const yKeys: string[] = chartConfig.series?.map((s) => s.column) ?? (chartConfig.yAxis ? [chartConfig.yAxis] : []);
+    const colors = chartConfig.colors || DEFAULT_COLORS;
+    const isDark = theme === "dark";
+
+    // Convert to uPlot columnar data: [xs, ...series]
+    const xs = chartData.map((_, i) => i);
+    const seriesData = yKeys.map((key) => chartData.map((row) => (Number(row[key]) || 0) as number));
+
+    // For stacked charts, compute stacked values
+    const isStacked = chartConfig.type === "stacked_bar" || chartConfig.type === "stacked_area";
+    const stackedData = isStacked
+      ? seriesData.reduce<number[][]>((acc, curr) => {
+          if (acc.length === 0) return [curr];
+          const prev = acc[acc.length - 1];
+          acc.push(curr.map((v, i) => v + prev[i]));
+          return acc;
+        }, [])
+      : seriesData;
+
+    const finalSeriesData = isStacked ? stackedData : seriesData;
+
+    const isBarType = ["bar", "stacked_bar", "grouped_bar"].includes(chartConfig.type);
+    const isAreaType = ["area", "stacked_area"].includes(chartConfig.type);
+    const isScatter = chartConfig.type === "scatter";
+
+    // X-axis labels
+    const xLabels = chartData.map((row) => shortenLabel(String(row[chartConfig.xAxis])));
+
+    // Build bars path builder
+    const barsBuilder = isBarType
+      ? uPlot.paths.bars!({
+          size: [0.6, 100],
+          radius: 0.2,
+          gap: yKeys.length > 1 && chartConfig.type === "grouped_bar" ? 2 : 0,
+        })
+      : undefined;
+
+    // Build series config
+    const uSeries: uPlot.Series[] = [
+      { label: chartConfig.xAxis },
+      ...yKeys.map((key, i) => {
+        const color = chartConfig.series?.[i]?.color || colors[i % colors.length];
+        const seriesLabel = chartConfig.series?.[i]?.label || key;
+
+        const s: uPlot.Series = {
+          label: seriesLabel,
+          stroke: color,
+          width: isBarType ? 0 : 2,
+          fill: isBarType || isAreaType ? color + (isAreaType ? "66" : "cc") : undefined,
+          points: { show: isScatter, size: isScatter ? 8 : 4 },
+          paths: isBarType ? barsBuilder : isScatter ? () => null : undefined,
+        };
+
+        // For grouped bars, need per-series bar offset
+        if (chartConfig.type === "grouped_bar" && yKeys.length > 1) {
+          const groupBars = uPlot.paths.bars!({
+            size: [0.6 / yKeys.length, 100],
+            radius: 0.2,
+            align: i === 0 ? -1 : i === yKeys.length - 1 ? 1 : 0,
+          });
+          s.paths = groupBars;
+        }
+
+        return s;
+      }),
+    ];
+
+    // Build axes config
+    const needsRotation = chartData.length > 10;
+    const maxLabelLen = Math.max(...xLabels.map((l) => l.length), 1);
+    const xAxisSize = needsRotation ? Math.min(120, 40 + maxLabelLen * 5) : 60;
+
+    const uAxes: uPlot.Axis[] = [
+      {
+        stroke: isDark ? "#888" : "#666",
+        grid: { stroke: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)", width: 1 },
+        ticks: { stroke: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)", width: 1 },
+        values: (_u: uPlot, vals: number[]) => vals.map((v) => xLabels[v] ?? ""),
+        gap: 8,
+        size: xAxisSize,
+        font: "12px system-ui, sans-serif",
+        labelFont: "12px system-ui, sans-serif",
+        rotate: needsRotation ? -45 : 0,
+      },
+      {
+        stroke: isDark ? "#888" : "#666",
+        grid: chartConfig.showGrid
+          ? { stroke: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)", width: 1, dash: [4, 4] }
+          : { show: false },
+        ticks: { stroke: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)", width: 1 },
+        values: (_u: uPlot, vals: number[]) => vals.map((v) => formatNumber(v)),
+        gap: 8,
+        size: 70,
+        font: "12px system-ui, sans-serif",
+        labelFont: "12px system-ui, sans-serif",
+      },
+    ];
+
+    const opts: Omit<uPlot.Options, "width" | "height"> = {
+      scales: {
+        x: { time: false },
+      },
+      series: uSeries,
+      axes: uAxes,
+      cursor: {
+        drag: { x: false, y: false },
+        points: {
+          size: 6,
+          fill: (u: uPlot, i: number) =>
+            (typeof u.series[i].stroke === "function"
+              ? (u.series[i].stroke as Function)(u, i)
+              : u.series[i].stroke) as string,
+          stroke: "transparent",
+          width: 0,
+        },
+      },
+      legend: { show: false },
+      plugins: [tooltipPlugin(xLabels)],
+      padding: [16, 16, 8, 0],
+    };
+
+    // Stacked: render in reverse order so first series is on top visually
+    const data: uPlot.AlignedData = isStacked
+      ? [xs, ...finalSeriesData.reverse()] as uPlot.AlignedData
+      : [xs, ...finalSeriesData] as uPlot.AlignedData;
+
+    return { uPlotOptions: opts, uPlotData: data };
+  }, [chartConfig, transformedData, theme]);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   const renderChart = () => {
-    if (!chartConfig || !chartConfig.xAxis || (!chartConfig.yAxis && (!chartConfig.series || chartConfig.series.length === 0))) {
+    if (
+      !chartConfig ||
+      !chartConfig.xAxis ||
+      (!chartConfig.yAxis && (!chartConfig.series || chartConfig.series.length === 0))
+    ) {
       return (
         <div className="flex flex-col items-center justify-center h-full space-y-6">
           <BarChart3 className="w-16 h-16 text-muted-foreground opacity-20" />
           <div className="text-center space-y-2 max-w-md">
             <h3 className="text-lg font-semibold">Create Your Chart</h3>
             <p className="text-muted-foreground text-sm">
-              Configure chart settings above to visualize your data. Choose a
-              chart type, select your axes, and customize to your needs.
+              Configure chart settings above to visualize your data. Choose a chart type, select your axes, and
+              customize to your needs.
             </p>
             {suggestedTypes.length > 0 && (
               <div className="pt-4">
@@ -247,334 +452,40 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
       );
     }
 
-    const chartData = transformedData.map((row) => {
-      const newRow: Record<string, any> = {
+    // Pie/Donut — SVG-based (uPlot is XY only)
+    if (chartConfig.type === "pie" || chartConfig.type === "donut") {
+      const chartData = transformedData.map((row) => ({
         ...row,
         [chartConfig.xAxis]: String(row[chartConfig.xAxis]),
-      };
-
-      // Handle single series
-      if (chartConfig.yAxis) {
-        newRow[chartConfig.yAxis] = Number(row[chartConfig.yAxis]) || 0;
-      }
-
-      // Handle multiple series
-      if (chartConfig.series) {
-        chartConfig.series.forEach((series) => {
-          newRow[series.column] = Number(row[series.column]) || 0;
-        });
-      }
-
-      return newRow;
-    });
-
-    // Common chart properties
-    const commonProps = {
-      data: chartData,
-      margin: { top: 20, right: 30, left: 20, bottom: 60 },
-    };
-
-    // Axis styling
-    const axisStyle = {
-      fontSize: 12,
-      fill: "hsl(var(--muted-foreground))",
-      fontFamily: "var(--font-sans)",
-    };
-
-    // Grid styling
-    const gridStyle = {
-      stroke: "hsl(var(--border))",
-      strokeOpacity: theme === "dark" ? 0.2 : 0.15,
-      strokeDasharray: "3 3",
-    };
-
-    // Legend styling
-    const legendStyle = {
-      fontSize: 12,
-      fontFamily: "var(--font-sans)",
-    };
-
-    const colors = chartConfig.colors || DEFAULT_COLORS;
-
-    // Helper to render series based on config
-    const renderSeries = () => {
-      if (chartConfig.series && chartConfig.series.length > 0) {
-        return chartConfig.series.map((series, idx) => {
-          const color = series.color || colors[idx % colors.length];
-
-          if (chartConfig.type === "bar" || chartConfig.type === "stacked_bar" || chartConfig.type === "grouped_bar") {
-            return (
-              <Bar
-                key={series.column}
-                dataKey={series.column}
-                fill={color}
-                radius={[8, 8, 0, 0]}
-                stackId={chartConfig.stacked ? "stack" : undefined}
-                name={series.label || series.column}
-              />
-            );
-          }
-
-          if (chartConfig.type === "line" || chartConfig.type === "area" || chartConfig.type === "stacked_area") {
-            return chartConfig.type.includes("area") ? (
-              <Area
-                key={series.column}
-                type={chartConfig.smooth ? "monotone" : "linear"}
-                dataKey={series.column}
-                stroke={color}
-                fill={color}
-                fillOpacity={0.6}
-                stackId={chartConfig.stacked ? "stack" : undefined}
-                name={series.label || series.column}
-              />
-            ) : (
-              <Line
-                key={series.column}
-                type={chartConfig.smooth ? "monotone" : "linear"}
-                dataKey={series.column}
-                stroke={color}
-                strokeWidth={2}
-                dot={{ r: 4 }}
-                name={series.label || series.column}
-              />
-            );
-          }
-
-          return null;
-        });
-      }
-
-      // Single series fallback
-      if (chartConfig.yAxis) {
-        const color = colors[0];
-
-        if (chartConfig.type === "bar" || chartConfig.type === "stacked_bar" || chartConfig.type === "grouped_bar") {
-          return (
-            <Bar
-              dataKey={chartConfig.yAxis}
-              fill={color}
-              radius={[8, 8, 0, 0]}
-              name={chartConfig.yAxis}
-            />
-          );
-        }
-
-        if (chartConfig.type === "line" || chartConfig.type === "area" || chartConfig.type === "stacked_area") {
-          return chartConfig.type.includes("area") ? (
-            <Area
-              type={chartConfig.smooth ? "monotone" : "linear"}
-              dataKey={chartConfig.yAxis}
-              stroke={color}
-              fill={color}
-              fillOpacity={0.6}
-              name={chartConfig.yAxis}
-            />
-          ) : (
-            <Line
-              type={chartConfig.smooth ? "monotone" : "linear"}
-              dataKey={chartConfig.yAxis}
-              stroke={color}
-              strokeWidth={2}
-              dot={{ r: 4 }}
-              name={chartConfig.yAxis}
-            />
-          );
-        }
-      }
-
-      return null;
-    };
-
-    // Render appropriate chart type
-    switch (chartConfig.type) {
-      case "bar":
-      case "stacked_bar":
-      case "grouped_bar":
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart {...commonProps}>
-              {chartConfig.showGrid && <CartesianGrid {...gridStyle} />}
-              <XAxis
-                dataKey={chartConfig.xAxis}
-                {...axisStyle}
-                height={60}
-                angle={chartData.length > 10 ? -45 : 0}
-                textAnchor={chartData.length > 10 ? "end" : "middle"}
-              />
-              <YAxis
-                {...axisStyle}
-                tickFormatter={formatNumber}
-                width={80}
-                label={chartConfig.yAxisConfig?.label ? {
-                  value: chartConfig.yAxisConfig.label,
-                  angle: -90,
-                  position: "insideLeft",
-                  style: axisStyle,
-                } : undefined}
-              />
-              <Tooltip content={<CustomChartTooltip formatter={formatNumber} />} />
-              {chartConfig.legend?.show && (
-                <Legend wrapperStyle={legendStyle} iconType="circle" />
-              )}
-              {renderSeries()}
-            </BarChart>
-          </ResponsiveContainer>
-        );
-
-      case "line":
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart {...commonProps}>
-              {chartConfig.showGrid && <CartesianGrid {...gridStyle} />}
-              <XAxis
-                dataKey={chartConfig.xAxis}
-                {...axisStyle}
-                tickFormatter={shortenLabel}
-                height={60}
-                angle={chartData.length > 10 ? -45 : 0}
-                textAnchor={chartData.length > 10 ? "end" : "middle"}
-              />
-              <YAxis {...axisStyle} tickFormatter={formatNumber} width={80} />
-              <Tooltip content={<CustomChartTooltip formatter={formatNumber} />} />
-              {chartConfig.legend?.show && (
-                <Legend wrapperStyle={legendStyle} iconType="line" />
-              )}
-              {renderSeries()}
-            </LineChart>
-          </ResponsiveContainer>
-        );
-
-      case "area":
-      case "stacked_area":
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart {...commonProps}>
-              {chartConfig.showGrid && <CartesianGrid {...gridStyle} />}
-              <XAxis
-                dataKey={chartConfig.xAxis}
-                {...axisStyle}
-                tickFormatter={shortenLabel}
-                height={60}
-                angle={chartData.length > 10 ? -45 : 0}
-                textAnchor={chartData.length > 10 ? "end" : "middle"}
-              />
-              <YAxis {...axisStyle} tickFormatter={formatNumber} width={80} />
-              <Tooltip content={<CustomChartTooltip formatter={formatNumber} />} />
-              {chartConfig.legend?.show && (
-                <Legend wrapperStyle={legendStyle} iconType="rect" />
-              )}
-              {renderSeries()}
-            </AreaChart>
-          </ResponsiveContainer>
-        );
-
-      case "scatter":
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart {...commonProps}>
-              {chartConfig.showGrid && <CartesianGrid {...gridStyle} />}
-              <XAxis
-                dataKey={chartConfig.xAxis}
-                {...axisStyle}
-                type="number"
-                tickFormatter={formatNumber}
-              />
-              <YAxis {...axisStyle} type="number" tickFormatter={formatNumber} width={80} />
-              <Tooltip content={<CustomChartTooltip formatter={formatNumber} />} />
-              {chartConfig.legend?.show && (
-                <Legend wrapperStyle={legendStyle} iconType="circle" />
-              )}
-              <Scatter
-                dataKey={chartConfig.yAxis || chartConfig.series?.[0]?.column}
-                fill={colors[0]}
-                name={chartConfig.yAxis || chartConfig.series?.[0]?.column}
-              />
-            </ScatterChart>
-          </ResponsiveContainer>
-        );
-
-      case "pie":
-      case "donut":
-        const RADIAN = Math.PI / 180;
-        const renderLabel = ({
-          cx,
-          cy,
-          midAngle,
-          innerRadius,
-          outerRadius,
-          percent,
-        }: any) => {
-          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-          const x = cx + radius * Math.cos(-midAngle * RADIAN);
-          const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-          return (
-            <text
-              x={x}
-              y={y}
-              fill="white"
-              textAnchor={x > cx ? "start" : "end"}
-              dominantBaseline="central"
-              fontSize={12}
-              fontWeight={600}
-            >
-              {`${(percent * 100).toFixed(0)}%`}
-            </text>
-          );
-        };
-
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                dataKey={chartConfig.yAxis || chartConfig.series?.[0]?.column}
-                nameKey={chartConfig.xAxis}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={chartConfig.showValues ? renderLabel : false}
-                outerRadius={120}
-                innerRadius={chartConfig.type === "donut" ? (chartConfig.innerRadius || 60) : 0}
-              >
-                {chartData.map((_, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={colors[index % colors.length]}
-                    stroke={theme === "dark" ? "#1a1a1a" : "#fff"}
-                    strokeWidth={2}
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomChartTooltip formatter={formatNumber} />} />
-              {chartConfig.legend?.show && (
-                <Legend
-                  wrapperStyle={legendStyle}
-                  iconType="circle"
-                  verticalAlign="bottom"
-                  height={36}
-                />
-              )}
-            </PieChart>
-          </ResponsiveContainer>
-        );
-
-      default:
-        return (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            Chart type "{chartConfig.type}" not yet implemented
-          </div>
-        );
+        [chartConfig.yAxis || chartConfig.series?.[0]?.column || ""]:
+          Number(row[chartConfig.yAxis || chartConfig.series?.[0]?.column || ""]) || 0,
+      }));
+      return (
+        <PieChart
+          data={chartData}
+          xKey={chartConfig.xAxis}
+          yKey={chartConfig.yAxis || chartConfig.series?.[0]?.column || ""}
+          colors={chartConfig.colors || DEFAULT_COLORS}
+          isDonut={chartConfig.type === "donut"}
+          innerRadius={chartConfig.innerRadius ? chartConfig.innerRadius / 120 : 0.45}
+          showValues={chartConfig.showValues}
+          theme={theme}
+          legendShow={chartConfig.legend?.show}
+        />
+      );
     }
+
+    // XY charts via uPlot
+    if (!uPlotOptions || !uPlotData) return null;
+
+    return <UPlotChart options={uPlotOptions} data={uPlotData} className="w-full h-full" />;
   };
 
   if (!result || !result.data || result.data.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center space-y-2">
-          <div className="text-muted-foreground text-sm">
-            No data available for visualization
-          </div>
+          <div className="text-muted-foreground text-sm">No data available for visualization</div>
         </div>
       </div>
     );
@@ -586,16 +497,13 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-4">
-            {/* Main Configuration Row */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               {/* Chart Type */}
               <div className="space-y-2">
                 <label className="text-xs font-medium">Chart Type</label>
                 <Select
                   value={localConfig.type}
-                  onValueChange={(value) =>
-                    handleConfigChange({ type: value as ChartType })
-                  }
+                  onValueChange={(value) => handleConfigChange({ type: value as ChartType })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -617,10 +525,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
               {/* X-Axis */}
               <div className="space-y-2">
                 <label className="text-xs font-medium">X-Axis</label>
-                <Select
-                  value={localConfig.xAxis || ""}
-                  onValueChange={(value) => handleConfigChange({ xAxis: value })}
-                >
+                <Select value={localConfig.xAxis || ""} onValueChange={(value) => handleConfigChange({ xAxis: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
@@ -634,7 +539,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
                 </Select>
               </div>
 
-              {/* Y-Axis (Multi-select 2-3 columns) */}
+              {/* Y-Axis */}
               <div className="space-y-2">
                 <label className="text-xs font-medium">Y-Axis (Select 2-3)</label>
                 <MultiSelect

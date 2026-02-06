@@ -30,6 +30,7 @@ import HomeTab from "@/components/workspace/HomeTab";
 import SqlTab from "@/components/workspace/SqlTab";
 import BrainTab from "@/components/workspace/BrainTab";
 import ConnectionsTab from "@/components/workspace/ConnectionsTab";
+import SettingsTab from "@/components/workspace/SettingsTab";
 import SortableTab from "@/components/workspace/SortableTab";
 import { useDuckStore } from "@/store";
 
@@ -112,11 +113,7 @@ export default function WorkspaceTabs() {
                     <div className="flex">
                       <TabsList className="inline-flex h-9 space-x-1 items-center justify-start rounded-none w-full bg-transparent">
                         {sortedTabs.map((tab) => (
-                          <SortableTab
-                            key={tab.id}
-                            tab={tab}
-                            isActive={activeTabId === tab.id}
-                          />
+                          <SortableTab key={tab.id} tab={tab} isActive={activeTabId === tab.id} />
                         ))}
                       </TabsList>
                     </div>
@@ -128,10 +125,7 @@ export default function WorkspaceTabs() {
                   New Query Tab <Plus className="ml-4 h-4 w-4" />
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem
-                  onClick={closeAllTabs}
-                  className="text-red-600"
-                >
+                <ContextMenuItem onClick={closeAllTabs} className="text-red-600">
                   Close All Tabs <XSquareIcon className="ml-4 h-4 w-4" />
                 </ContextMenuItem>
               </ContextMenuContent>
@@ -154,6 +148,8 @@ export default function WorkspaceTabs() {
                 <BrainTab />
               ) : tab.type === "connections" ? (
                 <ConnectionsTab />
+              ) : tab.type === "settings" ? (
+                <SettingsTab />
               ) : null}
             </TabsContent>
           ))}

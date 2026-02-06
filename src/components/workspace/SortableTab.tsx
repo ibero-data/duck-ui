@@ -1,7 +1,7 @@
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { TabsTrigger } from "@/components/ui/tabs";
-import { X, Home, Terminal, GripVertical, Brain, Cable } from "lucide-react";
+import { X, Home, Terminal, GripVertical, Brain, Cable, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDuckStore, type EditorTabType } from "@/store";
 
@@ -18,14 +18,7 @@ interface SortableTabProps {
 }
 
 function SortableTab({ tab, isActive }: SortableTabProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.id,
     disabled: tab.id === "home",
   });
@@ -98,6 +91,8 @@ function SortableTab({ tab, isActive }: SortableTabProps) {
               <Brain className="h-4 w-4" />
             ) : tab.type === "connections" ? (
               <Cable className="h-4 w-4" />
+            ) : tab.type === "settings" ? (
+              <Settings className="h-4 w-4" />
             ) : null}
           </div>
           <span className="truncate text-xs">{tab.title}</span>

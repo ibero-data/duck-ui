@@ -4,9 +4,9 @@
  * @returns Formatted string (e.g., 1,234,567)
  */
 export const formatNumber = (value: number): string => {
-  if (typeof value !== 'number' || isNaN(value)) return '0';
+  if (typeof value !== "number" || isNaN(value)) return "0";
 
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(value);
@@ -18,10 +18,10 @@ export const formatNumber = (value: number): string => {
  * @returns Formatted string with suffix (e.g., 1.23M)
  */
 export const formatNumberWithSuffix = (value: number): string => {
-  if (typeof value !== 'number' || isNaN(value)) return '0';
+  if (typeof value !== "number" || isNaN(value)) return "0";
 
   const absValue = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
+  const sign = value < 0 ? "-" : "";
 
   if (absValue >= 1e9) {
     return `${sign}${(absValue / 1e9).toFixed(2)}B`;
@@ -41,12 +41,12 @@ export const formatNumberWithSuffix = (value: number): string => {
  * @returns Formatted percentage string (e.g., 45.67%)
  */
 export const formatPercentage = (value: number, isDecimal: boolean = true): string => {
-  if (typeof value !== 'number' || isNaN(value)) return '0%';
+  if (typeof value !== "number" || isNaN(value)) return "0%";
 
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-    style: 'percent',
+    style: "percent",
   }).format(isDecimal ? value : value / 100);
 };
 
@@ -56,11 +56,11 @@ export const formatPercentage = (value: number, isDecimal: boolean = true): stri
  * @param currency - Currency code (default: USD)
  * @returns Formatted currency string (e.g., $1,234.56)
  */
-export const formatCurrency = (value: number, currency: string = 'USD'): string => {
-  if (typeof value !== 'number' || isNaN(value)) return '$0.00';
+export const formatCurrency = (value: number, currency: string = "USD"): string => {
+  if (typeof value !== "number" || isNaN(value)) return "$0.00";
 
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -74,7 +74,7 @@ export const formatCurrency = (value: number, currency: string = 'USD'): string 
  * @returns Shortened label
  */
 export const shortenLabel = (value: string, maxLength: number = 15): string => {
-  if (typeof value !== 'string') return String(value);
+  if (typeof value !== "string") return String(value);
 
   if (value.length <= maxLength) return value;
 
@@ -101,12 +101,12 @@ export const calculateTickCount = (dataLength: number): number => {
  */
 export const createGradient = (id: string, color: string) => ({
   id,
-  x1: '0',
-  y1: '0',
-  x2: '0',
-  y2: '1',
+  x1: "0",
+  y1: "0",
+  x2: "0",
+  y2: "1",
   stops: [
-    { offset: '5%', stopColor: color, stopOpacity: 0.8 },
-    { offset: '95%', stopColor: color, stopOpacity: 0.1 },
+    { offset: "5%", stopColor: color, stopOpacity: 0.8 },
+    { offset: "95%", stopColor: color, stopOpacity: 0.1 },
   ],
 });

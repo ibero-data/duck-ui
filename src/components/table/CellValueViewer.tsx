@@ -138,12 +138,7 @@ export const CellValueViewer: React.FC<CellValueViewerProps> = ({
             </p>
           </div>
           <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={handleCopy}
-            >
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleCopy}>
               <Copy className="h-3 w-3 mr-1" />
               Copy
             </Button>
@@ -155,12 +150,7 @@ export const CellValueViewer: React.FC<CellValueViewerProps> = ({
             >
               <ChevronDown className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={onClose}
-            >
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -177,9 +167,7 @@ export const CellValueViewer: React.FC<CellValueViewerProps> = ({
               {displayValue}
             </div>
           ) : valueType === "null" ? (
-            <div className="text-xs text-muted-foreground italic p-3">
-              {displayValue}
-            </div>
+            <div className="text-xs text-muted-foreground italic p-3">{displayValue}</div>
           ) : (
             <div className="text-xs font-mono bg-muted/50 p-3 rounded-md break-all">
               {displayValue}

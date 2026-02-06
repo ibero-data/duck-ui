@@ -40,7 +40,7 @@ self.MonacoEnvironment = {
 
 // Helper function to escape single quotes for SQL queries
 const escape = (str: string): string => {
-    return str.replace(/'/g, "''");
+  return str.replace(/'/g, "''");
 };
 
 // Create editor instance
@@ -84,9 +84,7 @@ export const createEditor = (
       await executeQueryFn(query, tabId);
     } catch (err) {
       toast.error(
-        `Query execution failed: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
+        `Query execution failed: ${err instanceof Error ? err.message : "Unknown error"}`
       );
     }
   });
@@ -100,24 +98,18 @@ export const createEditor = (
   editor.addAction({
     id: "execute-selection",
     label: "Execute Selected Query",
-    keybindings: [
-      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter,
-    ],
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
     contextMenuGroupId: "navigation",
     run: async (ed) => {
       const selection = ed.getSelection();
-      const selectedText = selection
-        ? ed.getModel()?.getValueInRange(selection)
-        : "";
+      const selectedText = selection ? ed.getModel()?.getValueInRange(selection) : "";
 
       if (selectedText?.trim()) {
         try {
           await executeQueryFn(selectedText.trim(), tabId);
         } catch (err) {
           toast.error(
-            `Query execution failed: ${
-              err instanceof Error ? err.message : "Unknown error"
-            }`
+            `Query execution failed: ${err instanceof Error ? err.message : "Unknown error"}`
           );
         }
       }
@@ -213,59 +205,58 @@ monaco.languages.registerDocumentFormattingEditProvider("sql", {
   },
 });
 
-
 // Adapt to use the WASM autocompletion
-interface AutocompleteItem { suggestion: string; }
+interface AutocompleteItem {
+  suggestion: string;
+}
 const queryNative = async <T>(connection: any, query: string): Promise<T[]> => {
-    const results = await connection.query(query);
-    return results.toArray().map((row: any) => row as T);
+  const results = await connection.query(query);
+  return results.toArray().map((row: any) => row as T);
 };
 
-monaco.languages.registerCompletionItemProvider('sql', {
-    triggerCharacters: [' ', '.', '(', ','],
-    async provideCompletionItems(model, position) {
-        const word = model.getWordUntilPosition(position);
-        const range = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: word.startColumn,
-            endColumn: word.endColumn,
+monaco.languages.registerCompletionItemProvider("sql", {
+  triggerCharacters: [" ", ".", "(", ","],
+  async provideCompletionItems(model, position) {
+    const word = model.getWordUntilPosition(position);
+    const range = {
+      startLineNumber: position.lineNumber,
+      endLineNumber: position.lineNumber,
+      startColumn: word.startColumn,
+      endColumn: word.endColumn,
+    };
+    const textInRange = model.getValueInRange({
+      startColumn: 0,
+      endColumn: position.column,
+      startLineNumber: position.lineNumber,
+      endLineNumber: position.lineNumber,
+    });
+
+    // Get the connection and ensure it's valid
+    const { connection } = useDuckStore.getState();
+    if (!connection) {
+      console.warn("No database connection available for autocompletion.");
+      return { suggestions: [] };
+    }
+    try {
+      const escapedText = escape(textInRange);
+      const query = `select suggestion from sql_auto_complete('${escapedText}')`;
+      const items: AutocompleteItem[] = await queryNative<AutocompleteItem>(connection, query);
+
+      const suggestions = items.map((item) => {
+        return {
+          label: String(item.suggestion),
+          kind: monaco.languages.CompletionItemKind.Field,
+          insertText: String(item.suggestion),
+          range,
         };
-        const textInRange = model.getValueInRange({
-            startColumn: 0,
-            endColumn: position.column,
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-        });
+      });
 
-        // Get the connection and ensure it's valid
-        const { connection } = useDuckStore.getState();
-        if (!connection) {
-            console.warn("No database connection available for autocompletion.");
-            return { suggestions: [] };
-        }
-        try {
-
-            const escapedText = escape(textInRange);
-            const query = `select suggestion from sql_auto_complete('${escapedText}')`;
-            const items: AutocompleteItem[] = await queryNative<AutocompleteItem>(connection, query);
-
-            const suggestions = items.map((item) => {
-                return {
-                    label: String(item.suggestion),
-                    kind: monaco.languages.CompletionItemKind.Field,
-                    insertText: String(item.suggestion),
-                    range,
-                };
-            });
-
-            return { suggestions };
-
-        } catch (error) {
-            console.error("Autocompletion query failed:", error);
-            return { suggestions: [] };
-        }
-    },
+      return { suggestions };
+    } catch (error) {
+      console.error("Autocompletion query failed:", error);
+      return { suggestions: [] };
+    }
+  },
 });
 
 // Export everything needed

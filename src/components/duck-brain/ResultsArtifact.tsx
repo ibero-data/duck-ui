@@ -2,10 +2,7 @@ import React, { useState } from "react";
 import { Loader2, AlertCircle, ChevronDown, ChevronUp, Table2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { QueryResultArtifact } from "@/store";
 
@@ -18,11 +15,7 @@ interface ResultsArtifactProps {
 const MAX_INLINE_ROWS = 5;
 const MAX_INLINE_COLUMNS = 6;
 
-const ResultsArtifact: React.FC<ResultsArtifactProps> = ({
-  queryResult,
-  onRetry,
-  className,
-}) => {
+const ResultsArtifact: React.FC<ResultsArtifactProps> = ({ queryResult, onRetry, className }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { status, data, error } = queryResult;
 
@@ -45,10 +38,7 @@ const ResultsArtifact: React.FC<ResultsArtifactProps> = ({
   if (status === "error") {
     return (
       <div
-        className={cn(
-          "p-3 rounded-lg border border-destructive/50 bg-destructive/5",
-          className
-        )}
+        className={cn("p-3 rounded-lg border border-destructive/50 bg-destructive/5", className)}
       >
         <div className="flex items-start gap-2">
           <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
@@ -59,12 +49,7 @@ const ResultsArtifact: React.FC<ResultsArtifactProps> = ({
             </p>
           </div>
           {onRetry && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRetry}
-              className="flex-shrink-0 h-7 px-2"
-            >
+            <Button variant="ghost" size="sm" onClick={onRetry} className="flex-shrink-0 h-7 px-2">
               <RotateCcw className="h-3 w-3 mr-1" />
               Retry
             </Button>
@@ -87,12 +72,7 @@ const ResultsArtifact: React.FC<ResultsArtifactProps> = ({
   const displayColumns = columns.slice(0, MAX_INLINE_COLUMNS);
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border border-border overflow-hidden bg-card",
-        className
-      )}
-    >
+    <div className={cn("rounded-lg border border-border overflow-hidden bg-card", className)}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
         <div className="flex items-center gap-2">
@@ -116,27 +96,20 @@ const ResultsArtifact: React.FC<ResultsArtifactProps> = ({
                 >
                   <div className="flex flex-col">
                     <span>{col}</span>
-                    <span className="text-[10px] font-normal opacity-60">
-                      {columnTypes[i]}
-                    </span>
+                    <span className="text-[10px] font-normal opacity-60">{columnTypes[i]}</span>
                   </div>
                 </th>
               ))}
               {hasMoreColumns && (
                 <th className="px-3 py-1.5 text-left font-medium text-muted-foreground">
-                  <span className="text-[10px]">
-                    +{columns.length - MAX_INLINE_COLUMNS} more
-                  </span>
+                  <span className="text-[10px]">+{columns.length - MAX_INLINE_COLUMNS} more</span>
                 </th>
               )}
             </tr>
           </thead>
           <tbody>
             {displayRows.map((row, rowIdx) => (
-              <tr
-                key={rowIdx}
-                className="border-b last:border-0 hover:bg-muted/20"
-              >
+              <tr key={rowIdx} className="border-b last:border-0 hover:bg-muted/20">
                 {displayColumns.map((col) => (
                   <td
                     key={col}
@@ -146,9 +119,7 @@ const ResultsArtifact: React.FC<ResultsArtifactProps> = ({
                     {formatCellValue(row[col])}
                   </td>
                 ))}
-                {hasMoreColumns && (
-                  <td className="px-3 py-1.5 text-muted-foreground">...</td>
-                )}
+                {hasMoreColumns && <td className="px-3 py-1.5 text-muted-foreground">...</td>}
               </tr>
             ))}
           </tbody>

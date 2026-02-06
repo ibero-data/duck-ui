@@ -2,11 +2,7 @@
 // Powered by WebLLM (in-browser LLM inference)
 
 export { duckBrainService } from "./webllm.service";
-export type {
-  ModelStatus,
-  DuckBrainServiceState,
-  StreamCallbacks,
-} from "./webllm.service";
+export type { ModelStatus, DuckBrainServiceState, StreamCallbacks } from "./webllm.service";
 
 export { AVAILABLE_MODELS, DEFAULT_MODEL } from "./models.config";
 export type { ModelConfig } from "./models.config";

@@ -13,12 +13,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Cloud,
   CloudOff,
@@ -86,9 +81,7 @@ function CloudConnectionItem({
             <span className={`text-[10px] px-1 py-0.5 rounded ${config.bgColor} ${config.color}`}>
               {config.label}
             </span>
-            {connection.isConnected && (
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            )}
+            {connection.isConnected && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
           </div>
           {connection.lastError && (
             <TooltipProvider>
@@ -110,11 +103,7 @@ function CloudConnectionItem({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100"
-          >
+          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
             {isLoading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
@@ -245,10 +234,7 @@ export default function CloudBrowser() {
       )}
 
       {/* Add Connection Modal */}
-      <CloudConnectionModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
+      <CloudConnectionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

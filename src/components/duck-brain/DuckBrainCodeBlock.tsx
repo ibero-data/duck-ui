@@ -53,19 +53,12 @@ const DuckBrainCodeBlock: React.FC<DuckBrainCodeBlockProps> = ({
       <div className="rounded-lg overflow-hidden border bg-muted/30">
         {/* SQL Code */}
         <pre className="p-3 text-xs overflow-x-auto">
-          <code className="text-foreground font-mono whitespace-pre-wrap break-all">
-            {sql}
-          </code>
+          <code className="text-foreground font-mono whitespace-pre-wrap break-all">{sql}</code>
         </pre>
 
         {/* Actions */}
         <div className="flex items-center gap-1 p-2 border-t bg-muted/50">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopy}
-            className="h-7 text-xs gap-1"
-          >
+          <Button variant="ghost" size="sm" onClick={handleCopy} className="h-7 text-xs gap-1">
             {copied ? (
               <>
                 <Check className="h-3 w-3" />

@@ -180,10 +180,10 @@ export async function testHttpfsSupport(): Promise<HttpfsTestResult[]> {
   console.log("📊 HTTPFS FEASIBILITY TEST SUMMARY");
   console.log("=".repeat(50));
 
-  const passed = results.filter(r => r.success).length;
-  const failed = results.filter(r => !r.success).length;
+  const passed = results.filter((r) => r.success).length;
+  const failed = results.filter((r) => !r.success).length;
 
-  results.forEach(r => {
+  results.forEach((r) => {
     const icon = r.success ? "✅" : "❌";
     console.log(`${icon} ${r.test}: ${r.success ? "PASS" : "FAIL"}`);
     if (r.error) console.log(`   Error: ${r.error}`);

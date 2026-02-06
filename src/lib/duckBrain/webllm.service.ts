@@ -21,13 +21,7 @@ declare global {
   }
 }
 
-export type ModelStatus =
-  | "idle"
-  | "checking"
-  | "downloading"
-  | "loading"
-  | "ready"
-  | "error";
+export type ModelStatus = "idle" | "checking" | "downloading" | "loading" | "ready" | "error";
 
 export interface DuckBrainServiceState {
   status: ModelStatus;
@@ -80,8 +74,7 @@ class DuckBrainService {
       this.updateState({
         isWebGPUSupported: false,
         status: "error",
-        error:
-          "WebGPU is not supported in this browser. Please use Chrome 113+ or Edge 113+.",
+        error: "WebGPU is not supported in this browser. Please use Chrome 113+ or Edge 113+.",
       });
       return false;
     }
@@ -93,9 +86,7 @@ class DuckBrainService {
       this.updateState({
         isWebGPUSupported: supported,
         status: supported ? "idle" : "error",
-        error: supported
-          ? null
-          : "WebGPU adapter not available. Your GPU may not be supported.",
+        error: supported ? null : "WebGPU adapter not available. Your GPU may not be supported.",
       });
 
       return supported;
@@ -179,10 +170,7 @@ class DuckBrainService {
       await this.cleanup();
 
       // Create Web Worker for off-main-thread processing
-      this.worker = new Worker(
-        new URL("./webllm.worker.ts", import.meta.url),
-        { type: "module" }
-      );
+      this.worker = new Worker(new URL("./webllm.worker.ts", import.meta.url), { type: "module" });
 
       // Create engine with worker
       this.engine = await CreateWebWorkerMLCEngine(this.worker, modelId, {
@@ -197,8 +185,7 @@ class DuckBrainService {
         error: null,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to initialize model";
+      const errorMessage = error instanceof Error ? error.message : "Failed to initialize model";
 
       this.updateState({
         status: "error",

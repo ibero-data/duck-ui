@@ -17,9 +17,7 @@ interface ConnectionSwitcherProps {
   className?: string;
 }
 
-export default function ConnectionSwitcher({
-  className,
-}: ConnectionSwitcherProps) {
+export default function ConnectionSwitcher({ className }: ConnectionSwitcherProps) {
   const {
     connectionList,
     currentConnection,
@@ -83,7 +81,10 @@ export default function ConnectionSwitcher({
             {isLoading ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              <Circle className={cn("h-2 w-2", getStatusColor(activeConnection?.scope || "WASM"))} fill="currentColor" />
+              <Circle
+                className={cn("h-2 w-2", getStatusColor(activeConnection?.scope || "WASM"))}
+                fill="currentColor"
+              />
             )}
             <span className="font-medium text-sm truncate max-w-[120px]">
               {activeConnection?.name}
@@ -95,11 +96,7 @@ export default function ConnectionSwitcher({
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent
-          className="w-[240px]"
-          align="start"
-          sideOffset={8}
-        >
+        <DropdownMenuContent className="w-[240px]" align="start" sideOffset={8}>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
             Switch Connection
           </DropdownMenuLabel>

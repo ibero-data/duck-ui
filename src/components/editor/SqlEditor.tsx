@@ -1,25 +1,17 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Play, Loader2, Lightbulb, Command, Edit, Share2, Brain } from "lucide-react";
+import { Play, Loader2, Lightbulb, Command, Edit, Share2, Brain, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDuckStore } from "@/store";
 import { useTheme } from "../theme/theme-provider";
 import { cn } from "@/lib/utils";
-import {
-  createEditor,
-  useMonacoConfig,
-  type EditorInstance,
-} from "./monacoConfig";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { createEditor, useMonacoConfig, type EditorInstance } from "./monacoConfig";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import FloatingActionButton from "@/components/common/FloatingActionButton";
 import { copyQueryURL } from "@/hooks/useQueryFromURL";
+import SaveQueryDialog from "@/components/saved-queries/SaveQueryDialog";
 
 interface SqlEditorProps {
   tabId: string;
@@ -31,25 +23,24 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
   const { theme } = useTheme();
-  const { tabs, executeQuery, isExecuting, updateTabTitle, toggleBrainPanel, duckBrain } =
+  const { tabs, executeQuery, isExecuting, updateTabTitle, toggleBrainPanel, duckBrain, currentProfileId } =
     useDuckStore();
   const monacoConfig = useMonacoConfig(theme);
 
   const currentTab = tabs.find((tab) => tab.id === tabId);
   const currentContent =
-    currentTab?.type === "sql" && typeof currentTab.content === "string"
-      ? currentTab.content
-      : "";
+    currentTab?.type === "sql" && typeof currentTab.content === "string" ? currentTab.content : "";
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(title);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   // Stable callback for query execution
   const stableExecuteCallback = useCallback(
     async (query: string, queryTabId: string) => {
       await executeQuery(query, queryTabId);
     },
-    [executeQuery]  // Add executeQuery as a dependency
+    [executeQuery] // Add executeQuery as a dependency
   );
 
   // Editor initialization effect
@@ -84,7 +75,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
         editor.setPosition(position);
       }
     }
-  }, [currentContent]);  // Only depend on currentContent
+  }, [currentContent]); // Only depend on currentContent
 
   const handleExecuteQuery = async () => {
     const editor = editorInstanceRef.current?.editor;
@@ -163,9 +154,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
             />
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-lg font-medium truncate text-sm">
-                {currentTitle}
-              </span>
+              <span className="text-lg font-medium truncate text-sm">{currentTitle}</span>
               <Button
                 variant="ghost"
                 size="icon"
@@ -186,11 +175,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
                 <TooltipTrigger className="hover:bg-muted/50 p-2 rounded-md transition-colors">
                   <Lightbulb className="h-5 w-5 text-yellow-500/70 hover:text-yellow-500 transition-colors" />
                 </TooltipTrigger>
-                <TooltipContent
-                  side="bottom"
-                  className="w-72 p-0"
-                  sideOffset={5}
-                >
+                <TooltipContent side="bottom" className="w-72 p-0" sideOffset={5}>
                   <div className="bg-card px-3 py-2 rounded-t-sm border-b">
                     <h4 className="font-medium flex items-center gap-2">
                       <Command className="h-4 w-4" />
@@ -218,17 +203,30 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
           <TooltipProvider>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <Button
-                  onClick={handleShareQuery}
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9"
-                >
+                <Button onClick={handleShareQuery} variant="ghost" size="icon" className="h-9 w-9">
                   <Share2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
                 <p>Copy shareable URL</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={() => setSaveDialogOpen(true)}
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  disabled={!currentContent.trim() || !currentProfileId}
+                >
+                  <Bookmark className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Save Query</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -277,6 +275,13 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
         label={isExecuting ? "Running..." : "Run"}
         disabled={isExecuting}
         className={isExecuting ? "animate-pulse" : ""}
+      />
+
+      <SaveQueryDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        defaultName={currentTitle}
+        sqlText={currentContent}
       />
     </div>
   );

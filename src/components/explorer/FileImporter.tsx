@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useState,
-  useMemo,
-  useRef,
-  useEffect,
-} from "react";
+import React, { useCallback, useState, useMemo, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import {
   Upload,
@@ -34,20 +28,10 @@ import { Button } from "@/components/ui/button";
 import DuckUITable from "@/components/table/DuckUItable";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -57,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -68,9 +52,7 @@ const ACCEPTED_FILE_TYPES = {
   "application/json": [".json"],
   "application/octet-stream": [".parquet", ".arrow", ".db", ".ddb"],
   "application/vnd.duckdb": [".duckdb", ".db", ".ddb"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
-    ".xlsx",
-  ],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
 } as const;
 
 const MAX_FILE_SIZE = 3 * 1024 * 1024 * 1024; // 3GB
@@ -178,12 +160,19 @@ const getErrorSuggestion = (errorMessage: string): string | null => {
   const lowerError = errorMessage.toLowerCase();
 
   // Network/URL errors
-  if (lowerError.includes("fetch") || lowerError.includes("network") || lowerError.includes("cors")) {
+  if (
+    lowerError.includes("fetch") ||
+    lowerError.includes("network") ||
+    lowerError.includes("cors")
+  ) {
     return "Check your internet connection and ensure the URL is publicly accessible. CORS restrictions may prevent access to some URLs.";
   }
 
   // File format errors
-  if (lowerError.includes("invalid") && (lowerError.includes("csv") || lowerError.includes("json") || lowerError.includes("parquet"))) {
+  if (
+    lowerError.includes("invalid") &&
+    (lowerError.includes("csv") || lowerError.includes("json") || lowerError.includes("parquet"))
+  ) {
     return "The file format may be corrupted or not match the expected structure. Try opening the file locally to verify its contents.";
   }
 
@@ -198,7 +187,11 @@ const getErrorSuggestion = (errorMessage: string): string | null => {
   }
 
   // Authentication errors
-  if (lowerError.includes("401") || lowerError.includes("403") || lowerError.includes("unauthorized")) {
+  if (
+    lowerError.includes("401") ||
+    lowerError.includes("403") ||
+    lowerError.includes("unauthorized")
+  ) {
     return "Access denied. The URL may require authentication or the resource is not publicly accessible.";
   }
 
@@ -245,10 +238,7 @@ const tableNameSchema = z
   .string()
   .trim()
   .min(1, "Table name cannot be empty")
-  .regex(
-    /^[a-zA-Z0-9_]+$/,
-    "Table name can only contain letters, numbers, and underscores"
-  );
+  .regex(/^[a-zA-Z0-9_]+$/, "Table name can only contain letters, numbers, and underscores");
 
 const FileDetails: React.FC<FileDetailsProps> = ({
   file,
@@ -272,9 +262,7 @@ const FileDetails: React.FC<FileDetailsProps> = ({
       setTableNameError(null);
     } catch (error) {
       setTableNameError(
-        error instanceof z.ZodError
-          ? error.issues[0].message
-          : "Invalid table name"
+        error instanceof z.ZodError ? error.issues[0].message : "Invalid table name"
       );
     }
   }, [tableName]);
@@ -319,9 +307,7 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                   </Tooltip>
                 </TooltipProvider>
 
-                <span className="uppercase px-2 py-0.5 rounded text-xs">
-                  {fileType}
-                </span>
+                <span className="uppercase px-2 py-0.5 rounded text-xs">{fileType}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -355,13 +341,9 @@ const FileDetails: React.FC<FileDetailsProps> = ({
               onChange={(e) => onTableNameChange(e.target.value)}
               placeholder="Enter table name"
               className="max-w-md p-2 ml-1"
-              disabled={
-                status.status === "uploading" || status.status === "processing"
-              }
+              disabled={status.status === "uploading" || status.status === "processing"}
             />
-            {tableNameError && (
-              <p className="text-sm text-red-500">{tableNameError}</p>
-            )}
+            {tableNameError && <p className="text-sm text-red-500">{tableNameError}</p>}
             <p className="text-sm text-gray-500">
               This name will be used to reference the table in SQL queries
             </p>
@@ -389,19 +371,11 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                         type="checkbox"
                         id={`header-${file.name}`}
                         checked={csvOptions.header}
-                        onChange={(e) =>
-                          handleCsvOptionChange("header", e.target.checked)
-                        }
-                        disabled={
-                          status.status === "uploading" ||
-                          status.status === "processing"
-                        }
+                        onChange={(e) => handleCsvOptionChange("header", e.target.checked)}
+                        disabled={status.status === "uploading" || status.status === "processing"}
                         className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
-                      <Label
-                        htmlFor={`header-${file.name}`}
-                        className="text-sm"
-                      >
+                      <Label htmlFor={`header-${file.name}`} className="text-sm">
                         Has header row
                       </Label>
                     </div>
@@ -411,19 +385,11 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                         type="checkbox"
                         id={`auto-detect-${file.name}`}
                         checked={csvOptions.autoDetect}
-                        onChange={(e) =>
-                          handleCsvOptionChange("autoDetect", e.target.checked)
-                        }
-                        disabled={
-                          status.status === "uploading" ||
-                          status.status === "processing"
-                        }
+                        onChange={(e) => handleCsvOptionChange("autoDetect", e.target.checked)}
+                        disabled={status.status === "uploading" || status.status === "processing"}
                         className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
-                      <Label
-                        htmlFor={`auto-detect-${file.name}`}
-                        className="text-sm"
-                      >
+                      <Label htmlFor={`auto-detect-${file.name}`} className="text-sm">
                         Auto-detect types
                       </Label>
                     </div>
@@ -433,22 +399,11 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                         type="checkbox"
                         id={`ignore-errors-${file.name}`}
                         checked={csvOptions.ignoreErrors}
-                        onChange={(e) =>
-                          handleCsvOptionChange(
-                            "ignoreErrors",
-                            e.target.checked
-                          )
-                        }
-                        disabled={
-                          status.status === "uploading" ||
-                          status.status === "processing"
-                        }
+                        onChange={(e) => handleCsvOptionChange("ignoreErrors", e.target.checked)}
+                        disabled={status.status === "uploading" || status.status === "processing"}
                         className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
-                      <Label
-                        htmlFor={`ignore-errors-${file.name}`}
-                        className="text-sm"
-                      >
+                      <Label htmlFor={`ignore-errors-${file.name}`} className="text-sm">
                         Ignore errors
                       </Label>
                     </div>
@@ -458,44 +413,28 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                         type="checkbox"
                         id={`null-padding-${file.name}`}
                         checked={csvOptions.nullPadding}
-                        onChange={(e) =>
-                          handleCsvOptionChange("nullPadding", e.target.checked)
-                        }
-                        disabled={
-                          status.status === "uploading" ||
-                          status.status === "processing"
-                        }
+                        onChange={(e) => handleCsvOptionChange("nullPadding", e.target.checked)}
+                        disabled={status.status === "uploading" || status.status === "processing"}
                         className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
-                      <Label
-                        htmlFor={`null-padding-${file.name}`}
-                        className="text-sm"
-                      >
+                      <Label htmlFor={`null-padding-${file.name}`} className="text-sm">
                         Pad missing columns
                       </Label>
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <Label
-                      htmlFor={`delimiter-${file.name}`}
-                      className="text-sm"
-                    >
+                    <Label htmlFor={`delimiter-${file.name}`} className="text-sm">
                       Delimiter
                     </Label>
                     <div className="max-w-xs">
                       <Input
                         id={`delimiter-${file.name}`}
                         value={csvOptions.delimiter}
-                        onChange={(e) =>
-                          handleCsvOptionChange("delimiter", e.target.value)
-                        }
+                        onChange={(e) => handleCsvOptionChange("delimiter", e.target.value)}
                         placeholder="Delimiter character"
                         className="h-8"
-                        disabled={
-                          status.status === "uploading" ||
-                          status.status === "processing"
-                        }
+                        disabled={status.status === "uploading" || status.status === "processing"}
                       />
                     </div>
                     <p className="text-xs text-gray-500">
@@ -509,54 +448,35 @@ const FileDetails: React.FC<FileDetailsProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label
-                          htmlFor={`quote-${file.name}`}
-                          className="text-xs"
-                        >
+                        <Label htmlFor={`quote-${file.name}`} className="text-xs">
                           Quote Character
                         </Label>
                         <Input
                           id={`quote-${file.name}`}
                           value={csvOptions.quote || ""}
-                          onChange={(e) =>
-                            handleCsvOptionChange("quote", e.target.value)
-                          }
+                          onChange={(e) => handleCsvOptionChange("quote", e.target.value)}
                           placeholder={`" (default)`}
                           className="h-8 text-xs"
-                          disabled={
-                            status.status === "uploading" ||
-                            status.status === "processing"
-                          }
+                          disabled={status.status === "uploading" || status.status === "processing"}
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <Label
-                          htmlFor={`escape-${file.name}`}
-                          className="text-xs"
-                        >
+                        <Label htmlFor={`escape-${file.name}`} className="text-xs">
                           Escape Character
                         </Label>
                         <Input
                           id={`escape-${file.name}`}
                           value={csvOptions.escape || ""}
-                          onChange={(e) =>
-                            handleCsvOptionChange("escape", e.target.value)
-                          }
+                          onChange={(e) => handleCsvOptionChange("escape", e.target.value)}
                           placeholder={`" (default)`}
                           className="h-8 text-xs"
-                          disabled={
-                            status.status === "uploading" ||
-                            status.status === "processing"
-                          }
+                          disabled={status.status === "uploading" || status.status === "processing"}
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <Label
-                          htmlFor={`skip-${file.name}`}
-                          className="text-xs"
-                        >
+                        <Label htmlFor={`skip-${file.name}`} className="text-xs">
                           Skip Rows
                         </Label>
                         <Input
@@ -569,18 +489,12 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                           }
                           placeholder="0"
                           className="h-8 text-xs"
-                          disabled={
-                            status.status === "uploading" ||
-                            status.status === "processing"
-                          }
+                          disabled={status.status === "uploading" || status.status === "processing"}
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <Label
-                          htmlFor={`sample-size-${file.name}`}
-                          className="text-xs"
-                        >
+                        <Label htmlFor={`sample-size-${file.name}`} className="text-xs">
                           Sample Size
                         </Label>
                         <Input
@@ -589,37 +503,29 @@ const FileDetails: React.FC<FileDetailsProps> = ({
                           min="1"
                           value={csvOptions.sampleSize || ""}
                           onChange={(e) =>
-                            handleCsvOptionChange("sampleSize", parseInt(e.target.value, 10) || undefined)
+                            handleCsvOptionChange(
+                              "sampleSize",
+                              parseInt(e.target.value, 10) || undefined
+                            )
                           }
                           placeholder="Auto"
                           className="h-8 text-xs"
-                          disabled={
-                            status.status === "uploading" ||
-                            status.status === "processing"
-                          }
+                          disabled={status.status === "uploading" || status.status === "processing"}
                         />
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <Label
-                        htmlFor={`null-str-${file.name}`}
-                        className="text-xs"
-                      >
+                      <Label htmlFor={`null-str-${file.name}`} className="text-xs">
                         NULL String
                       </Label>
                       <Input
                         id={`null-str-${file.name}`}
                         value={csvOptions.nullStr || ""}
-                        onChange={(e) =>
-                          handleCsvOptionChange("nullStr", e.target.value)
-                        }
+                        onChange={(e) => handleCsvOptionChange("nullStr", e.target.value)}
                         placeholder="Empty values treated as NULL"
                         className="h-8 text-xs"
-                        disabled={
-                          status.status === "uploading" ||
-                          status.status === "processing"
-                        }
+                        disabled={status.status === "uploading" || status.status === "processing"}
                       />
                       <p className="text-xs text-muted-foreground">
                         Values matching this string will be treated as NULL
@@ -628,46 +534,30 @@ const FileDetails: React.FC<FileDetailsProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label
-                          htmlFor={`date-format-${file.name}`}
-                          className="text-xs"
-                        >
+                        <Label htmlFor={`date-format-${file.name}`} className="text-xs">
                           Date Format
                         </Label>
                         <Input
                           id={`date-format-${file.name}`}
                           value={csvOptions.dateFormat || ""}
-                          onChange={(e) =>
-                            handleCsvOptionChange("dateFormat", e.target.value)
-                          }
+                          onChange={(e) => handleCsvOptionChange("dateFormat", e.target.value)}
                           placeholder="ISO 8601"
                           className="h-8 text-xs"
-                          disabled={
-                            status.status === "uploading" ||
-                            status.status === "processing"
-                          }
+                          disabled={status.status === "uploading" || status.status === "processing"}
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <Label
-                          htmlFor={`timestamp-format-${file.name}`}
-                          className="text-xs"
-                        >
+                        <Label htmlFor={`timestamp-format-${file.name}`} className="text-xs">
                           Timestamp Format
                         </Label>
                         <Input
                           id={`timestamp-format-${file.name}`}
                           value={csvOptions.timestampFormat || ""}
-                          onChange={(e) =>
-                            handleCsvOptionChange("timestampFormat", e.target.value)
-                          }
+                          onChange={(e) => handleCsvOptionChange("timestampFormat", e.target.value)}
                           placeholder="ISO 8601"
                           className="h-8 text-xs"
-                          disabled={
-                            status.status === "uploading" ||
-                            status.status === "processing"
-                          }
+                          disabled={status.status === "uploading" || status.status === "processing"}
                         />
                       </div>
                     </div>
@@ -679,9 +569,7 @@ const FileDetails: React.FC<FileDetailsProps> = ({
 
           {status.status === "uploading" && status.progress !== undefined && (
             <div className="flex flex-col space-y-2">
-              <span className="text-sm text-gray-500">
-                Uploading... {status.progress}%
-              </span>
+              <span className="text-sm text-gray-500">Uploading... {status.progress}%</span>
               <Progress value={status.progress} />
             </div>
           )}
@@ -705,22 +593,15 @@ const FileDetails: React.FC<FileDetailsProps> = ({
   );
 };
 
-const FileImporter: React.FC<FileImporterProps> = ({
-  isSheetOpen,
-  setIsSheetOpen,
-}) => {
+const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen }) => {
   const { importFile, executeQuery } = useDuckStore();
   const [activeTab, setActiveTab] = useState("upload");
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [tableNames, setTableNames] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<UploadError[]>([]);
-  const [importStates, setImportStates] = useState<
-    Record<string, FileImportState>
-  >({});
-  const [csvOptions, setCsvOptions] = useState<
-    Record<string, CsvImportOptions>
-  >({});
+  const [importStates, setImportStates] = useState<Record<string, FileImportState>>({});
+  const [csvOptions, setCsvOptions] = useState<Record<string, CsvImportOptions>>({});
   const [isDragActive, setIsDragActive] = useState(false);
   const [importMode, setImportMode] = useState<"table" | "view">("table");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -767,14 +648,11 @@ const FileImporter: React.FC<FileImporterProps> = ({
 
   const validateFile = (file: File): UploadError[] => {
     const errors: UploadError[] = [];
-    const extension = file.name
-      .split(".")
-      .pop()
-      ?.toLowerCase() as FileExtension;
+    const extension = file.name.split(".").pop()?.toLowerCase() as FileExtension;
 
     if (!extension || !SUPPORTED_FILE_EXTENSIONS.includes(extension)) {
       errors.push({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         file: file.name,
         message: `Unsupported file type: .${extension}`,
         severity: "error",
@@ -784,25 +662,18 @@ const FileImporter: React.FC<FileImporterProps> = ({
 
     if (file.size > MAX_FILE_SIZE) {
       errors.push({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         file: file.name,
-        message: `File exceeds maximum size of ${formatFileSize(
-          MAX_FILE_SIZE
-        )}`,
+        message: `File exceeds maximum size of ${formatFileSize(MAX_FILE_SIZE)}`,
         severity: "error",
       });
-      toast.warning(
-        `File exceeds maximum size of ${formatFileSize(MAX_FILE_SIZE)}`
-      );
+      toast.warning(`File exceeds maximum size of ${formatFileSize(MAX_FILE_SIZE)}`);
     }
 
     return errors;
   };
 
-  const updateImportState = (
-    fileName: string,
-    state: Partial<FileImportState>
-  ) => {
+  const updateImportState = (fileName: string, state: Partial<FileImportState>) => {
     setImportStates((prev) => ({
       ...prev,
       [fileName]: {
@@ -851,28 +722,26 @@ const FileImporter: React.FC<FileImporterProps> = ({
       setTableNames((prev) => ({ ...prev, ...newTableNames }));
 
       // Initialize CSV options for any CSV files
-      const newCsvOptions = validFiles.reduce<Record<string, CsvImportOptions>>(
+      const newCsvOptions = validFiles.reduce<Record<string, CsvImportOptions>>((acc, file) => {
+        const extension = file.name.split(".").pop()?.toLowerCase();
+        if (extension === "csv") {
+          acc[file.name] = { ...defaultCsvOptions };
+        }
+        return acc;
+      }, {});
+
+      setCsvOptions((prev) => ({ ...prev, ...newCsvOptions }));
+
+      const initialImportStates = validFiles.reduce<Record<string, FileImportState>>(
         (acc, file) => {
-          const extension = file.name.split(".").pop()?.toLowerCase();
-          if (extension === "csv") {
-            acc[file.name] = { ...defaultCsvOptions };
-          }
+          acc[file.name] = {
+            fileName: file.name,
+            status: "pending",
+          };
           return acc;
         },
         {}
       );
-
-      setCsvOptions((prev) => ({ ...prev, ...newCsvOptions }));
-
-      const initialImportStates = validFiles.reduce<
-        Record<string, FileImportState>
-      >((acc, file) => {
-        acc[file.name] = {
-          fileName: file.name,
-          status: "pending",
-        };
-        return acc;
-      }, {});
 
       setImportStates((prev) => ({ ...prev, ...initialImportStates }));
     },
@@ -883,28 +752,21 @@ const FileImporter: React.FC<FileImporterProps> = ({
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
       setIsDragActive(false);
-      if (!event.dataTransfer.files || event.dataTransfer.files.length === 0)
-        return;
+      if (!event.dataTransfer.files || event.dataTransfer.files.length === 0) return;
       onFileChange(Array.from(event.dataTransfer.files));
     },
     [onFileChange]
   );
 
-  const handleDragOver = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      setIsDragActive(true);
-    },
-    []
-  );
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragActive(true);
+  }, []);
 
-  const handleDragLeave = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      setIsDragActive(false);
-    },
-    []
-  );
+  const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragActive(false);
+  }, []);
 
   const handleFileInputChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -932,13 +794,11 @@ const FileImporter: React.FC<FileImporterProps> = ({
           tableNameSchema.parse(cleanTableName);
         } catch (error) {
           const errorMessage =
-            error instanceof z.ZodError
-              ? error.issues[0].message
-              : "Invalid table name";
+            error instanceof z.ZodError ? error.issues[0].message : "Invalid table name";
           setErrors((prev) => [
             ...prev,
             {
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               message: errorMessage,
               file: file.name,
               severity: "error",
@@ -955,10 +815,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
         updateImportState(file.name, { status: "processing" });
 
         try {
-          const fileType = file.name
-            .split(".")
-            .pop()
-            ?.toLowerCase() as FileExtension;
+          const fileType = file.name.split(".").pop()?.toLowerCase() as FileExtension;
           const arrayBuffer = await file.arrayBuffer();
 
           // Add options for import
@@ -988,12 +845,9 @@ const FileImporter: React.FC<FileImporterProps> = ({
           setErrors((prev) => [
             ...prev,
             {
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               message: errorMessage,
-              file:
-                errorMessage === "File processing aborted"
-                  ? undefined
-                  : file.name,
+              file: errorMessage === "File processing aborted" ? undefined : file.name,
               severity: "error",
             },
           ]);
@@ -1111,11 +965,13 @@ const FileImporter: React.FC<FileImporterProps> = ({
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Unknown error";
       toast.error(`Preview failed: ${errorMessage}`);
-      setErrors([{
-        id: crypto.randomUUID(),
-        message: errorMessage,
-        severity: "error",
-      }]);
+      setErrors([
+        {
+          id: generateUUID(),
+          message: errorMessage,
+          severity: "error",
+        },
+      ]);
     } finally {
       setIsPreviewing(false);
     }
@@ -1137,9 +993,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
       tableNameSchema.parse(urlTableName);
     } catch (error) {
       const errorMessage =
-        error instanceof z.ZodError
-          ? error.issues[0].message
-          : "Invalid table name";
+        error instanceof z.ZodError ? error.issues[0].message : "Invalid table name";
       toast.error(errorMessage);
       return;
     }
@@ -1171,15 +1025,15 @@ const FileImporter: React.FC<FileImporterProps> = ({
         const extension = urlPath.split(".").pop()?.toLowerCase();
 
         // Build column selection and casting based on schema customization
-        const includedColumns = schemaColumns.filter(col => col.included);
+        const includedColumns = schemaColumns.filter((col) => col.included);
         const hasSchemaChanges = schemaColumns.some(
-          col => col.newName !== col.originalName || !col.included
+          (col) => col.newName !== col.originalName || !col.included
         );
 
         let columnSelection = "*";
         if (hasSchemaChanges && includedColumns.length > 0) {
           columnSelection = includedColumns
-            .map(col => {
+            .map((col) => {
               if (col.newName !== col.originalName) {
                 return `"${col.originalName}" AS "${col.newName}"`;
               }
@@ -1211,11 +1065,13 @@ const FileImporter: React.FC<FileImporterProps> = ({
       }
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Unknown error";
-      setErrors([{
-        id: crypto.randomUUID(),
-        message: errorMessage,
-        severity: "error",
-      }]);
+      setErrors([
+        {
+          id: generateUUID(),
+          message: errorMessage,
+          severity: "error",
+        },
+      ]);
       toast.error(`Failed to import: ${errorMessage}`);
     } finally {
       setIsUrlImporting(false);
@@ -1224,32 +1080,22 @@ const FileImporter: React.FC<FileImporterProps> = ({
 
   // Schema customization handlers
   const handleToggleColumn = (originalName: string) => {
-    setSchemaColumns(prev =>
-      prev.map(col =>
-        col.originalName === originalName
-          ? { ...col, included: !col.included }
-          : col
+    setSchemaColumns((prev) =>
+      prev.map((col) =>
+        col.originalName === originalName ? { ...col, included: !col.included } : col
       )
     );
   };
 
   const handleRenameColumn = (originalName: string, newName: string) => {
-    setSchemaColumns(prev =>
-      prev.map(col =>
-        col.originalName === originalName
-          ? { ...col, newName }
-          : col
-      )
+    setSchemaColumns((prev) =>
+      prev.map((col) => (col.originalName === originalName ? { ...col, newName } : col))
     );
   };
 
   const handleChangeColumnType = (originalName: string, type: string) => {
-    setSchemaColumns(prev =>
-      prev.map(col =>
-        col.originalName === originalName
-          ? { ...col, type }
-          : col
-      )
+    setSchemaColumns((prev) =>
+      prev.map((col) => (col.originalName === originalName ? { ...col, type } : col))
     );
   };
 
@@ -1269,9 +1115,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
       tableNameSchema.parse(urlTableName);
     } catch (error) {
       const errorMessage =
-        error instanceof z.ZodError
-          ? error.issues[0].message
-          : "Invalid table name";
+        error instanceof z.ZodError ? error.issues[0].message : "Invalid table name";
       toast.error(errorMessage);
       return;
     }
@@ -1311,7 +1155,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
       const errorMessage = e instanceof Error ? e.message : "Unknown error";
       setErrors([
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           message: errorMessage,
           severity: "error",
         },
@@ -1338,9 +1182,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
       tableNameSchema.parse(queryTableName);
     } catch (error) {
       const errorMessage =
-        error instanceof z.ZodError
-          ? error.issues[0].message
-          : "Invalid table name";
+        error instanceof z.ZodError ? error.issues[0].message : "Invalid table name";
       toast.error(errorMessage);
       return;
     }
@@ -1366,7 +1208,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
       const errorMessage = e instanceof Error ? e.message : "Unknown error";
       setErrors([
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           message: errorMessage,
           severity: "error",
         },
@@ -1404,7 +1246,10 @@ const FileImporter: React.FC<FileImporterProps> = ({
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg mb-1">
-                      Preview: {previewFileName.length > 50 ? `...${previewFileName.slice(-47)}` : previewFileName}
+                      Preview:{" "}
+                      {previewFileName.length > 50
+                        ? `...${previewFileName.slice(-47)}`
+                        : previewFileName}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       Table Name: <span className="font-mono">{previewTableName}</span>
@@ -1424,11 +1269,7 @@ const FileImporter: React.FC<FileImporterProps> = ({
             {/* Preview Table */}
             <Card>
               <CardContent className="p-4">
-                <DuckUITable
-                  data={previewData.data}
-                  initialPageSize={20}
-                  tableHeight="400px"
-                />
+                <DuckUITable data={previewData.data} initialPageSize={20} tableHeight="400px" />
               </CardContent>
             </Card>
 
@@ -1476,7 +1317,10 @@ const FileImporter: React.FC<FileImporterProps> = ({
                           </thead>
                           <tbody className="divide-y">
                             {schemaColumns.map((col) => (
-                              <tr key={col.originalName} className={!col.included ? "opacity-50" : ""}>
+                              <tr
+                                key={col.originalName}
+                                className={!col.included ? "opacity-50" : ""}
+                              >
                                 <td className="p-2">
                                   <Checkbox
                                     checked={col.included}
@@ -1491,7 +1335,9 @@ const FileImporter: React.FC<FileImporterProps> = ({
                                 <td className="p-2">
                                   <Input
                                     value={col.newName}
-                                    onChange={(e) => handleRenameColumn(col.originalName, e.target.value)}
+                                    onChange={(e) =>
+                                      handleRenameColumn(col.originalName, e.target.value)
+                                    }
                                     disabled={!col.included}
                                     className="h-8 text-xs"
                                     placeholder="Column name"
@@ -1500,7 +1346,9 @@ const FileImporter: React.FC<FileImporterProps> = ({
                                 <td className="p-2">
                                   <Select
                                     value={col.type}
-                                    onValueChange={(value) => handleChangeColumnType(col.originalName, value)}
+                                    onValueChange={(value) =>
+                                      handleChangeColumnType(col.originalName, value)
+                                    }
                                     disabled={!col.included}
                                   >
                                     <SelectTrigger className="h-8 text-xs">
@@ -1522,7 +1370,8 @@ const FileImporter: React.FC<FileImporterProps> = ({
                       </div>
                       <div className="p-3 bg-muted/50 text-xs text-muted-foreground">
                         <p>
-                          {schemaColumns.filter(col => col.included).length} of {schemaColumns.length} columns will be imported
+                          {schemaColumns.filter((col) => col.included).length} of{" "}
+                          {schemaColumns.length} columns will be imported
                         </p>
                       </div>
                     </div>
@@ -1583,497 +1432,493 @@ const FileImporter: React.FC<FileImporterProps> = ({
         {/* Import Tabs (when not in preview mode) */}
         {!isPreviewMode && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="upload" className="gap-2">
-              <Upload className="w-4 h-4" />
-              Upload Files
-            </TabsTrigger>
-            <TabsTrigger value="url" className="gap-2">
-              <LinkIcon className="w-4 h-4" />
-              From URL
-            </TabsTrigger>
-            <TabsTrigger value="query" className="gap-2">
-              <Code className="w-4 h-4" />
-              From Query
-            </TabsTrigger>
-          </TabsList>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="upload" className="gap-2">
+                <Upload className="w-4 h-4" />
+                Upload Files
+              </TabsTrigger>
+              <TabsTrigger value="url" className="gap-2">
+                <LinkIcon className="w-4 h-4" />
+                From URL
+              </TabsTrigger>
+              <TabsTrigger value="query" className="gap-2">
+                <Code className="w-4 h-4" />
+                From Query
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Upload Files Tab */}
-          <TabsContent value="upload" className="space-y-4 mt-4">
-            <CardContent className="space-y-4 p-0">
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            className={cn(
-              "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer",
-              "transition-colors duration-200 min-h-[200px] flex flex-col items-center justify-center",
-              isDragActive
-                ? "border-primary bg-primary/10"
-                : "border-gray-300 hover:border-primary hover:bg-primary/10"
-            )}
-          >
-            <Input
-              type="file"
-              multiple
-              hidden
-              ref={fileInputRef}
-              accept={Object.values(ACCEPTED_FILE_TYPES).flat().join(",")}
-              onChange={handleFileInputChange}
-            />
-            <Upload
-              className={cn(
-                "w-12 h-12 mb-4 mt-4",
-                isDragActive ? "text-accent" : "text-muted-foreground"
-              )}
-            />
-            {isDragActive ? (
-              <p className="text-blue-500 font-medium">
-                Drop the files here ...
-              </p>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <p className="font-medium">
-                    Drag & drop files here, or
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Select Files
-                  </Button>
-                  <p className="text-sm text-gray-500">
-                    Supported formats: CSV, JSON, Parquet, Arrow and DuckDB
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Maximum file size: {formatFileSize(MAX_FILE_SIZE)}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          {hasFilesToImport && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-lg">Files to Import</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Mode:</span>
-                  <div className="flex rounded-md border">
-                    <Button
-                      variant={importMode === "table" ? "default" : "ghost"}
-                      size="sm"
-                      className="rounded-r-none h-7 text-xs"
-                      onClick={() => setImportMode("table")}
-                    >
-                      Import (Table)
-                    </Button>
-                    <Button
-                      variant={importMode === "view" ? "default" : "ghost"}
-                      size="sm"
-                      className="rounded-l-none h-7 text-xs"
-                      onClick={() => setImportMode("view")}
-                    >
-                      Link (View)
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              {importMode === "view" && (
-                <p className="text-xs text-muted-foreground">
-                  Views reference the original file without copying data. Queries re-read the file each time, using less memory but may be slower.
-                </p>
-              )}
-              <div className="space-y-3">
-                {files.map((file) => {
-                  const fileType = file.name.split(".").pop()?.toLowerCase();
-                  const isCsvFile = fileType === "csv";
-
-                  return (
-                    <FileDetails
-                      key={file.name}
-                      file={file}
-                      tableName={tableNames[file.name] || ""}
-                      onTableNameChange={(name) =>
-                        setTableNames((prev) => ({
-                          ...prev,
-                          [file.name]: name,
-                        }))
-                      }
-                      status={
-                        importStates[file.name] || {
-                          fileName: file.name,
-                          status: "pending",
-                        }
-                      }
-                      csvOptions={isCsvFile ? csvOptions[file.name] : undefined}
-                      onCsvOptionsChange={
-                        isCsvFile
-                          ? (options) =>
-                              setCsvOptions((prev) => ({
-                                ...prev,
-                                [file.name]: options,
-                              }))
-                          : undefined
-                      }
-                      onRemove={() => removeFile(file.name)}
-                      onRetry={() => retryFileUpload(file.name)}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {errors.length > 0 && (
-            <div className="space-y-2">
-              {errors.map((error) => {
-                const suggestion = getErrorSuggestion(error.message);
-                return (
-                  <Alert
-                    key={error.id}
-                    variant={
-                      error.severity === "error" ? "destructive" : "default"
-                    }
-                  >
-                    <AlertTitle className="flex items-center gap-2">
-                      {error.severity === "error" ? (
-                        <AlertTriangle className="h-4 w-4" />
-                      ) : (
-                        <FileWarning className="h-4 w-4" />
-                      )}
-                      {error.severity === "error" ? "Error" : "Warning"}
-                    </AlertTitle>
-                    <AlertDescription>
-                      <div className="space-y-2">
-                        <p>
-                          {error.file
-                            ? `${error.file}: ${error.message}`
-                            : error.message}
-                        </p>
-                        {suggestion && (
-                          <p className="text-sm opacity-90 border-t pt-2 mt-2">
-                            <strong>Suggestion:</strong> {suggestion}
-                          </p>
-                        )}
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                );
-              })}
-            </div>
-          )}
-
-          {hasFilesToImport && (
-            <div className="flex gap-2">
-              <Button
-                onClick={handleFileUpload}
-                disabled={isUploading}
-                className="flex-1"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Importing Files...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Import {files.length}{" "}
-                    {files.length === 1 ? "File" : "Files"}
-                  </>
-                )}
-              </Button>
-
-              {isUploading && (
-                <Button
-                  variant="destructive"
-                  onClick={handleCancelUpload}
-                  className="whitespace-nowrap"
+            {/* Upload Files Tab */}
+            <TabsContent value="upload" className="space-y-4 mt-4">
+              <CardContent className="space-y-4 p-0">
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={cn(
+                    "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer",
+                    "transition-colors duration-200 min-h-[200px] flex flex-col items-center justify-center",
+                    isDragActive
+                      ? "border-primary bg-primary/10"
+                      : "border-gray-300 hover:border-primary hover:bg-primary/10"
+                  )}
                 >
-                  <X className="w-4 h-4 mr-2" />
-                  Cancel
-                </Button>
-              )}
-            </div>
-          )}
-            </CardContent>
-          </TabsContent>
-
-          {/* URL Import Tab */}
-          <TabsContent value="url" className="space-y-4 mt-4">
-            <CardContent className="space-y-4 p-0">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium text-lg mb-4">Import from URL</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    DuckDB can directly read files from HTTP/HTTPS URLs. Supports CSV, JSON, and Parquet files.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="url-input">File URL</Label>
                   <Input
-                    id="url-input"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="https://example.com/data.csv"
-                    disabled={isUrlImporting || isPreviewing}
+                    type="file"
+                    multiple
+                    hidden
+                    ref={fileInputRef}
+                    accept={Object.values(ACCEPTED_FILE_TYPES).flat().join(",")}
+                    onChange={handleFileInputChange}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Enter a direct URL to a CSV, JSON, or Parquet file
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="url-table-name">Name</Label>
-                  <Input
-                    id="url-table-name"
-                    value={urlTableName}
-                    onChange={(e) => setUrlTableName(e.target.value)}
-                    placeholder="my_table"
-                    disabled={isUrlImporting || isPreviewing}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Import Mode</Label>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant={importMode === "table" ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setImportMode("table")}
-                      disabled={isUrlImporting || isPreviewing}
-                    >
-                      <Table className="h-4 w-4 mr-1.5" />
-                      Table
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={importMode === "view" ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setImportMode("view")}
-                      disabled={isUrlImporting || isPreviewing}
-                    >
-                      <Link2 className="h-4 w-4 mr-1.5" />
-                      View
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {importMode === "view"
-                      ? "View references URL directly (fresh data, less memory)"
-                      : "Table copies data into DuckDB (faster queries)"}
-                  </p>
-                </div>
-
-                {errors.length > 0 && (
-                  <div className="space-y-2">
-                    {errors.map((error) => {
-                      const suggestion = getErrorSuggestion(error.message);
-                      return (
-                        <Alert key={error.id} variant="destructive">
-                          <AlertTitle className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            Error
-                          </AlertTitle>
-                          <AlertDescription>
-                            <div className="space-y-2">
-                              <p>{error.message}</p>
-                              {suggestion && (
-                                <p className="text-sm opacity-90 border-t pt-2 mt-2">
-                                  <strong>Suggestion:</strong> {suggestion}
-                                </p>
-                              )}
-                            </div>
-                          </AlertDescription>
-                        </Alert>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handlePreview}
-                    disabled={isUrlImporting || isPreviewing}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    {isPreviewing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Loading Preview...
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="w-4 h-4 mr-2" />
-                        Preview
-                      </>
+                  <Upload
+                    className={cn(
+                      "w-12 h-12 mb-4 mt-4",
+                      isDragActive ? "text-accent" : "text-muted-foreground"
                     )}
-                  </Button>
-                  <Button
-                    onClick={handleUrlImport}
-                    disabled={isUrlImporting || isPreviewing}
-                    className="flex-1"
-                  >
-                    {isUrlImporting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Importing...
-                      </>
-                    ) : (
-                      <>
-                        <LinkIcon className="w-4 h-4 mr-2" />
-                        Import Directly
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </TabsContent>
-
-          {/* Query Import Tab */}
-          <TabsContent value="query" className="space-y-4 mt-4">
-            <CardContent className="space-y-4 p-0">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium text-lg mb-4">Import from Query Result</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Execute a SQL query and create a table from the result. Use DuckDB functions like read_csv, read_json, read_parquet, or query existing tables.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="query-input">SQL Query</Label>
-                  <Textarea
-                    id="query-input"
-                    value={queryInput}
-                    onChange={(e) => setQueryInput(e.target.value)}
-                    placeholder="SELECT * FROM read_csv('https://example.com/data.csv')"
-                    disabled={isQueryImporting}
-                    rows={8}
-                    className="font-mono text-sm"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Enter any SELECT query. The result will be saved to a new table.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="query-table-name">Name</Label>
-                  <Input
-                    id="query-table-name"
-                    value={queryTableName}
-                    onChange={(e) => setQueryTableName(e.target.value)}
-                    placeholder="my_table"
-                    disabled={isQueryImporting}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Save As</Label>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant={importMode === "table" ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setImportMode("table")}
-                      disabled={isQueryImporting}
-                    >
-                      <Table className="h-4 w-4 mr-1.5" />
-                      Table
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={importMode === "view" ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setImportMode("view")}
-                      disabled={isQueryImporting}
-                    >
-                      <Link2 className="h-4 w-4 mr-1.5" />
-                      View
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {importMode === "view"
-                      ? "View re-runs query each time (always fresh)"
-                      : "Table stores result (faster queries)"}
-                  </p>
-                </div>
-
-                {/* Examples */}
-                <div className="rounded-lg border p-4 bg-muted/50">
-                  <h4 className="font-medium text-sm mb-2">Example Queries:</h4>
-                  <div className="space-y-2 text-xs font-mono">
-                    <p className="text-muted-foreground">
-                      <span className="text-foreground">• Import from URL:</span><br />
-                      <code className="block ml-4 mt-1">SELECT * FROM read_csv('https://example.com/data.csv')</code>
-                    </p>
-                    <p className="text-muted-foreground">
-                      <span className="text-foreground">• Filter data:</span><br />
-                      <code className="block ml-4 mt-1">SELECT * FROM read_json('data.json') WHERE age &gt; 21</code>
-                    </p>
-                    <p className="text-muted-foreground">
-                      <span className="text-foreground">• Join tables:</span><br />
-                      <code className="block ml-4 mt-1">SELECT a.*, b.name FROM table1 a JOIN table2 b ON a.id = b.id</code>
-                    </p>
-                  </div>
-                </div>
-
-                {errors.length > 0 && (
-                  <div className="space-y-2">
-                    {errors.map((error) => {
-                      const suggestion = getErrorSuggestion(error.message);
-                      return (
-                        <Alert key={error.id} variant="destructive">
-                          <AlertTitle className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            Error
-                          </AlertTitle>
-                          <AlertDescription>
-                            <div className="space-y-2">
-                              <p>{error.message}</p>
-                              {suggestion && (
-                                <p className="text-sm opacity-90 border-t pt-2 mt-2">
-                                  <strong>Suggestion:</strong> {suggestion}
-                                </p>
-                              )}
-                            </div>
-                          </AlertDescription>
-                        </Alert>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <Button
-                  onClick={handleQueryImport}
-                  disabled={isQueryImporting}
-                  className="w-full"
-                >
-                  {isQueryImporting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Executing Query...
-                    </>
+                  {isDragActive ? (
+                    <p className="text-blue-500 font-medium">Drop the files here ...</p>
                   ) : (
                     <>
-                      <Code className="w-4 h-4 mr-2" />
-                      Execute and Import
+                      <div className="space-y-2">
+                        <p className="font-medium">Drag & drop files here, or</p>
+                        <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                          Select Files
+                        </Button>
+                        <p className="text-sm text-gray-500">
+                          Supported formats: CSV, JSON, Parquet, Arrow and DuckDB
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Maximum file size: {formatFileSize(MAX_FILE_SIZE)}
+                        </p>
+                      </div>
                     </>
                   )}
-                </Button>
-              </div>
-            </CardContent>
-          </TabsContent>
-        </Tabs>
+                </div>
+
+                {hasFilesToImport && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium text-lg">Files to Import</h3>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Mode:</span>
+                        <div className="flex rounded-md border">
+                          <Button
+                            variant={importMode === "table" ? "default" : "ghost"}
+                            size="sm"
+                            className="rounded-r-none h-7 text-xs"
+                            onClick={() => setImportMode("table")}
+                          >
+                            Import (Table)
+                          </Button>
+                          <Button
+                            variant={importMode === "view" ? "default" : "ghost"}
+                            size="sm"
+                            className="rounded-l-none h-7 text-xs"
+                            onClick={() => setImportMode("view")}
+                          >
+                            Link (View)
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    {importMode === "view" && (
+                      <p className="text-xs text-muted-foreground">
+                        Views reference the original file without copying data. Queries re-read the
+                        file each time, using less memory but may be slower.
+                      </p>
+                    )}
+                    <div className="space-y-3">
+                      {files.map((file) => {
+                        const fileType = file.name.split(".").pop()?.toLowerCase();
+                        const isCsvFile = fileType === "csv";
+
+                        return (
+                          <FileDetails
+                            key={file.name}
+                            file={file}
+                            tableName={tableNames[file.name] || ""}
+                            onTableNameChange={(name) =>
+                              setTableNames((prev) => ({
+                                ...prev,
+                                [file.name]: name,
+                              }))
+                            }
+                            status={
+                              importStates[file.name] || {
+                                fileName: file.name,
+                                status: "pending",
+                              }
+                            }
+                            csvOptions={isCsvFile ? csvOptions[file.name] : undefined}
+                            onCsvOptionsChange={
+                              isCsvFile
+                                ? (options) =>
+                                    setCsvOptions((prev) => ({
+                                      ...prev,
+                                      [file.name]: options,
+                                    }))
+                                : undefined
+                            }
+                            onRemove={() => removeFile(file.name)}
+                            onRetry={() => retryFileUpload(file.name)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {errors.length > 0 && (
+                  <div className="space-y-2">
+                    {errors.map((error) => {
+                      const suggestion = getErrorSuggestion(error.message);
+                      return (
+                        <Alert
+                          key={error.id}
+                          variant={error.severity === "error" ? "destructive" : "default"}
+                        >
+                          <AlertTitle className="flex items-center gap-2">
+                            {error.severity === "error" ? (
+                              <AlertTriangle className="h-4 w-4" />
+                            ) : (
+                              <FileWarning className="h-4 w-4" />
+                            )}
+                            {error.severity === "error" ? "Error" : "Warning"}
+                          </AlertTitle>
+                          <AlertDescription>
+                            <div className="space-y-2">
+                              <p>
+                                {error.file ? `${error.file}: ${error.message}` : error.message}
+                              </p>
+                              {suggestion && (
+                                <p className="text-sm opacity-90 border-t pt-2 mt-2">
+                                  <strong>Suggestion:</strong> {suggestion}
+                                </p>
+                              )}
+                            </div>
+                          </AlertDescription>
+                        </Alert>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {hasFilesToImport && (
+                  <div className="flex gap-2">
+                    <Button onClick={handleFileUpload} disabled={isUploading} className="flex-1">
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Importing Files...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Import {files.length} {files.length === 1 ? "File" : "Files"}
+                        </>
+                      )}
+                    </Button>
+
+                    {isUploading && (
+                      <Button
+                        variant="destructive"
+                        onClick={handleCancelUpload}
+                        className="whitespace-nowrap"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </TabsContent>
+
+            {/* URL Import Tab */}
+            <TabsContent value="url" className="space-y-4 mt-4">
+              <CardContent className="space-y-4 p-0">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium text-lg mb-4">Import from URL</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      DuckDB can directly read files from HTTP/HTTPS URLs. Supports CSV, JSON, and
+                      Parquet files.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="url-input">File URL</Label>
+                    <Input
+                      id="url-input"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      placeholder="https://example.com/data.csv"
+                      disabled={isUrlImporting || isPreviewing}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter a direct URL to a CSV, JSON, or Parquet file
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="url-table-name">Name</Label>
+                    <Input
+                      id="url-table-name"
+                      value={urlTableName}
+                      onChange={(e) => setUrlTableName(e.target.value)}
+                      placeholder="my_table"
+                      disabled={isUrlImporting || isPreviewing}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Import Mode</Label>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        variant={importMode === "table" ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setImportMode("table")}
+                        disabled={isUrlImporting || isPreviewing}
+                      >
+                        <Table className="h-4 w-4 mr-1.5" />
+                        Table
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={importMode === "view" ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setImportMode("view")}
+                        disabled={isUrlImporting || isPreviewing}
+                      >
+                        <Link2 className="h-4 w-4 mr-1.5" />
+                        View
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {importMode === "view"
+                        ? "View references URL directly (fresh data, less memory)"
+                        : "Table copies data into DuckDB (faster queries)"}
+                    </p>
+                  </div>
+
+                  {errors.length > 0 && (
+                    <div className="space-y-2">
+                      {errors.map((error) => {
+                        const suggestion = getErrorSuggestion(error.message);
+                        return (
+                          <Alert key={error.id} variant="destructive">
+                            <AlertTitle className="flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4" />
+                              Error
+                            </AlertTitle>
+                            <AlertDescription>
+                              <div className="space-y-2">
+                                <p>{error.message}</p>
+                                {suggestion && (
+                                  <p className="text-sm opacity-90 border-t pt-2 mt-2">
+                                    <strong>Suggestion:</strong> {suggestion}
+                                  </p>
+                                )}
+                              </div>
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handlePreview}
+                      disabled={isUrlImporting || isPreviewing}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      {isPreviewing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Loading Preview...
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-4 h-4 mr-2" />
+                          Preview
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleUrlImport}
+                      disabled={isUrlImporting || isPreviewing}
+                      className="flex-1"
+                    >
+                      {isUrlImporting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="w-4 h-4 mr-2" />
+                          Import Directly
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </TabsContent>
+
+            {/* Query Import Tab */}
+            <TabsContent value="query" className="space-y-4 mt-4">
+              <CardContent className="space-y-4 p-0">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium text-lg mb-4">Import from Query Result</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Execute a SQL query and create a table from the result. Use DuckDB functions
+                      like read_csv, read_json, read_parquet, or query existing tables.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="query-input">SQL Query</Label>
+                    <Textarea
+                      id="query-input"
+                      value={queryInput}
+                      onChange={(e) => setQueryInput(e.target.value)}
+                      placeholder="SELECT * FROM read_csv('https://example.com/data.csv')"
+                      disabled={isQueryImporting}
+                      rows={8}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter any SELECT query. The result will be saved to a new table.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="query-table-name">Name</Label>
+                    <Input
+                      id="query-table-name"
+                      value={queryTableName}
+                      onChange={(e) => setQueryTableName(e.target.value)}
+                      placeholder="my_table"
+                      disabled={isQueryImporting}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Save As</Label>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        variant={importMode === "table" ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setImportMode("table")}
+                        disabled={isQueryImporting}
+                      >
+                        <Table className="h-4 w-4 mr-1.5" />
+                        Table
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={importMode === "view" ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setImportMode("view")}
+                        disabled={isQueryImporting}
+                      >
+                        <Link2 className="h-4 w-4 mr-1.5" />
+                        View
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {importMode === "view"
+                        ? "View re-runs query each time (always fresh)"
+                        : "Table stores result (faster queries)"}
+                    </p>
+                  </div>
+
+                  {/* Examples */}
+                  <div className="rounded-lg border p-4 bg-muted/50">
+                    <h4 className="font-medium text-sm mb-2">Example Queries:</h4>
+                    <div className="space-y-2 text-xs font-mono">
+                      <p className="text-muted-foreground">
+                        <span className="text-foreground">• Import from URL:</span>
+                        <br />
+                        <code className="block ml-4 mt-1">
+                          SELECT * FROM read_csv('https://example.com/data.csv')
+                        </code>
+                      </p>
+                      <p className="text-muted-foreground">
+                        <span className="text-foreground">• Filter data:</span>
+                        <br />
+                        <code className="block ml-4 mt-1">
+                          SELECT * FROM read_json('data.json') WHERE age &gt; 21
+                        </code>
+                      </p>
+                      <p className="text-muted-foreground">
+                        <span className="text-foreground">• Join tables:</span>
+                        <br />
+                        <code className="block ml-4 mt-1">
+                          SELECT a.*, b.name FROM table1 a JOIN table2 b ON a.id = b.id
+                        </code>
+                      </p>
+                    </div>
+                  </div>
+
+                  {errors.length > 0 && (
+                    <div className="space-y-2">
+                      {errors.map((error) => {
+                        const suggestion = getErrorSuggestion(error.message);
+                        return (
+                          <Alert key={error.id} variant="destructive">
+                            <AlertTitle className="flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4" />
+                              Error
+                            </AlertTitle>
+                            <AlertDescription>
+                              <div className="space-y-2">
+                                <p>{error.message}</p>
+                                {suggestion && (
+                                  <p className="text-sm opacity-90 border-t pt-2 mt-2">
+                                    <strong>Suggestion:</strong> {suggestion}
+                                  </p>
+                                )}
+                              </div>
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleQueryImport}
+                    disabled={isQueryImporting}
+                    className="w-full"
+                  >
+                    {isQueryImporting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Executing Query...
+                      </>
+                    ) : (
+                      <>
+                        <Code className="w-4 h-4 mr-2" />
+                        Execute and Import
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </TabsContent>
+          </Tabs>
         )}
       </SheetContent>
     </Sheet>

@@ -23,12 +23,7 @@ import {
   type FolderEntry,
   SUPPORTED_EXTENSIONS,
 } from "@/lib/fileSystem";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -108,9 +103,10 @@ const FileNode: React.FC<FileNodeProps> = ({
       for await (const child of folderEntry.handle.values()) {
         if (child.kind === "file") {
           const fileHandle = child as FileSystemFileHandle;
-          const ext = child.name.lastIndexOf(".") > 0
-            ? child.name.slice(child.name.lastIndexOf(".")).toLowerCase()
-            : "";
+          const ext =
+            child.name.lastIndexOf(".") > 0
+              ? child.name.slice(child.name.lastIndexOf(".")).toLowerCase()
+              : "";
 
           if (!SUPPORTED_EXTENSIONS.includes(ext)) continue;
 
@@ -209,10 +205,7 @@ const FileNode: React.FC<FileNodeProps> = ({
             <span className="truncate flex-1">{entry.name}</span>
             {isFile && (
               <>
-                <ImportOptionsPopover
-                  fileName={entry.name}
-                  onImport={handleImport}
-                >
+                <ImportOptionsPopover fileName={entry.name} onImport={handleImport}>
                   <button
                     type="button"
                     onClick={(e) => e.stopPropagation()}
@@ -233,10 +226,17 @@ const FileNode: React.FC<FileNodeProps> = ({
         </ContextMenuTrigger>
         <ContextMenuContent>
           {isFile && (
-            <ContextMenuItem onClick={() => handleImport({
-              tableName: entry.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_]/g, "_").replace(/^[0-9]/, "_$&"),
-              importMode: "table"
-            })}>
+            <ContextMenuItem
+              onClick={() =>
+                handleImport({
+                  tableName: entry.name
+                    .replace(/\.[^.]+$/, "")
+                    .replace(/[^a-zA-Z0-9_]/g, "_")
+                    .replace(/^[0-9]/, "_$&"),
+                  importMode: "table",
+                })
+              }
+            >
               Quick Import as Table
             </ContextMenuItem>
           )}
@@ -348,10 +348,7 @@ const MountedFolderNode: React.FC<MountedFolderNodeProps> = ({
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </ContextMenuItem>
-          <ContextMenuItem
-            onClick={() => onUnmount(folder.id)}
-            className="text-destructive"
-          >
+          <ContextMenuItem onClick={() => onUnmount(folder.id)} className="text-destructive">
             <X className="h-4 w-4 mr-2" />
             Unmount
           </ContextMenuItem>
@@ -374,19 +371,13 @@ const MountedFolderNode: React.FC<MountedFolderNodeProps> = ({
       )}
 
       {isExpanded && files.length === 0 && !isLoading && (
-        <p className="text-xs text-muted-foreground ml-8 py-1">
-          No supported files found
-        </p>
+        <p className="text-xs text-muted-foreground ml-8 py-1">No supported files found</p>
       )}
     </li>
   );
 };
 
-const FolderBrowser: React.FC<FolderBrowserProps> = ({
-  onFileSelect,
-  onFileImport,
-  className,
-}) => {
+const FolderBrowser: React.FC<FolderBrowserProps> = ({ onFileSelect, onFileImport, className }) => {
   const {
     mountedFolders,
     isFileSystemSupported,
@@ -461,12 +452,7 @@ const FolderBrowser: React.FC<FolderBrowserProps> = ({
           </span>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={mountFolder}
-              >
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={mountFolder}>
                 <FolderPlus className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -474,37 +460,30 @@ const FolderBrowser: React.FC<FolderBrowserProps> = ({
           </Tooltip>
         </div>
 
-      {/* Mounted folders list */}
-      {mountedFolders.length > 0 ? (
-        <ul className="space-y-0.5">
-          {mountedFolders.map((folder) => (
-            <MountedFolderNode
-              key={folder.id}
-              folder={folder}
-              onFileSelect={onFileSelect}
-              onFileImport={handleFileImport}
-              onUnmount={unmountFolder}
-              onRequestPermission={handleRequestPermission}
-            />
-          ))}
-        </ul>
-      ) : (
-        <div className="px-2 py-4 text-center">
-          <FolderOpen className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-          <p className="text-xs text-muted-foreground mb-2">
-            No folders mounted
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={mountFolder}
-          >
-            <FolderPlus className="h-3.5 w-3.5" />
-            Add Folder
-          </Button>
-        </div>
-      )}
+        {/* Mounted folders list */}
+        {mountedFolders.length > 0 ? (
+          <ul className="space-y-0.5">
+            {mountedFolders.map((folder) => (
+              <MountedFolderNode
+                key={folder.id}
+                folder={folder}
+                onFileSelect={onFileSelect}
+                onFileImport={handleFileImport}
+                onUnmount={unmountFolder}
+                onRequestPermission={handleRequestPermission}
+              />
+            ))}
+          </ul>
+        ) : (
+          <div className="px-2 py-4 text-center">
+            <FolderOpen className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+            <p className="text-xs text-muted-foreground mb-2">No folders mounted</p>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={mountFolder}>
+              <FolderPlus className="h-3.5 w-3.5" />
+              Add Folder
+            </Button>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );

@@ -118,9 +118,7 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:w-[450px] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>
-            {isEditMode ? "Edit Connection" : "Add New Connection"}
-          </SheetTitle>
+          <SheetTitle>{isEditMode ? "Edit Connection" : "Add New Connection"}</SheetTitle>
           <SheetDescription>
             {isEditMode
               ? "Modify existing connection details."
@@ -175,7 +173,7 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                     <AlertDescription className="text-xs space-y-1">
                       <p>Start HTTP server in DuckDB:</p>
                       <pre className="bg-background px-2 py-1 rounded text-[10px] leading-relaxed">
-{`INSTALL httpserver FROM community;
+                        {`INSTALL httpserver FROM community;
 LOAD httpserver;
 SELECT httpserve_start('0.0.0.0', 9999, '');`}
                       </pre>
@@ -191,9 +189,7 @@ SELECT httpserve_start('0.0.0.0', 9999, '');`}
                         <FormControl>
                           <Input placeholder="http://localhost:9999" {...field} />
                         </FormControl>
-                        <FormDescription>
-                          Full URL including protocol (http/https)
-                        </FormDescription>
+                        <FormDescription>Full URL including protocol (http/https)</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -324,7 +320,11 @@ SELECT httpserve_start('0.0.0.0', 9999, '');`}
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isLoadingExternalConnection}>
-                  {isLoadingExternalConnection ? "Connecting..." : isEditMode ? "Update" : "Connect"}
+                  {isLoadingExternalConnection
+                    ? "Connecting..."
+                    : isEditMode
+                      ? "Update"
+                      : "Connect"}
                 </Button>
               </SheetFooter>
             </form>

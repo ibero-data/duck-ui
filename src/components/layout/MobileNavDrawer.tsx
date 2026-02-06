@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { Menu, Github, BookText, Cable, Sun, Moon, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/components/theme/theme-provider";
 import { useNavigate } from "react-router";
@@ -35,12 +29,7 @@ export const MobileNavDrawer = () => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          aria-label="Open menu"
-        >
+        <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
@@ -55,9 +44,7 @@ export const MobileNavDrawer = () => {
         <div className="mt-6 space-y-4">
           {/* Connection Switcher */}
           <div>
-            <p className="text-sm font-medium mb-2 text-muted-foreground">
-              Connection
-            </p>
+            <p className="text-sm font-medium mb-2 text-muted-foreground">Connection</p>
             <ConnectionSwitcher />
           </div>
 
@@ -65,9 +52,7 @@ export const MobileNavDrawer = () => {
 
           {/* Navigation */}
           <div className="space-y-2">
-            <p className="text-sm font-medium mb-2 text-muted-foreground">
-              Navigate
-            </p>
+            <p className="text-sm font-medium mb-2 text-muted-foreground">Navigate</p>
             <Button
               variant="ghost"
               className="w-full justify-start"
@@ -97,9 +82,7 @@ export const MobileNavDrawer = () => {
 
           {/* External Links */}
           <div className="space-y-2">
-            <p className="text-sm font-medium mb-2 text-muted-foreground">
-              Resources
-            </p>
+            <p className="text-sm font-medium mb-2 text-muted-foreground">Resources</p>
             <Button
               variant="ghost"
               className="w-full justify-start"
@@ -116,9 +99,7 @@ export const MobileNavDrawer = () => {
               variant="ghost"
               className="w-full justify-start"
               onClick={() =>
-                handleExternalLink(
-                  "https://duckui.com?utm_source=duck-ui&utm_medium=mobile-nav"
-                )
+                handleExternalLink("https://duckui.com?utm_source=duck-ui&utm_medium=mobile-nav")
               }
             >
               <BookText className="mr-2 h-4 w-4" />
@@ -130,14 +111,8 @@ export const MobileNavDrawer = () => {
 
           {/* Theme Toggle */}
           <div className="space-y-2">
-            <p className="text-sm font-medium mb-2 text-muted-foreground">
-              Appearance
-            </p>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={toggleTheme}
-            >
+            <p className="text-sm font-medium mb-2 text-muted-foreground">Appearance</p>
+            <Button variant="outline" className="w-full justify-start" onClick={toggleTheme}>
               {theme === "dark" ? (
                 <>
                   <Sun className="mr-2 h-4 w-4" />

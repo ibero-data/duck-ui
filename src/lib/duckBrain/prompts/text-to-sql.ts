@@ -29,10 +29,7 @@ export function buildResultsContext(messages: DuckBrainMessage[]): string {
   // Find recent messages with successful query results
   const messagesWithResults = messages.filter(
     (m) =>
-      m.role === "assistant" &&
-      m.sql &&
-      m.queryResult?.status === "success" &&
-      m.queryResult.data
+      m.role === "assistant" && m.sql && m.queryResult?.status === "success" && m.queryResult.data
   );
 
   // Take the last 3 results to avoid context overflow
@@ -75,8 +72,7 @@ export const DUCKDB_FEW_SHOT_EXAMPLES: ChatCompletionMessageParam[] = [
   },
   {
     role: "assistant",
-    content:
-      "SELECT email, COUNT(*) as count FROM users GROUP BY email HAVING COUNT(*) > 1",
+    content: "SELECT email, COUNT(*) as count FROM users GROUP BY email HAVING COUNT(*) > 1",
   },
   {
     role: "user",

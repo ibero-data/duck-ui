@@ -11,10 +11,7 @@ export type TransformedData = Record<string, any>[];
 /**
  * Check if a column contains numeric values
  */
-export const isNumericColumn = (
-  data: Record<string, any>[],
-  column: string
-): boolean => {
+export const isNumericColumn = (data: Record<string, any>[], column: string): boolean => {
   if (data.length === 0) return false;
 
   // Sample first few non-null values
@@ -32,10 +29,7 @@ export const isNumericColumn = (
 /**
  * Check if a column contains date/time values
  */
-export const isDateColumn = (
-  data: Record<string, any>[],
-  column: string
-): boolean => {
+export const isDateColumn = (data: Record<string, any>[], column: string): boolean => {
   if (data.length === 0) return false;
 
   const value = data[0][column];
@@ -51,13 +45,8 @@ export const isDateColumn = (
 /**
  * Aggregate values based on aggregation type
  */
-export const aggregate = (
-  values: any[],
-  aggregationType: AggregationType
-): number => {
-  const numericValues = values
-    .map((v) => Number(v))
-    .filter((v) => !isNaN(v));
+export const aggregate = (values: any[], aggregationType: AggregationType): number => {
+  const numericValues = values.map((v) => Number(v)).filter((v) => !isNaN(v));
 
   if (numericValues.length === 0) return 0;
 
@@ -135,10 +124,7 @@ export const sortData = (
 /**
  * Limit data to top/bottom N rows
  */
-export const limitData = (
-  data: TransformedData,
-  limit: number
-): TransformedData => {
+export const limitData = (data: TransformedData, limit: number): TransformedData => {
   return data.slice(0, Math.max(1, limit));
 };
 
@@ -227,10 +213,7 @@ export const suggestChartTypes = (
 /**
  * Detect recommended aggregations for a column
  */
-export const suggestAggregations = (
-  result: QueryResult,
-  column: string
-): AggregationType[] => {
+export const suggestAggregations = (result: QueryResult, column: string): AggregationType[] => {
   if (isNumericColumn(result.data, column)) {
     return ["sum", "avg", "count", "min", "max"];
   }
@@ -297,10 +280,7 @@ function adjustColorBrightness(hex: string, percent: number): string {
 /**
  * Format value for display in charts
  */
-export const formatChartValue = (
-  value: any,
-  format?: string
-): string => {
+export const formatChartValue = (value: any, format?: string): string => {
   if (value === null || value === undefined) return "";
 
   if (typeof value === "number") {

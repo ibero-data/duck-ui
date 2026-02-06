@@ -4,6 +4,7 @@
  */
 
 import { useDuckStore } from "@/store";
+import { generateUUID } from "@/lib/utils";
 
 // Cloud provider types
 export type CloudProviderType = "s3" | "gcs" | "azure";
@@ -251,8 +252,10 @@ class CloudStorageService {
   /**
    * Add a new cloud connection
    */
-  async addConnection(config: Omit<CloudConnection, "id" | "addedAt" | "isConnected">): Promise<CloudConnection> {
-    const id = crypto.randomUUID();
+  async addConnection(
+    config: Omit<CloudConnection, "id" | "addedAt" | "isConnected">
+  ): Promise<CloudConnection> {
+    const id = generateUUID();
 
     const conn: CloudConnection = {
       ...config,
@@ -270,7 +273,10 @@ class CloudStorageService {
   /**
    * Update an existing connection
    */
-  async updateConnection(id: string, updates: Partial<CloudConnection>): Promise<CloudConnection | null> {
+  async updateConnection(
+    id: string,
+    updates: Partial<CloudConnection>
+  ): Promise<CloudConnection | null> {
     const existing = this.connections.get(id);
     if (!existing) return null;
 
@@ -321,7 +327,7 @@ class CloudStorageService {
     if (!this.supportStatus?.secretsSupported) {
       throw new Error(
         "Cloud storage secrets are not supported in this browser. " +
-        "DuckDB-WASM has limited cloud storage support due to CORS restrictions."
+          "DuckDB-WASM has limited cloud storage support due to CORS restrictions."
       );
     }
 

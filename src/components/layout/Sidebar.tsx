@@ -18,19 +18,19 @@ import {
   History,
   ExternalLink,
   Circle,
+  Settings,
+  Bookmark,
+  ChevronRight,
 } from "lucide-react";
 import { useDuckStore, type EditorTabType } from "@/store";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -46,9 +46,9 @@ import { useTheme } from "@/components/theme/theme-provider";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import QueryHistory from "../workspace/QueryHistory";
-
-import Logo from "/logo.png";
-import LogoLight from "/logo-light.png";
+import SavedQueriesPanel from "@/components/saved-queries/SavedQueriesPanel";
+import PasswordDialog from "@/components/profile/PasswordDialog";
+import ProfileAvatar from "@/components/profile/ProfileAvatar";
 
 interface SidebarProps {
   isExplorerOpen: boolean;
@@ -57,9 +57,20 @@ interface SidebarProps {
 
 export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarProps) {
   const { theme, setTheme } = useTheme();
-  const { tabs, activeTabId, createTab, setActiveTab, currentConnection } = useDuckStore();
+  const {
+    tabs,
+    activeTabId,
+    createTab,
+    setActiveTab,
+    currentConnection,
+    currentProfile,
+    profiles,
+    switchProfile,
+  } = useDuckStore();
   const [searchOpen, setSearchOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [savedQueriesOpen, setSavedQueriesOpen] = useState(false);
+  const [switchTarget, setSwitchTarget] = useState<(typeof profiles)[0] | null>(null);
 
   // Get connection status color
   const getConnectionColor = (scope?: string) => {
@@ -91,6 +102,26 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
     return activeTab?.type === type;
   };
 
+  // Mutual exclusion for right panels
+  const openHistory = () => {
+    setSavedQueriesOpen(false);
+    setHistoryOpen(!historyOpen);
+  };
+
+  const openSavedQueries = () => {
+    setHistoryOpen(false);
+    setSavedQueriesOpen(!savedQueriesOpen);
+  };
+
+  // Profile switching
+  const handleSwitchProfile = (profile: (typeof profiles)[0]) => {
+    if (profile.hasPassword) {
+      setSwitchTarget(profile);
+    } else {
+      switchProfile(profile.id);
+    }
+  };
+
   // Keyboard shortcut for search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -107,6 +138,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
     { type: "home" as EditorTabType, label: "Home" },
     { type: "connections" as EditorTabType, label: "Connections" },
     { type: "brain" as EditorTabType, label: "Duck Brain" },
+    { type: "settings" as EditorTabType, label: "Settings" },
   ];
 
   const externalLinks = [
@@ -114,28 +146,61 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
     { to: "https://duckui.com", label: "Documentation", icon: BookOpen },
   ];
 
+  const otherProfiles = profiles.filter((p) => p.id !== currentProfile?.id);
+
   return (
     <>
       <div className="flex flex-col h-full w-16 border-r bg-background shrink-0">
-        {/* Logo */}
+        {/* Profile Avatar */}
         <div className="flex items-center justify-center w-16 h-10 border-b">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => openOrFocusTab("home", "Home")}
-                  className="p-1.5 rounded-md hover:bg-muted transition-colors"
-                >
-                  <img
-                    src={theme === "dark" ? Logo : LogoLight}
-                    alt="Duck-UI"
-                    className="h-6"
-                  />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Duck-UI</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <DropdownMenu>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-1.5 rounded-md hover:bg-muted transition-colors">
+                      <ProfileAvatar
+                        avatarEmoji={currentProfile?.avatarEmoji || "logo"}
+                        size="md"
+                      />
+                    </button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {currentProfile?.name || "Duck-UI"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <DropdownMenuContent side="right" align="start">
+              <DropdownMenuLabel className="flex items-center gap-2">
+                <ProfileAvatar avatarEmoji={currentProfile?.avatarEmoji || "logo"} size="md" />
+                <div>
+                  <div className="font-medium">{currentProfile?.name}</div>
+                  <div className="text-xs text-muted-foreground font-normal">Active</div>
+                </div>
+              </DropdownMenuLabel>
+              {otherProfiles.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                    Switch Profile
+                  </DropdownMenuLabel>
+                  {otherProfiles.map((p) => (
+                    <DropdownMenuItem key={p.id} onClick={() => handleSwitchProfile(p)}>
+                      <ProfileAvatar avatarEmoji={p.avatarEmoji} size="sm" className="mr-2" />
+                      {p.name}
+                      <ChevronRight className="ml-auto h-3 w-3" />
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openOrFocusTab("settings", "Settings")}>
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Main Navigation */}
@@ -231,6 +296,23 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
             </Tooltip>
           </TooltipProvider>
 
+          {/* Saved Queries */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={savedQueriesOpen ? "secondary" : "ghost"}
+                  size="icon"
+                  className="mx-auto h-9 w-9"
+                  onClick={openSavedQueries}
+                >
+                  <Bookmark className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Saved Queries</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           {/* Query History */}
           <TooltipProvider>
             <Tooltip>
@@ -239,7 +321,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   variant={historyOpen ? "secondary" : "ghost"}
                   size="icon"
                   className="mx-auto h-9 w-9"
-                  onClick={() => setHistoryOpen(!historyOpen)}
+                  onClick={openHistory}
                 >
                   <History className="h-4 w-4" />
                 </Button>
@@ -270,9 +352,28 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
               <TooltipContent side="right">
                 <div className="text-xs">
                   <div className="font-medium">{currentConnection?.name || "No connection"}</div>
-                  <div className="text-muted-foreground">{currentConnection?.scope || "Click to manage"}</div>
+                  <div className="text-muted-foreground">
+                    {currentConnection?.scope || "Click to manage"}
+                  </div>
                 </div>
               </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Settings */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={isTabActive("settings") ? "secondary" : "ghost"}
+                  size="icon"
+                  className="mx-auto h-9 w-9"
+                  onClick={() => openOrFocusTab("settings", "Settings")}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Settings</TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
@@ -286,11 +387,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   className="mx-auto h-9 w-9"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" />
-                  ) : (
-                    <Moon className="h-4 w-4" />
-                  )}
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">
@@ -305,11 +402,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="mx-auto h-9 w-9"
-                    >
+                    <Button variant="ghost" size="icon" className="mx-auto h-9 w-9">
                       <HelpCircle className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -319,18 +412,12 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
             </TooltipProvider>
             <DropdownMenuContent side="right" align="end">
               <DropdownMenuItem
-                onClick={() =>
-                  window.open("https://github.com/ibero-data/duck-ui", "_blank")
-                }
+                onClick={() => window.open("https://github.com/ibero-data/duck-ui", "_blank")}
               >
                 <Github className="h-4 w-4 mr-2" />
                 GitHub
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  window.open("https://duckui.com", "_blank")
-                }
-              >
+              <DropdownMenuItem onClick={() => window.open("https://duckui.com", "_blank")}>
                 <BookOpen className="h-4 w-4 mr-2" />
                 Documentation
               </DropdownMenuItem>
@@ -412,14 +499,35 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
               className="h-6 w-6"
               onClick={() => setHistoryOpen(false)}
             >
-              <span className="sr-only">Close</span>
-              ×
+              <span className="sr-only">Close</span>×
             </Button>
           </div>
           <div className="h-[calc(100%-41px)] overflow-auto">
             <QueryHistory isExpanded={true} mode="inline" />
           </div>
         </div>
+      )}
+
+      {/* Saved Queries Panel */}
+      {savedQueriesOpen && (
+        <div className="fixed right-0 top-0 h-full w-96 border-l bg-background z-40 shadow-lg">
+          <SavedQueriesPanel onClose={() => setSavedQueriesOpen(false)} />
+        </div>
+      )}
+
+      {/* Password Dialog for Profile Switching */}
+      {switchTarget && (
+        <PasswordDialog
+          open={!!switchTarget}
+          onOpenChange={(open) => {
+            if (!open) setSwitchTarget(null);
+          }}
+          profile={switchTarget}
+          onSubmit={async (password) => {
+            await switchProfile(switchTarget.id, password);
+            setSwitchTarget(null);
+          }}
+        />
       )}
     </>
   );

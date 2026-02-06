@@ -8,12 +8,17 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   // Manually construct the object to be defined
+  // Filter out keys with invalid JS identifier characters (fixes Windows builds where
+  // env vars like "=::" exist). See: https://github.com/ibero-data/duck-ui/issues/26
   const processEnvValues: Record<string, string> = {};
   for (const key in env) {
-    processEnvValues[`import.meta.env.${key}`] = JSON.stringify(env[key]);
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
+      processEnvValues[`import.meta.env.${key}`] = JSON.stringify(env[key]);
+    }
   }
 
   return {
+    base: process.env.DUCK_UI_BASEPATH ?? '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

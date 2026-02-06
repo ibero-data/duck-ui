@@ -28,11 +28,7 @@ const renderMentions = (content: string) => {
         key={`${match.index}-${mention}`}
         className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded-md bg-primary/20 text-primary-foreground text-xs font-medium"
       >
-        {isColumn ? (
-          <Columns className="h-3 w-3" />
-        ) : (
-          <Table2 className="h-3 w-3" />
-        )}
+        {isColumn ? <Columns className="h-3 w-3" /> : <Table2 className="h-3 w-3" />}
         {mention}
       </span>
     );
@@ -86,9 +82,7 @@ const DuckBrainMessages: React.FC<DuckBrainMessagesProps> = ({
         <div className="text-center text-muted-foreground">
           <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
           <p className="text-sm font-medium">Hi! I'm Duck Brain</p>
-          <p className="text-xs mt-1">
-            Ask me to write SQL queries for your data
-          </p>
+          <p className="text-xs mt-1">Ask me to write SQL queries for your data</p>
         </div>
       </div>
     );
@@ -100,10 +94,7 @@ const DuckBrainMessages: React.FC<DuckBrainMessagesProps> = ({
         {messages.map((message) => (
           <div
             key={message.id}
-            className={cn(
-              "flex gap-3",
-              message.role === "user" ? "justify-end" : "justify-start"
-            )}
+            className={cn("flex gap-3", message.role === "user" ? "justify-end" : "justify-start")}
           >
             {message.role === "assistant" && (
               <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
@@ -128,10 +119,7 @@ const DuckBrainMessages: React.FC<DuckBrainMessagesProps> = ({
                 {message.role === "user" ? (
                   <p className="text-sm whitespace-pre-wrap">{renderMentions(message.content)}</p>
                 ) : (
-                  <MarkdownContent
-                    content={message.content}
-                    skipCodeBlocks={!!message.sql}
-                  />
+                  <MarkdownContent content={message.content} skipCodeBlocks={!!message.sql} />
                 )}
               </div>
 

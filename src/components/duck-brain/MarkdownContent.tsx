@@ -23,9 +23,9 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
   // 2. Fallback for any remaining code blocks: ```...```
   const processedContent = skipCodeBlocks
     ? content
-        .replace(/```\w*\n[\s\S]*?```/g, "")   // Code blocks with newline after lang
-        .replace(/```[\s\S]*?```/g, "")         // Any remaining code blocks
-        .replace(/\n{3,}/g, "\n\n")             // Collapse multiple blank lines
+        .replace(/```\w*\n[\s\S]*?```/g, "") // Code blocks with newline after lang
+        .replace(/```[\s\S]*?```/g, "") // Any remaining code blocks
+        .replace(/\n{3,}/g, "\n\n") // Collapse multiple blank lines
         .trim()
     : content;
 
@@ -52,32 +52,21 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
 
       // Inline code
       return (
-        <code
-          className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono"
-          {...props}
-        >
+        <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
           {children}
         </code>
       );
     },
     // Paragraph styling
-    p: ({ children }) => (
-      <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
-    ),
+    p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
     // Strong/bold
-    strong: ({ children }) => (
-      <strong className="font-semibold">{children}</strong>
-    ),
+    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
     // Emphasis/italic
     em: ({ children }) => <em className="italic">{children}</em>,
     // Unordered list
-    ul: ({ children }) => (
-      <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>
-    ),
+    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
     // Ordered list
-    ol: ({ children }) => (
-      <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>
-    ),
+    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
     // List item
     li: ({ children }) => <li className="leading-relaxed">{children}</li>,
     // Links
@@ -98,15 +87,9 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
       </blockquote>
     ),
     // Headings (rarely used in chat but good to have)
-    h1: ({ children }) => (
-      <h1 className="text-lg font-bold mt-3 mb-2">{children}</h1>
-    ),
-    h2: ({ children }) => (
-      <h2 className="text-base font-bold mt-3 mb-2">{children}</h2>
-    ),
-    h3: ({ children }) => (
-      <h3 className="text-sm font-bold mt-2 mb-1">{children}</h3>
-    ),
+    h1: ({ children }) => <h1 className="text-lg font-bold mt-3 mb-2">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-base font-bold mt-3 mb-2">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-sm font-bold mt-2 mb-1">{children}</h3>,
     // Horizontal rule
     hr: () => <hr className="my-3 border-muted-foreground/20" />,
   };

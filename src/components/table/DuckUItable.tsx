@@ -95,9 +95,7 @@ const safeStringify = (value: any): string => {
   if (typeof value === "bigint") return value.toString();
   if (typeof value === "object") {
     try {
-      return JSON.stringify(value, (_, v) =>
-        typeof v === "bigint" ? v.toString() : v
-      );
+      return JSON.stringify(value, (_, v) => (typeof v === "bigint" ? v.toString() : v));
     } catch (e) {
       return String(value);
     }
@@ -128,10 +126,7 @@ const calculateOptimalWidth = (
   });
 
   // Rough estimation: 8px per character + padding
-  const estimatedWidth = Math.max(
-    minWidth,
-    Math.min(maxWidth, maxLength * 8 + 20)
-  );
+  const estimatedWidth = Math.max(minWidth, Math.min(maxWidth, maxLength * 8 + 20));
 
   return estimatedWidth;
 };
@@ -155,14 +150,10 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     pageIndex: 0,
     pageSize: initialPageSize,
   });
-  const [enabledColumns, setEnabledColumns] = useState<Record<string, boolean>>(
-    {}
-  );
+  const [enabledColumns, setEnabledColumns] = useState<Record<string, boolean>>({});
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-  const [userResizedColumns, setUserResizedColumns] = useState<
-    Record<string, number>
-  >({});
+  const [userResizedColumns, setUserResizedColumns] = useState<Record<string, number>>({});
   const [columnSelectorFilter, setColumnSelectorFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -174,12 +165,8 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
   // Cell selection state
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
-  const [lastSelectedCell, setLastSelectedCell] = useState<CellPosition | null>(
-    null
-  );
-  const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(
-    null
-  );
+  const [lastSelectedCell, setLastSelectedCell] = useState<CellPosition | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null);
   // Drag selection state
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<CellPosition | null>(null);
@@ -214,11 +201,13 @@ const DuckUITable: React.FC<DuckTableProps> = ({
   useEffect(() => {
     if (data && data.length > 0 && data[0]) {
       const allKeys = Object.keys(data[0]);
-      const initialEnabledCols = allKeys.reduce((acc, key) => {
-        acc[key] =
-          enabledColumns[key] === undefined ? true : enabledColumns[key];
-        return acc;
-      }, {} as Record<string, boolean>);
+      const initialEnabledCols = allKeys.reduce(
+        (acc, key) => {
+          acc[key] = enabledColumns[key] === undefined ? true : enabledColumns[key];
+          return acc;
+        },
+        {} as Record<string, boolean>
+      );
       setEnabledColumns(initialEnabledCols);
 
       const validUserResized: Record<string, number> = {};
@@ -241,9 +230,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       const newSizingState: ColumnSizingState = {};
       Object.keys(data[0]).forEach((key) => {
         newSizingState[key] =
-          userResizedColumns[key] !== undefined
-            ? userResizedColumns[key]
-            : DEFAULT_COLUMN_WIDTH; // Use default width
+          userResizedColumns[key] !== undefined ? userResizedColumns[key] : DEFAULT_COLUMN_WIDTH; // Use default width
       });
       if (JSON.stringify(columnSizing) !== JSON.stringify(newSizingState)) {
         setColumnSizing(newSizingState);
@@ -260,12 +247,12 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       const target = e.target as HTMLElement;
 
       // Close column selector if clicking outside
-      if (showColumnSelector && !target.closest('.column-selector-panel')) {
+      if (showColumnSelector && !target.closest(".column-selector-panel")) {
         setShowColumnSelector(false);
       }
 
       // Close spreadsheet options if clicking outside
-      if (showSpreadsheetOptions && !target.closest('.spreadsheet-options-panel')) {
+      if (showSpreadsheetOptions && !target.closest(".spreadsheet-options-panel")) {
         setShowSpreadsheetOptions(false);
       }
 
@@ -275,8 +262,8 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showColumnSelector, showSpreadsheetOptions, contextMenu]);
 
   const columns = useMemo<ColumnDef<DataRow>[]>(() => {
@@ -342,18 +329,11 @@ const DuckUITable: React.FC<DuckTableProps> = ({
             const titleAttribute = safeStringify(value);
             let displayValue: React.ReactNode;
 
-            if (
-              columnRenderers &&
-              columnRenderers[key] &&
-              value !== null &&
-              value !== undefined
-            ) {
+            if (columnRenderers && columnRenderers[key] && value !== null && value !== undefined) {
               displayValue = columnRenderers[key](value);
             } else if (value === null || value === undefined) {
               displayValue = (
-                <span className="text-neutral-400 italic text-xs opacity-50">
-                  null
-                </span>
+                <span className="text-neutral-400 italic text-xs opacity-50">null</span>
               );
             } else if (typeof value === "object" || typeof value === "bigint") {
               // Properly stringify objects and BigInt for display
@@ -383,19 +363,14 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         const accessorKey = (column as any).accessorKey as string;
         const columnId = (column as any).id as string;
         const keyToCheck = columnId || accessorKey;
-        return (
-          keyToCheck === undefined || enabledColumns[keyToCheck] !== false
-        );
+        return keyToCheck === undefined || enabledColumns[keyToCheck] !== false;
       });
 
     return [...cols, ...dataCols];
   }, [data, enabledColumns, columnRenderers, showRowNumbers]);
 
-  const handleColumnSizeChange = (
-    updater: React.SetStateAction<ColumnSizingState>
-  ) => {
-    const newSizingFromTable =
-      typeof updater === "function" ? updater(columnSizing) : updater;
+  const handleColumnSizeChange = (updater: React.SetStateAction<ColumnSizingState>) => {
+    const newSizingFromTable = typeof updater === "function" ? updater(columnSizing) : updater;
     setColumnSizing(newSizingFromTable);
     setUserResizedColumns(newSizingFromTable);
   };
@@ -430,10 +405,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
   const ROW_HEIGHT = 32; // Must match CSS and cell content height
 
   // Helper function to create selection range between two points
-  const createSelectionRange = (
-    start: CellPosition,
-    end: CellPosition
-  ): Set<string> => {
+  const createSelectionRange = (start: CellPosition, end: CellPosition): Set<string> => {
     const selection = new Set<string>();
     if (!data || !data[0]) return selection;
 
@@ -446,11 +418,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     const maxColIndex = Math.max(startColIndex, endColIndex);
 
     for (let row = minRow; row <= maxRow && row < data.length; row++) {
-      for (
-        let colIdx = minColIndex;
-        colIdx <= maxColIndex && colIdx < columns.length;
-        colIdx++
-      ) {
+      for (let colIdx = minColIndex; colIdx <= maxColIndex && colIdx < columns.length; colIdx++) {
         const col = columns[colIdx];
         if (col !== "__row_number__") {
           selection.add(`${row}::${col}`);
@@ -587,29 +555,21 @@ const DuckUITable: React.FC<DuckTableProps> = ({
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
+  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
   const paddingBottom =
     virtualRows.length > 0
-      ? rowVirtualizer.getTotalSize() -
-        (virtualRows[virtualRows.length - 1]?.end ?? 0)
+      ? rowVirtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
 
   const exportToCSV = () => {
     if (!data || !data.length) return;
     const visibleKeys = table.getVisibleLeafColumns().map((c) => c.id);
-    const headers =
-      visibleKeys.length > 0
-        ? visibleKeys
-        : data[0]
-        ? Object.keys(data[0])
-        : [];
+    const headers = visibleKeys.length > 0 ? visibleKeys : data[0] ? Object.keys(data[0]) : [];
     if (headers.length === 0) return;
 
     const csvRows = [headers.join(",")];
     // Export based on current filter, but original data (not paginated)
-    const dataToExport = table
-      .getFilteredRowModel()
-      .rows.map((r) => r.original);
+    const dataToExport = table.getFilteredRowModel().rows.map((r) => r.original);
 
     for (const row of dataToExport) {
       const values = headers.map((header) => {
@@ -629,10 +589,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `duck-ui-export-${new Date().toISOString().slice(0, 19)}.csv`
-    );
+    link.setAttribute("download", `duck-ui-export-${new Date().toISOString().slice(0, 19)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -643,9 +600,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
   const exportToJSON = () => {
     if (!data || !data.length) return;
 
-    const dataToExport = table
-      .getFilteredRowModel()
-      .rows.map((r) => r.original);
+    const dataToExport = table.getFilteredRowModel().rows.map((r) => r.original);
 
     const jsonString = JSON.stringify(
       dataToExport,
@@ -657,10 +612,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `duck-ui-export-${new Date().toISOString().slice(0, 19)}.json`
-    );
+    link.setAttribute("download", `duck-ui-export-${new Date().toISOString().slice(0, 19)}.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -676,17 +628,15 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       // Dynamic import - only load XLSX when needed
       const XLSX = await import("xlsx");
 
-      const dataToExport = table
-        .getFilteredRowModel()
-        .rows.map((r) => {
-          // Handle BigInt for XLSX
-          const row: Record<string, any> = {};
-          Object.keys(r.original).forEach((key) => {
-            const val = r.original[key];
-            row[key] = typeof val === "bigint" ? val.toString() : val;
-          });
-          return row;
+      const dataToExport = table.getFilteredRowModel().rows.map((r) => {
+        // Handle BigInt for XLSX
+        const row: Record<string, any> = {};
+        Object.keys(r.original).forEach((key) => {
+          const val = r.original[key];
+          row[key] = typeof val === "bigint" ? val.toString() : val;
         });
+        return row;
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
       const workbook = XLSX.utils.book_new();
@@ -705,10 +655,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       }));
       worksheet["!cols"] = colWidths;
 
-      XLSX.writeFile(
-        workbook,
-        `duck-ui-export-${new Date().toISOString().slice(0, 19)}.xlsx`
-      );
+      XLSX.writeFile(workbook, `duck-ui-export-${new Date().toISOString().slice(0, 19)}.xlsx`);
 
       toast.success("Exported to Excel");
     } catch (error) {
@@ -758,7 +705,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       const keys = Object.keys(dataToExport[0]);
 
       await connection.query(
-        `COPY (SELECT * FROM (VALUES ${valuesClause}) AS t(${keys.map(k => `"${k}"`).join(", ")})) TO '${fileName}' (FORMAT 'parquet')`
+        `COPY (SELECT * FROM (VALUES ${valuesClause}) AS t(${keys.map((k) => `"${k}"`).join(", ")})) TO '${fileName}' (FORMAT 'parquet')`
       );
 
       const buffer = await db.copyFileToBuffer(fileName);
@@ -779,7 +726,9 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       toast.success("Exported to Parquet (DuckDB format)");
     } catch (error) {
       console.error("DuckDB export failed:", error);
-      toast.error("Failed to export: " + (error instanceof Error ? error.message : "Unknown error"));
+      toast.error(
+        "Failed to export: " + (error instanceof Error ? error.message : "Unknown error")
+      );
     }
   };
 
@@ -915,7 +864,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
       const keys = Object.keys(dataToExport[0]);
 
       await connection.query(
-        `COPY (SELECT * FROM (VALUES ${valuesClause}) AS t(${keys.map(k => `"${k}"`).join(", ")})) TO '${tempFileName}' (FORMAT 'parquet')`
+        `COPY (SELECT * FROM (VALUES ${valuesClause}) AS t(${keys.map((k) => `"${k}"`).join(", ")})) TO '${tempFileName}' (FORMAT 'parquet')`
       );
 
       const buffer = await db.copyFileToBuffer(tempFileName);
@@ -940,10 +889,13 @@ const DuckUITable: React.FC<DuckTableProps> = ({
   const toggleAllColumns = (value: boolean) => {
     if (!data || !data.length || !data[0]) return;
     setEnabledColumns(
-      Object.keys(data[0]).reduce((acc, key) => {
-        acc[key] = value;
-        return acc;
-      }, {} as Record<string, boolean>)
+      Object.keys(data[0]).reduce(
+        (acc, key) => {
+          acc[key] = value;
+          return acc;
+        },
+        {} as Record<string, boolean>
+      )
     );
   };
 
@@ -1068,14 +1020,9 @@ const DuckUITable: React.FC<DuckTableProps> = ({
               <Checkbox
                 id="show-row-numbers"
                 checked={showRowNumbers}
-                onCheckedChange={(checked) =>
-                  setShowRowNumbers(checked === true)
-                }
+                onCheckedChange={(checked) => setShowRowNumbers(checked === true)}
               />
-              <label
-                htmlFor="show-row-numbers"
-                className="text-xs cursor-pointer"
-              >
+              <label htmlFor="show-row-numbers" className="text-xs cursor-pointer">
                 Show row numbers
               </label>
             </div>
@@ -1093,14 +1040,9 @@ const DuckUITable: React.FC<DuckTableProps> = ({
               <Checkbox
                 id="show-grid-lines"
                 checked={showGridLines}
-                onCheckedChange={(checked) =>
-                  setShowGridLines(checked === true)
-                }
+                onCheckedChange={(checked) => setShowGridLines(checked === true)}
               />
-              <label
-                htmlFor="show-grid-lines"
-                className="text-xs cursor-pointer"
-              >
+              <label htmlFor="show-grid-lines" className="text-xs cursor-pointer">
                 Show grid lines
               </label>
             </div>
@@ -1211,10 +1153,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
   return (
     <TooltipProvider>
-      <div
-        className="flex flex-col h-full w-full min-w-0 overflow-hidden"
-        ref={tableContainerRef}
-      >
+      <div className="flex flex-col h-full w-full min-w-0 overflow-hidden" ref={tableContainerRef}>
         {/* Top controls area */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2 flex-shrink-0 mt-2 px-2">
           <div className="flex items-center gap-2 flex-1">
@@ -1235,19 +1174,14 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                 table.resetColumnFilters(true);
               }}
               className="h-8 text-xs"
-              disabled={
-                !globalFilterInput && !table.getState().columnFilters.length
-              }
+              disabled={!globalFilterInput && !table.getState().columnFilters.length}
             >
               Clear Filters
             </Button>
           </div>
           <div className="hidden md:flex items-center gap-x-4 text-xs text-muted-foreground px-2">
             {executionTime !== null && executionTime !== undefined && (
-              <div
-                className="flex items-center gap-1"
-                title="Query execution time"
-              >
+              <div className="flex items-center gap-1" title="Query execution time">
                 <Clock className="h-3 w-3" />
                 <span>{formatDuration(executionTime)}</span>
               </div>
@@ -1257,9 +1191,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                 <span>{formatBytes(responseSize)}</span>
               </div>
             )}
-            <span title="Showing rows count">
-              {data.length.toLocaleString()} rows
-            </span>
+            <span title="Showing rows count">{data.length.toLocaleString()} rows</span>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -1292,9 +1224,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  setShowSpreadsheetOptions(!showSpreadsheetOptions)
-                }
+                onClick={() => setShowSpreadsheetOptions(!showSpreadsheetOptions)}
                 className="h-8 text-xs"
                 title="Spreadsheet display options"
               >
@@ -1363,19 +1293,27 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                               {folder.name}
                             </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent>
-                              <DropdownMenuItem onClick={() => saveToFolderAsCSV(folder.id, folder.name)}>
+                              <DropdownMenuItem
+                                onClick={() => saveToFolderAsCSV(folder.id, folder.name)}
+                              >
                                 <FileText className="mr-2 h-3.5 w-3.5" />
                                 Save as CSV
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => saveToFolderAsJSON(folder.id, folder.name)}>
+                              <DropdownMenuItem
+                                onClick={() => saveToFolderAsJSON(folder.id, folder.name)}
+                              >
                                 <FileJson className="mr-2 h-3.5 w-3.5" />
                                 Save as JSON
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => saveToFolderAsXLSX(folder.id, folder.name)}>
+                              <DropdownMenuItem
+                                onClick={() => saveToFolderAsXLSX(folder.id, folder.name)}
+                              >
                                 <FileSpreadsheet className="mr-2 h-3.5 w-3.5" />
                                 Save as Excel (XLSX)
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => saveToFolderAsParquet(folder.id, folder.name)}>
+                              <DropdownMenuItem
+                                onClick={() => saveToFolderAsParquet(folder.id, folder.name)}
+                              >
                                 <FileArchive className="mr-2 h-3.5 w-3.5" />
                                 Save as Parquet
                               </DropdownMenuItem>
@@ -1393,8 +1331,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
             {selectedCells.size > 0 && (
               <div className="flex items-center gap-2 ml-4 px-3 py-1 bg-primary/10 rounded-md border">
                 <span className="text-xs text-muted-foreground">
-                  {selectedCells.size} cell{selectedCells.size !== 1 ? "s" : ""}{" "}
-                  selected
+                  {selectedCells.size} cell{selectedCells.size !== 1 ? "s" : ""} selected
                 </span>
                 <Button
                   variant="ghost"
@@ -1419,10 +1356,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
             ref={horizontalScrollRef}
             className="h-full w-full overflow-auto"
             style={{
-              height:
-                typeof tableHeight === "string"
-                  ? tableHeight
-                  : `${tableHeight}px`,
+              height: typeof tableHeight === "string" ? tableHeight : `${tableHeight}px`,
               maxWidth: "100%",
             }}
           >
@@ -1445,10 +1379,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                   }`}
                 >
                   {table.getHeaderGroups().map((headerGroup) => (
-                    <tr
-                      key={headerGroup.id}
-                      className="border-b border-border/40"
-                    >
+                    <tr key={headerGroup.id} className="border-b border-border/40">
                       {headerGroup.headers.map((header) => (
                         <th
                           key={header.id}
@@ -1462,17 +1393,12 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                           }}
                         >
                           <div className="flex items-center justify-between w-full h-full px-2">
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                            {flexRender(header.column.columnDef.header, header.getContext())}
                           </div>
                           {header.column.getCanResize() && (
                             <div
                               className={`absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none group ${
-                                header.column.getIsResizing()
-                                  ? "bg-primary/20"
-                                  : ""
+                                header.column.getIsResizing() ? "bg-primary/20" : ""
                               }`}
                               onMouseDown={header.getResizeHandler()}
                               onTouchStart={header.getResizeHandler()}
@@ -1528,11 +1454,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                               key={cell.id}
                               className={`align-middle overflow-hidden relative ${
                                 showGridLines ? "border-r border-border/30" : ""
-                              } ${
-                                isSelected
-                                  ? "bg-primary/20 ring-1 ring-primary/30"
-                                  : ""
-                              } ${
+                              } ${isSelected ? "bg-primary/20 ring-1 ring-primary/30" : ""} ${
                                 isDragging ? "cursor-crosshair" : "cursor-cell"
                               }`}
                               style={{
@@ -1541,10 +1463,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                                 maxWidth: cell.column.columnDef.maxSize,
                               }}
                               onMouseDown={(e) => {
-                                if (
-                                  cell.column.id !== "__row_number__" &&
-                                  e.button === 0
-                                ) {
+                                if (cell.column.id !== "__row_number__" && e.button === 0) {
                                   e.preventDefault();
                                   const currentPosition = {
                                     row: virtualRow.index,
@@ -1623,10 +1542,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
                                 }
                               }}
                             >
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext()
-                              )}
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </td>
                           );
                         })}
@@ -1700,8 +1616,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount() || 1}
+              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
             </span>
             <select
               value={table.getState().pagination.pageSize}

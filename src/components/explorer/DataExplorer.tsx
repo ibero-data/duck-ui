@@ -65,9 +65,7 @@ export default function DataExplorer() {
       } catch (error) {
         console.error("Failed to import file:", error);
         toast.error(
-          `Failed to import: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          `Failed to import: ${error instanceof Error ? error.message : "Unknown error"}`,
           { id: "folder-import" }
         );
       }
@@ -186,9 +184,7 @@ export default function DataExplorer() {
                     <Server className="h-8 w-8 text-muted-foreground" />
                     {schemaFetchError ? (
                       <>
-                        <p className="text-destructive text-sm">
-                          Connection error
-                        </p>
+                        <p className="text-destructive text-sm">Connection error</p>
                         <p className="text-xs text-muted-foreground max-w-[200px]">
                           {schemaFetchError}
                         </p>
@@ -223,11 +219,7 @@ export default function DataExplorer() {
                   Refresh Schema
                 </Button>
               ) : (
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => setIsSheetOpen(true)}
-                >
+                <Button variant="outline" className="gap-2" onClick={() => setIsSheetOpen(true)}>
                   <Plus className="h-4 w-4" />
                   Import Data
                 </Button>

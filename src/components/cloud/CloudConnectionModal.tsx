@@ -45,37 +45,42 @@ interface CloudConnectionModalProps {
 }
 
 // Form validation schema
-const cloudConnectionSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.enum(["s3", "gcs", "azure"]),
-  // S3 fields
-  bucket: z.string().optional(),
-  region: z.string().optional(),
-  accessKeyId: z.string().optional(),
-  secretAccessKey: z.string().optional(),
-  endpoint: z.string().optional(),
-  // GCS fields
-  hmacKeyId: z.string().optional(),
-  hmacSecret: z.string().optional(),
-  // Azure fields
-  accountName: z.string().optional(),
-  accountKey: z.string().optional(),
-  containerName: z.string().optional(),
-}).refine((data) => {
-  // Validate required fields based on type
-  if (data.type === "s3") {
-    return data.bucket && data.accessKeyId && data.secretAccessKey;
-  }
-  if (data.type === "gcs") {
-    return data.bucket && data.hmacKeyId && data.hmacSecret;
-  }
-  if (data.type === "azure") {
-    return data.containerName && data.accountName && data.accountKey;
-  }
-  return true;
-}, {
-  message: "Please fill in all required fields for the selected provider",
-});
+const cloudConnectionSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    type: z.enum(["s3", "gcs", "azure"]),
+    // S3 fields
+    bucket: z.string().optional(),
+    region: z.string().optional(),
+    accessKeyId: z.string().optional(),
+    secretAccessKey: z.string().optional(),
+    endpoint: z.string().optional(),
+    // GCS fields
+    hmacKeyId: z.string().optional(),
+    hmacSecret: z.string().optional(),
+    // Azure fields
+    accountName: z.string().optional(),
+    accountKey: z.string().optional(),
+    containerName: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      // Validate required fields based on type
+      if (data.type === "s3") {
+        return data.bucket && data.accessKeyId && data.secretAccessKey;
+      }
+      if (data.type === "gcs") {
+        return data.bucket && data.hmacKeyId && data.hmacSecret;
+      }
+      if (data.type === "azure") {
+        return data.containerName && data.accountName && data.accountKey;
+      }
+      return true;
+    },
+    {
+      message: "Please fill in all required fields for the selected provider",
+    }
+  );
 
 type CloudConnectionFormData = z.infer<typeof cloudConnectionSchema>;
 
@@ -143,7 +148,8 @@ export function CloudConnectionModal({
       if (!cloudSupportStatus?.httpfsAvailable) {
         setTestResult({
           success: false,
-          error: "Cloud storage (httpfs) is not available in this browser. Direct S3/GCS/Azure access may not work due to CORS restrictions.",
+          error:
+            "Cloud storage (httpfs) is not available in this browser. Direct S3/GCS/Azure access may not work due to CORS restrictions.",
         });
       } else if (!cloudSupportStatus?.secretsSupported) {
         setTestResult({
@@ -177,8 +183,9 @@ export function CloudConnectionModal({
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Cloud storage support is limited in this browser. The httpfs extension is not available.
-              You may need to use HTTPS URLs directly instead of s3:// or gcs:// protocols.
+              Cloud storage support is limited in this browser. The httpfs extension is not
+              available. You may need to use HTTPS URLs directly instead of s3:// or gcs://
+              protocols.
             </AlertDescription>
           </Alert>
         )}
@@ -295,9 +302,7 @@ export function CloudConnectionModal({
                       <FormControl>
                         <Input placeholder="https://minio.example.com" {...field} />
                       </FormControl>
-                      <FormDescription>
-                        For S3-compatible services like MinIO or R2
-                      </FormDescription>
+                      <FormDescription>For S3-compatible services like MinIO or R2</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -406,9 +411,7 @@ export function CloudConnectionModal({
             {testResult && (
               <Alert variant={testResult.success ? "default" : "destructive"}>
                 <AlertDescription>
-                  {testResult.success
-                    ? "Cloud storage support is available!"
-                    : testResult.error}
+                  {testResult.success ? "Cloud storage support is available!" : testResult.error}
                 </AlertDescription>
               </Alert>
             )}

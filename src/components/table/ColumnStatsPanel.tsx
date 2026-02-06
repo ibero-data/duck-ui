@@ -2,16 +2,6 @@ import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 import { useTheme } from "@/components/theme/theme-provider";
 
 type DataRow = Record<string, any>;
@@ -74,8 +64,7 @@ const calculateColumnStats = (data: DataRow[], columnName: string): ColumnStats 
     if (numericValues.length > 0) {
       stats.min = Math.min(...numericValues);
       stats.max = Math.max(...numericValues);
-      stats.avg =
-        numericValues.reduce((sum, v) => sum + v, 0) / numericValues.length;
+      stats.avg = numericValues.reduce((sum, v) => sum + v, 0) / numericValues.length;
     }
   }
 
@@ -100,11 +89,7 @@ const MiniChart: React.FC<{ stats: ColumnStats }> = ({ stats }) => {
   const { theme } = useTheme();
 
   if (!stats.topValues || stats.topValues.length === 0) {
-    return (
-      <div className="text-xs text-muted-foreground italic">
-        No chart data available
-      </div>
-    );
+    return <div className="text-xs text-muted-foreground italic">No chart data available</div>;
   }
 
   const chartData = stats.topValues.slice(0, 8).map((item) => ({
@@ -115,38 +100,41 @@ const MiniChart: React.FC<{ stats: ColumnStats }> = ({ stats }) => {
     value: item.count,
   }));
 
-  const colors = theme === "dark"
-    ? ["#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe"]
-    : ["#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe"];
+  const maxValue = Math.max(...chartData.map((d) => d.value));
+
+  const colors =
+    theme === "dark"
+      ? ["#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe"]
+      : ["#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe"];
 
   return (
-    <ResponsiveContainer width="100%" height={250}>
-      <BarChart data={chartData} margin={{ top: 15, right: 15, bottom: 20, left: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-        <XAxis
-          dataKey="name"
-          tick={{ fontSize: 10 }}
-          angle={-45}
-          textAnchor="end"
-          height={60}
-        />
-        <YAxis tick={{ fontSize: 10 }} />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: theme === "dark" ? "#1e293b" : "#ffffff",
-            border: "1px solid #cbd5e1",
-            borderRadius: "6px",
-            fontSize: "12px",
-            color: theme === "dark" ? "#65fc2eff" : "#0f172a",
-          }}
-        />
-        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-          {chartData.map((_entry, index) => (
-            <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="space-y-1">
+      <div className="flex items-end gap-0.5 h-[80px]">
+        {chartData.map((item, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-t transition-opacity hover:opacity-80"
+            style={{
+              height: `${maxValue > 0 ? (item.value / maxValue) * 100 : 0}%`,
+              backgroundColor: colors[i % colors.length],
+              minHeight: item.value > 0 ? 2 : 0,
+            }}
+            title={`${item.name}: ${item.value}`}
+          />
+        ))}
+      </div>
+      <div className="flex gap-0.5">
+        {chartData.map((item, i) => (
+          <div
+            key={i}
+            className="flex-1 text-[8px] text-muted-foreground truncate text-center"
+            title={item.name}
+          >
+            {item.name}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
@@ -176,7 +164,7 @@ const ColumnStatCard: React.FC<{ stats: ColumnStats }> = ({ stats }) => {
           <div>
             <span className="text-muted-foreground">Fill:</span>{" "}
             <span className="font-medium">
-              {((((stats.totalCount - stats.nullCount) / stats.totalCount) * 100) || 0).toFixed(1)}%
+              {(((stats.totalCount - stats.nullCount) / stats.totalCount) * 100 || 0).toFixed(1)}%
             </span>
           </div>
         </div>
@@ -194,7 +182,9 @@ const ColumnStatCard: React.FC<{ stats: ColumnStats }> = ({ stats }) => {
             {stats.avg !== undefined && (
               <div>
                 <span className="text-muted-foreground">Avg:</span>{" "}
-                <span className="font-mono">{stats.avg.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                <span className="font-mono">
+                  {stats.avg.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
               </div>
             )}
           </div>
@@ -270,12 +260,7 @@ export const ColumnStatsPanel: React.FC<ColumnStatsPanelProps> = ({
             </p>
           </div>
           <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={onToggleMinimize}
-            >
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onToggleMinimize}>
               <ChevronDown className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onClose}>

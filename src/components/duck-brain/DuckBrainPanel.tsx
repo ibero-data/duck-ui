@@ -1,14 +1,5 @@
 import React, { useCallback, useMemo } from "react";
-import {
-  Brain,
-  X,
-  Loader2,
-  AlertCircle,
-  Download,
-  Trash2,
-  RefreshCw,
-  Cloud,
-} from "lucide-react";
+import { Brain, X, Loader2, AlertCircle, Download, Trash2, RefreshCw, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -115,7 +106,10 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
     }
 
     // Add OpenAI-Compatible if configured
-    if (providerConfigs["openai-compatible"]?.baseUrl && providerConfigs["openai-compatible"]?.modelId) {
+    if (
+      providerConfigs["openai-compatible"]?.baseUrl &&
+      providerConfigs["openai-compatible"]?.modelId
+    ) {
       providers.push({
         value: "openai-compatible",
         label: providerConfigs["openai-compatible"].modelId,
@@ -169,8 +163,8 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
             <AlertDescription className="mt-2">
               <p className="font-medium">WebGPU Not Supported</p>
               <p className="text-xs mt-1">
-                Duck Brain requires WebGPU for local AI processing.
-                Please use Chrome 113+ or Edge 113+.
+                Duck Brain requires WebGPU for local AI processing. Please use Chrome 113+ or Edge
+                113+.
               </p>
             </AlertDescription>
           </Alert>
@@ -183,7 +177,9 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
   const hasExternalProvider =
     (aiProvider === "openai" && providerConfigs.openai?.apiKey) ||
     (aiProvider === "anthropic" && providerConfigs.anthropic?.apiKey) ||
-    (aiProvider === "openai-compatible" && providerConfigs["openai-compatible"]?.baseUrl && providerConfigs["openai-compatible"]?.modelId);
+    (aiProvider === "openai-compatible" &&
+      providerConfigs["openai-compatible"]?.baseUrl &&
+      providerConfigs["openai-compatible"]?.modelId);
 
   // Render idle state (not initialized) - only for WebLLM without external provider
   if ((modelStatus === "idle" || modelStatus === "checking") && !hasExternalProvider) {
@@ -195,8 +191,8 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
             <Brain className="h-12 w-12 mx-auto mb-4 text-primary" />
             <h3 className="font-semibold mb-2">Initialize Duck Brain</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Download an AI model to enable natural language to SQL conversion.
-              This runs 100% locally in your browser.
+              Download an AI model to enable natural language to SQL conversion. This runs 100%
+              locally in your browser.
             </p>
             <div className="space-y-2 text-xs text-muted-foreground mb-4">
               <p>
@@ -226,9 +222,7 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
           <div className="text-center max-w-sm w-full">
             <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-primary" />
             <h3 className="font-semibold mb-2">
-              {modelStatus === "downloading"
-                ? "Downloading Model..."
-                : "Loading Model..."}
+              {modelStatus === "downloading" ? "Downloading Model..." : "Loading Model..."}
             </h3>
             <Progress value={downloadProgress} className="mb-2" />
             <p className="text-xs text-muted-foreground">

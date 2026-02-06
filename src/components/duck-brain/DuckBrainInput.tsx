@@ -34,11 +34,7 @@ const renderWithMentions = (text: string) => {
         key={`mention-${match.index}`}
         className="inline-flex items-center gap-0.5 px-1 py-px rounded bg-primary/20 text-primary text-xs font-medium align-baseline"
       >
-        {isColumn ? (
-          <Columns className="h-3 w-3" />
-        ) : (
-          <Table2 className="h-3 w-3" />
-        )}
+        {isColumn ? <Columns className="h-3 w-3" /> : <Table2 className="h-3 w-3" />}
         {mention}
       </span>
     );
@@ -166,9 +162,7 @@ const DuckBrainInput: React.FC<DuckBrainInputProps> = ({
           return;
         case "ArrowUp":
           e.preventDefault();
-          setActiveIndex((prev) =>
-            prev === 0 ? suggestions.length - 1 : prev - 1
-          );
+          setActiveIndex((prev) => (prev === 0 ? suggestions.length - 1 : prev - 1));
           return;
         case "Tab":
         case "Enter":
@@ -204,10 +198,7 @@ const DuckBrainInput: React.FC<DuckBrainInputProps> = ({
   // Close autocomplete when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsAutocompleteOpen(false);
       }
     };
@@ -220,11 +211,7 @@ const DuckBrainInput: React.FC<DuckBrainInputProps> = ({
   const hasMentions = /@[\w.]+/.test(input);
 
   return (
-    <form
-      ref={containerRef}
-      onSubmit={handleSubmit}
-      className={cn("relative", className)}
-    >
+    <form ref={containerRef} onSubmit={handleSubmit} className={cn("relative", className)}>
       {/* Visual overlay for styled mentions */}
       {hasMentions && (
         <div
@@ -280,11 +267,7 @@ const DuckBrainInput: React.FC<DuckBrainInputProps> = ({
             disabled={!input.trim() || disabled}
             className="h-8 w-8"
           >
-            {disabled ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
+            {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         )}
       </div>

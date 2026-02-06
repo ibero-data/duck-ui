@@ -1,0 +1,7 @@
+dist
+node_modules
+bun.lockb
+*.wasm
+public
+docs/.vitepress/cache
+docs/.vitepress/dist

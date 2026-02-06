@@ -1,6 +1,8 @@
 # Use an official Node runtime as a parent image with bun
 FROM oven/bun:1-alpine AS build
 
+ARG DUCK_UI_BASEPATH="/"
+
 # Set the working directory
 WORKDIR /app
 

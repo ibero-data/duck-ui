@@ -23,14 +23,19 @@ interface FileSystemFileHandle extends FileSystemHandle {
 
 interface FileSystemDirectoryHandle extends FileSystemHandle {
   readonly kind: "directory";
-  getDirectoryHandle(name: string, options?: FileSystemGetDirectoryOptions): Promise<FileSystemDirectoryHandle>;
+  getDirectoryHandle(
+    name: string,
+    options?: FileSystemGetDirectoryOptions
+  ): Promise<FileSystemDirectoryHandle>;
   getFileHandle(name: string, options?: FileSystemGetFileOptions): Promise<FileSystemFileHandle>;
   removeEntry(name: string, options?: FileSystemRemoveOptions): Promise<void>;
   resolve(possibleDescendant: FileSystemHandle): Promise<string[] | null>;
   keys(): AsyncIterableIterator<string>;
   values(): AsyncIterableIterator<FileSystemDirectoryHandle | FileSystemFileHandle>;
   entries(): AsyncIterableIterator<[string, FileSystemDirectoryHandle | FileSystemFileHandle]>;
-  [Symbol.asyncIterator](): AsyncIterableIterator<[string, FileSystemDirectoryHandle | FileSystemFileHandle]>;
+  [Symbol.asyncIterator](): AsyncIterableIterator<
+    [string, FileSystemDirectoryHandle | FileSystemFileHandle]
+  >;
 }
 
 interface FileSystemGetDirectoryOptions {
@@ -55,12 +60,7 @@ interface FileSystemWritableFileStream extends WritableStream {
   truncate(size: number): Promise<void>;
 }
 
-type FileSystemWriteChunkType =
-  | ArrayBuffer
-  | ArrayBufferView
-  | Blob
-  | string
-  | WriteParams;
+type FileSystemWriteChunkType = ArrayBuffer | ArrayBufferView | Blob | string | WriteParams;
 
 interface WriteParams {
   type: "write" | "seek" | "truncate";
@@ -94,13 +94,7 @@ interface FilePickerAcceptType {
   accept: Record<string, string | string[]>;
 }
 
-type WellKnownDirectory =
-  | "desktop"
-  | "documents"
-  | "downloads"
-  | "music"
-  | "pictures"
-  | "videos";
+type WellKnownDirectory = "desktop" | "documents" | "downloads" | "music" | "pictures" | "videos";
 
 interface Window {
   showOpenFilePicker(options?: OpenFilePickerOptions): Promise<FileSystemFileHandle[]>;

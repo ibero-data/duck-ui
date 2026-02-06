@@ -10,11 +10,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export interface MultiSelectOption {
@@ -58,9 +54,7 @@ export function MultiSelect({
     onChange(selected.filter((item) => item !== value));
   };
 
-  const selectedOptions = options.filter((option) =>
-    selected.includes(option.value)
-  );
+  const selectedOptions = options.filter((option) => selected.includes(option.value));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -78,11 +72,9 @@ export function MultiSelect({
                   key={option.value}
                   className="shrink-0 gap-1.5 font-medium"
                   style={{
-                    backgroundColor: option.color
-                      ? `${option.color}65`
-                      : undefined,
+                    backgroundColor: option.color ? `${option.color}65` : undefined,
                     borderColor: option.color || undefined,
-                    borderWidth: '2px',
+                    borderWidth: "2px",
                     boxShadow: option.color ? `0 1px 3px ${option.color}30` : undefined,
                   }}
                 >
@@ -137,13 +129,9 @@ export function MultiSelect({
                           }}
                         />
                       )}
-                      <span className={isDisabled ? "opacity-50" : ""}>
-                        {option.label}
-                      </span>
+                      <span className={isDisabled ? "opacity-50" : ""}>{option.label}</span>
                     </div>
-                    {isSelected && (
-                      <Check className="ml-auto h-4 w-4 opacity-100" />
-                    )}
+                    {isSelected && <Check className="ml-auto h-4 w-4 opacity-100" />}
                   </CommandItem>
                 );
               })}

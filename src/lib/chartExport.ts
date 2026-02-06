@@ -4,7 +4,23 @@
  */
 
 /**
- * Export chart as PNG image
+ * Helper to trigger a blob download
+ */
+const downloadBlob = (blob: Blob, fileName: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * Export chart as PNG image.
+ * For canvas-based charts (uPlot), captures the canvas directly.
+ * For SVG-based charts (pie/donut), falls back to html2canvas.
  */
 export const exportChartAsPNG = async (
   chartElement: HTMLElement,
@@ -12,30 +28,37 @@ export const exportChartAsPNG = async (
   backgroundColor: string = "#ffffff"
 ): Promise<void> => {
   try {
-    // Dynamic import to reduce bundle size
-    const html2canvas = (await import("html2canvas")).default;
+    // Direct canvas capture (uPlot renders to <canvas>)
+    const sourceCanvas = chartElement.querySelector("canvas");
+    if (sourceCanvas && sourceCanvas.width > 0 && sourceCanvas.height > 0) {
+      const offscreen = document.createElement("canvas");
+      offscreen.width = sourceCanvas.width;
+      offscreen.height = sourceCanvas.height;
+      const ctx = offscreen.getContext("2d");
+      if (!ctx) throw new Error("Failed to get canvas context");
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+      ctx.drawImage(sourceCanvas, 0, 0);
 
-    const canvas = await html2canvas(chartElement, {
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        offscreen.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png");
+      });
+      downloadBlob(blob, fileName);
+      return;
+    }
+
+    // Fallback: html2canvas for SVG-based charts (pie/donut)
+    const html2canvas = (await import("html2canvas")).default;
+    const rendered = await html2canvas(chartElement, {
       backgroundColor,
-      scale: 2, // Higher resolution
+      scale: 2,
       logging: false,
       useCORS: true,
     });
 
-    // Convert canvas to blob and download
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        throw new Error("Failed to create image blob");
-      }
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+    rendered.toBlob((blob) => {
+      if (!blob) throw new Error("Failed to create image blob");
+      downloadBlob(blob, fileName);
     }, "image/png");
   } catch (error) {
     console.error("Failed to export chart as PNG:", error);
@@ -44,7 +67,8 @@ export const exportChartAsPNG = async (
 };
 
 /**
- * Export chart as SVG
+ * Export chart as SVG (works for SVG-based charts like pie/donut)
+ * For canvas-based charts (uPlot), falls back to PNG export.
  */
 export const exportChartAsSVG = async (
   chartElement: HTMLElement,
@@ -54,7 +78,9 @@ export const exportChartAsSVG = async (
     // Find SVG element in the chart
     const svgElement = chartElement.querySelector("svg");
     if (!svgElement) {
-      throw new Error("No SVG element found in chart");
+      // Canvas-based chart (uPlot) — fall back to PNG
+      await exportChartAsPNG(chartElement, fileName.replace(/\.svg$/, ".png"));
+      return;
     }
 
     // Clone SVG to avoid modifying original
@@ -89,35 +115,43 @@ export const exportChartAsSVG = async (
  * Copy chart as image to clipboard
  */
 export const copyChartToClipboard = async (
-  chartElement: HTMLElement
+  chartElement: HTMLElement,
+  backgroundColor: string = "#ffffff"
 ): Promise<void> => {
   try {
-    const html2canvas = (await import("html2canvas")).default;
+    let blob: Blob;
 
-    const canvas = await html2canvas(chartElement, {
-      backgroundColor: "#ffffff",
-      scale: 2,
-      logging: false,
-      useCORS: true,
-    });
+    // Direct canvas capture (uPlot)
+    const sourceCanvas = chartElement.querySelector("canvas");
+    if (sourceCanvas && sourceCanvas.width > 0 && sourceCanvas.height > 0) {
+      const offscreen = document.createElement("canvas");
+      offscreen.width = sourceCanvas.width;
+      offscreen.height = sourceCanvas.height;
+      const ctx = offscreen.getContext("2d");
+      if (!ctx) throw new Error("Failed to get canvas context");
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+      ctx.drawImage(sourceCanvas, 0, 0);
 
-    // Convert canvas to blob
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(blob);
-        } else {
-          reject(new Error("Failed to create blob"));
-        }
-      }, "image/png");
-    });
+      blob = await new Promise<Blob>((resolve, reject) => {
+        offscreen.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png");
+      });
+    } else {
+      // Fallback: html2canvas for SVG-based charts
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(chartElement, {
+        backgroundColor,
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      });
 
-    // Copy to clipboard
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        "image/png": blob,
-      }),
-    ]);
+      blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png");
+      });
+    }
+
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
   } catch (error) {
     console.error("Failed to copy chart to clipboard:", error);
     throw new Error("Failed to copy chart to clipboard. Please try again.");
@@ -133,15 +167,24 @@ export const printChart = (chartElement: HTMLElement): void => {
     throw new Error("Failed to open print window. Please allow popups.");
   }
 
+  // Try SVG first, then canvas (uPlot)
   const svgElement = chartElement.querySelector("svg");
-  if (!svgElement) {
+  const canvasElement = chartElement.querySelector("canvas");
+
+  if (!svgElement && !canvasElement) {
     printWindow.close();
     throw new Error("No chart found to print");
   }
 
-  const clonedSvg = svgElement.cloneNode(true) as SVGElement;
-  const serializer = new XMLSerializer();
-  const svgString = serializer.serializeToString(clonedSvg);
+  let chartContent: string;
+  if (svgElement) {
+    const clonedSvg = svgElement.cloneNode(true) as SVGElement;
+    const serializer = new XMLSerializer();
+    chartContent = serializer.serializeToString(clonedSvg);
+  } else {
+    const dataUrl = canvasElement!.toDataURL("image/png");
+    chartContent = `<img src="${dataUrl}" style="max-width:100%;height:auto;" />`;
+  }
 
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -154,7 +197,7 @@ export const printChart = (chartElement: HTMLElement): void => {
               margin: 0;
               padding: 20px;
             }
-            svg {
+            svg, img {
               max-width: 100%;
               height: auto;
             }
@@ -162,7 +205,7 @@ export const printChart = (chartElement: HTMLElement): void => {
         </style>
       </head>
       <body>
-        ${svgString}
+        ${chartContent}
         <script>
           window.onload = function() {
             window.print();

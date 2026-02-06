@@ -41,10 +41,7 @@ interface QueryHistoryProps {
   mode?: "sheet" | "inline";
 }
 
-const QueryHistory: React.FC<QueryHistoryProps> = ({
-  isExpanded,
-  mode = "sheet",
-}) => {
+const QueryHistory: React.FC<QueryHistoryProps> = ({ isExpanded, mode = "sheet" }) => {
   const queryHistory = useDuckStore((state) => state.queryHistory);
   const clearHistory = useDuckStore((state) => state.clearHistory);
   const [copiedQuery, setCopiedQuery] = useState<string | null>(null);
@@ -72,8 +69,7 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({
           <AlertCircle className="w-4 h-4 mt-6" />
           <AlertTitle>No History</AlertTitle>
           <AlertDescription>
-            Your query history will appear here once you start executing
-            queries.
+            Your query history will appear here once you start executing queries.
           </AlertDescription>
         </Alert>
       ) : (
@@ -87,9 +83,7 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({
                       <div className="mt-1 shrink-0">{getStatusIcon(item)}</div>
                       <pre className="font-mono text-xs bg-muted overflow-x-auto p-2 rounded flex-1 min-w-0">
                         <code className="break-all whitespace-pre-wrap">
-                          {item.query.length > 150
-                            ? item.query.slice(0, 150) + "..."
-                            : item.query}
+                          {item.query.length > 150 ? item.query.slice(0, 150) + "..." : item.query}
                         </code>
                       </pre>
                     </div>
@@ -105,9 +99,7 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({
                       <Alert variant="destructive" className="mt-2 py-2">
                         <AlertCircle className="w-3 h-3" />
                         <AlertDescription className="text-xs">
-                          {item.error.length > 100
-                            ? item.error.slice(0, 100) + "..."
-                            : item.error}
+                          {item.error.length > 100 ? item.error.slice(0, 100) + "..." : item.error}
                         </AlertDescription>
                       </Alert>
                     )}
@@ -149,15 +141,12 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({
             <AlertDialogHeader>
               <AlertDialogTitle>Clear Query History?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your
-                query history.
+                This action cannot be undone. This will permanently delete your query history.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={clearHistory}>
-                Clear History
-              </AlertDialogAction>
+              <AlertDialogAction onClick={clearHistory}>Clear History</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

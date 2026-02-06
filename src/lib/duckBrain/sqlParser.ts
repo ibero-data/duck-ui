@@ -83,9 +83,7 @@ export function extractSQLFromResponse(response: string): ParsedSQLResult {
   // 3. If no code blocks were found, try to extract SQL from the text
   // Look for SQL that starts with a keyword and try to find its end
   if (codeBlocks.length === 0) {
-    const sqlStartMatch = cleaned.match(
-      new RegExp(`(${SQL_KEYWORDS.join("|")})\\b`, "i")
-    );
+    const sqlStartMatch = cleaned.match(new RegExp(`(${SQL_KEYWORDS.join("|")})\\b`, "i"));
 
     if (sqlStartMatch && sqlStartMatch.index !== undefined) {
       // Start from the SQL keyword
@@ -97,9 +95,7 @@ export function extractSQLFromResponse(response: string): ParsedSQLResult {
         // Check if there's text after the semicolon that looks like an explanation
         const afterSemicolon = sqlPart.slice(semicolonIndex + 1).trim();
         const looksLikeExplanation =
-          /^(This|Note|The above|It |I |You |Where |Which |Here |--|\n\n)/i.test(
-            afterSemicolon
-          );
+          /^(This|Note|The above|It |I |You |Where |Which |Here |--|\n\n)/i.test(afterSemicolon);
 
         if (looksLikeExplanation || !afterSemicolon) {
           // Include up to and including the semicolon
@@ -118,9 +114,7 @@ export function extractSQLFromResponse(response: string): ParsedSQLResult {
   cleaned = cleaned.replace(/^`+|`+$/g, "").trim();
 
   // 5. Validate it looks like SQL
-  const startsWithKeyword = SQL_KEYWORDS.some((kw) =>
-    cleaned.toUpperCase().startsWith(kw)
-  );
+  const startsWithKeyword = SQL_KEYWORDS.some((kw) => cleaned.toUpperCase().startsWith(kw));
 
   if (!startsWithKeyword) {
     issues.push("Does not start with expected SQL keyword");
@@ -129,9 +123,7 @@ export function extractSQLFromResponse(response: string): ParsedSQLResult {
 
   // 6. Basic SQL validation
   if (cleaned.toUpperCase().startsWith("SELECT")) {
-    const hasFrom =
-      /\bFROM\b/i.test(cleaned) ||
-      /SELECT\s+[\d+\-*/() ]+;?\s*$/i.test(cleaned); // Allow SELECT 1+1 etc
+    const hasFrom = /\bFROM\b/i.test(cleaned) || /SELECT\s+[\d+\-*/() ]+;?\s*$/i.test(cleaned); // Allow SELECT 1+1 etc
     if (!hasFrom) {
       issues.push("SELECT query might be missing FROM clause");
     }

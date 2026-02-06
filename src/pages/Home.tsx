@@ -2,18 +2,8 @@ import { useState } from "react";
 import { Menu } from "lucide-react";
 import DataExplorer from "@/components/explorer/DataExplorer";
 import Sidebar from "@/components/layout/Sidebar";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import WorkspaceTabs from "@/components/workspace/WorkspaceTabs";
 

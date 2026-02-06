@@ -71,10 +71,12 @@ export function buildSchemaSuggestions(
   }
 
   // Sort: tables first, then columns, alphabetically
-  return suggestions.sort((a, b) => {
-    if (a.type !== b.type) return a.type === "table" ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  }).slice(0, 10); // Limit to 10 suggestions
+  return suggestions
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === "table" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, 10); // Limit to 10 suggestions
 }
 
 const SchemaAutocomplete: React.FC<SchemaAutocompleteProps> = ({
@@ -126,18 +128,14 @@ const SchemaAutocomplete: React.FC<SchemaAutocompleteProps> = ({
               <Columns3 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
             )}
             <div className="flex-1 min-w-0">
-              <span className="font-medium truncate block">
-                {suggestion.name}
-              </span>
+              <span className="font-medium truncate block">{suggestion.name}</span>
               {suggestion.type === "table" && (
                 <span className="text-[10px] text-muted-foreground">
                   {suggestion.rowCount ? `${suggestion.rowCount.toLocaleString()} rows` : "table"}
                 </span>
               )}
               {suggestion.type === "column" && suggestion.columnType && (
-                <span className="text-[10px] text-muted-foreground">
-                  {suggestion.columnType}
-                </span>
+                <span className="text-[10px] text-muted-foreground">{suggestion.columnType}</span>
               )}
             </div>
           </button>

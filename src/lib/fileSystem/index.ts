@@ -2,6 +2,7 @@
  * File System Access API Service
  * Provides persistent folder access across browser sessions
  */
+import { generateUUID } from "@/lib/utils";
 
 // Types for file system entries
 export interface FileEntry {
@@ -209,7 +210,7 @@ class FileSystemService {
     });
 
     // Generate unique ID
-    const id = crypto.randomUUID();
+    const id = generateUUID();
 
     const folder: MountedFolder = {
       id,
