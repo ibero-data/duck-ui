@@ -23,8 +23,15 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
   const { theme } = useTheme();
-  const { tabs, executeQuery, isExecuting, updateTabTitle, toggleBrainPanel, duckBrain, currentProfileId } =
-    useDuckStore();
+  const {
+    tabs,
+    executeQuery,
+    isExecuting,
+    updateTabTitle,
+    toggleBrainPanel,
+    duckBrain,
+    currentProfileId,
+  } = useDuckStore();
   const monacoConfig = useMonacoConfig(theme);
 
   const currentTab = tabs.find((tab) => tab.id === tabId);

@@ -155,21 +155,15 @@ async function migrateFromLocalStorage(profileId: string): Promise<void> {
     const parsed = JSON.parse(raw);
     const state = parsed.state ?? parsed;
 
-    const { saveWorkspace } = await import(
-      "@/services/persistence/repositories/workspaceRepository"
-    );
-    const { addHistoryEntry } = await import(
-      "@/services/persistence/repositories/queryHistoryRepository"
-    );
-    const { saveProviderConfig, saveConversation } = await import(
-      "@/services/persistence/repositories/aiConfigRepository"
-    );
-    const { setSetting } = await import(
-      "@/services/persistence/repositories/settingsRepository"
-    );
-    const { saveConnection } = await import(
-      "@/services/persistence/repositories/connectionRepository"
-    );
+    const { saveWorkspace } =
+      await import("@/services/persistence/repositories/workspaceRepository");
+    const { addHistoryEntry } =
+      await import("@/services/persistence/repositories/queryHistoryRepository");
+    const { saveProviderConfig, saveConversation } =
+      await import("@/services/persistence/repositories/aiConfigRepository");
+    const { setSetting } = await import("@/services/persistence/repositories/settingsRepository");
+    const { saveConnection } =
+      await import("@/services/persistence/repositories/connectionRepository");
     const { loadKeyForProfile } = await import("@/services/persistence/crypto");
 
     // Load the encryption key for this profile
@@ -191,13 +185,17 @@ async function migrateFromLocalStorage(profileId: string): Promise<void> {
       if (conn.password) credentials.password = conn.password;
       if (conn.apiKey) credentials.apiKey = conn.apiKey;
 
-      await saveConnection(profileId, {
-        name: conn.name ?? "Untitled",
-        scope: conn.scope ?? "External",
-        config,
-        credentials: Object.keys(credentials).length > 0 ? credentials : undefined,
-        environment: conn.environment ?? "APP",
-      }, cryptoKey);
+      await saveConnection(
+        profileId,
+        {
+          name: conn.name ?? "Untitled",
+          scope: conn.scope ?? "External",
+          config,
+          credentials: Object.keys(credentials).length > 0 ? credentials : undefined,
+          environment: conn.environment ?? "APP",
+        },
+        cryptoKey
+      );
     }
 
     // Migrate query history
@@ -215,7 +213,8 @@ async function migrateFromLocalStorage(profileId: string): Promise<void> {
       await saveWorkspace(profileId, {
         tabs: tabsJson,
         activeTabId: (state.activeTabId as string) ?? null,
-        currentConnectionId: (state.currentConnection as Record<string, unknown>)?.id as string ?? null,
+        currentConnectionId:
+          ((state.currentConnection as Record<string, unknown>)?.id as string) ?? null,
         currentDatabase: (state.currentDatabase as string) ?? null,
       });
     }

@@ -47,10 +47,7 @@ export async function saveQuery(
   return record;
 }
 
-export async function getSavedQueries(
-  profileId: string,
-  folder?: string
-): Promise<SavedQuery[]> {
+export async function getSavedQueries(profileId: string, folder?: string): Promise<SavedQuery[]> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     let sql = `SELECT * FROM saved_queries WHERE profile_id = '${profileId}'`;
@@ -88,8 +85,7 @@ export async function updateSavedQuery(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const setClauses: string[] = [`updated_at = '${now}'`];
-    if (updates.name !== undefined)
-      setClauses.push(`name = '${updates.name.replace(/'/g, "''")}'`);
+    if (updates.name !== undefined) setClauses.push(`name = '${updates.name.replace(/'/g, "''")}'`);
     if (updates.sql_text !== undefined)
       setClauses.push(`sql_text = '${updates.sql_text.replace(/'/g, "''")}'`);
     if (updates.description !== undefined)
@@ -99,9 +95,10 @@ export async function updateSavedQuery(
           : `description = NULL`
       );
     if (updates.tags !== undefined)
-      setClauses.push(updates.tags ? `tags = '${updates.tags.replace(/'/g, "''")}'` : `tags = NULL`);
-    if (updates.folder !== undefined)
-      setClauses.push(`folder = '${updates.folder}'`);
+      setClauses.push(
+        updates.tags ? `tags = '${updates.tags.replace(/'/g, "''")}'` : `tags = NULL`
+      );
+    if (updates.folder !== undefined) setClauses.push(`folder = '${updates.folder}'`);
     await conn.query(`UPDATE saved_queries SET ${setClauses.join(", ")} WHERE id = '${id}'`);
   } else {
     const existing = (await fallbackGet("saved_queries", id)) as SavedQuery | null;

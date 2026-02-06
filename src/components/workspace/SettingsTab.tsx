@@ -169,11 +169,7 @@ export default function SettingsTab() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium">Profiles</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCreateDialog(true)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
                     <UserPlus className="h-4 w-4 mr-2" />
                     Create New Profile
                   </Button>

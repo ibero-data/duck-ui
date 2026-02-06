@@ -156,12 +156,8 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({ isExpanded, mode = "sheet" 
   if (mode === "inline") {
     return (
       <div className="flex flex-col h-full">
-        <ScrollArea className="flex-1 px-3">
-          {historyContent}
-        </ScrollArea>
-        <div className="p-3 border-t flex justify-end">
-          {clearHistoryButton}
-        </div>
+        <ScrollArea className="flex-1 px-3">{historyContent}</ScrollArea>
+        <div className="p-3 border-t flex justify-end">{clearHistoryButton}</div>
       </div>
     );
   }
@@ -198,13 +194,9 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({ isExpanded, mode = "sheet" 
           </SheetTitle>
         </SheetHeader>
 
-        <ScrollArea className="h-[calc(100vh-12rem)] mt-4 pr-4">
-          {historyContent}
-        </ScrollArea>
+        <ScrollArea className="h-[calc(100vh-12rem)] mt-4 pr-4">{historyContent}</ScrollArea>
 
-        <SheetFooter className="absolute bottom-4 right-4">
-          {clearHistoryButton}
-        </SheetFooter>
+        <SheetFooter className="absolute bottom-4 right-4">{clearHistoryButton}</SheetFooter>
       </SheetContent>
     </Sheet>
   );

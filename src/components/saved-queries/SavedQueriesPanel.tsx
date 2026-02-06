@@ -66,9 +66,7 @@ export default function SavedQueriesPanel({ onClose }: SavedQueriesPanelProps) {
     }
     try {
       await updateSavedQuery(id, { name: editName.trim() });
-      setQueries((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, name: editName.trim() } : q))
-      );
+      setQueries((prev) => prev.map((q) => (q.id === id ? { ...q, name: editName.trim() } : q)));
       bumpSavedQueriesVersion();
     } catch {
       toast.error("Failed to rename query");
@@ -138,9 +136,7 @@ export default function SavedQueriesPanel({ onClose }: SavedQueriesPanelProps) {
                           className="h-6 text-sm font-medium px-1"
                         />
                       ) : (
-                        <span className="font-medium text-sm truncate block">
-                          {query.name}
-                        </span>
+                        <span className="font-medium text-sm truncate block">{query.name}</span>
                       )}
                       <pre className="text-xs font-mono text-muted-foreground truncate">
                         {query.sql_text.length > 100

@@ -70,7 +70,17 @@ export async function saveConnection(
 export async function getConnections(
   profileId: string,
   cryptoKey: CryptoKey | null
-): Promise<Array<{ id: string; name: string; scope: string; config: Record<string, unknown>; credentials: Record<string, unknown> | null; environment: string; created_at: string }>> {
+): Promise<
+  Array<{
+    id: string;
+    name: string;
+    scope: string;
+    config: Record<string, unknown>;
+    credentials: Record<string, unknown> | null;
+    environment: string;
+    created_at: string;
+  }>
+> {
   let records: SavedConnection[] = [];
 
   if (isUsingOpfs()) {

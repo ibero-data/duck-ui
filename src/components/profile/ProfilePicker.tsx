@@ -110,7 +110,8 @@ export default function ProfilePicker({
         </Button>
         <p className="text-xs text-muted-foreground">
           Your profiles are stored locally on your device. Creating a profile does not share any
-          data... This application is 100% offline and private by design, it's runs on the client side and does not send any data to any server.
+          data... This application is 100% offline and private by design, it's runs on the client
+          side and does not send any data to any server.
         </p>
       </div>
 

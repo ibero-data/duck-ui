@@ -265,7 +265,10 @@ const FileDetails: React.FC<FileDetailsProps> = ({
   }, [tableName]);
 
   // Handle CSV option changes
-  const handleCsvOptionChange = (key: keyof CsvImportOptions, value: string | boolean | number | undefined) => {
+  const handleCsvOptionChange = (
+    key: keyof CsvImportOptions,
+    value: string | boolean | number | undefined
+  ) => {
     if (onCsvOptionsChange && csvOptions) {
       onCsvOptionsChange({
         ...csvOptions,

@@ -98,13 +98,14 @@ export async function listProfiles(): Promise<Profile[]> {
 
 export async function updateProfile(
   id: string,
-  updates: Partial<Pick<Profile, "name" | "avatar_emoji" | "has_password" | "password_verify_token">>
+  updates: Partial<
+    Pick<Profile, "name" | "avatar_emoji" | "has_password" | "password_verify_token">
+  >
 ): Promise<void> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const setClauses: string[] = [];
-    if (updates.name !== undefined)
-      setClauses.push(`name = '${updates.name.replace(/'/g, "''")}'`);
+    if (updates.name !== undefined) setClauses.push(`name = '${updates.name.replace(/'/g, "''")}'`);
     if (updates.avatar_emoji !== undefined)
       setClauses.push(`avatar_emoji = '${updates.avatar_emoji}'`);
     if (updates.has_password !== undefined)

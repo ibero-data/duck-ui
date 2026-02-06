@@ -166,9 +166,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                     </button>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  {currentProfile?.name || "Duck-UI"}
-                </TooltipContent>
+                <TooltipContent side="right">{currentProfile?.name || "Duck-UI"}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <DropdownMenuContent side="right" align="start">

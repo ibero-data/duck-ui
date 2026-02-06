@@ -14,7 +14,8 @@ interface Migration {
 const MIGRATIONS: Migration[] = [
   {
     version: 1,
-    description: "Initial schema — profiles, settings, connections, history, workspace, AI, saved queries",
+    description:
+      "Initial schema — profiles, settings, connections, history, workspace, AI, saved queries",
     sql: [
       `CREATE TABLE IF NOT EXISTS profiles (
         id VARCHAR PRIMARY KEY,

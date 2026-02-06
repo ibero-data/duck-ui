@@ -132,7 +132,9 @@ export const createSchemaSlice: StateCreator<
       const buffer = new Uint8Array(fileContent);
       try {
         await db.dropFile(fileName);
-      } catch { /* file may not exist */ }
+      } catch {
+        /* file may not exist */
+      }
       await db.registerFileBuffer(fileName, buffer);
       // Handle DuckDB database files (.duckdb, .db, .ddb)
       if (fileType === "duckdb" || fileType === "db" || fileType === "ddb") {

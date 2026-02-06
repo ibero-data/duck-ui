@@ -8,8 +8,26 @@ import ProfileAvatar from "./ProfileAvatar";
 
 const AVATAR_OPTIONS = [
   "logo",
-  "\u{1F986}", "\u{1F424}", "\u{1F985}", "\u{1F427}", "\u{1F989}", "\u{1F426}", "\u{1F99C}", "\u{1F438}", "\u{1F43B}", "\u{1F98A}",
-  "\u{1F431}", "\u{1F436}", "\u{1F43C}", "\u{1F981}", "\u{1F428}", "\u{1F42F}", "\u{1F430}", "\u{1F419}", "\u{1F98B}", "\u{1F31F}",
+  "\u{1F986}",
+  "\u{1F424}",
+  "\u{1F985}",
+  "\u{1F427}",
+  "\u{1F989}",
+  "\u{1F426}",
+  "\u{1F99C}",
+  "\u{1F438}",
+  "\u{1F43B}",
+  "\u{1F98A}",
+  "\u{1F431}",
+  "\u{1F436}",
+  "\u{1F43C}",
+  "\u{1F981}",
+  "\u{1F428}",
+  "\u{1F42F}",
+  "\u{1F430}",
+  "\u{1F419}",
+  "\u{1F98B}",
+  "\u{1F31F}",
 ];
 
 interface ProfileEditorProps {
@@ -19,7 +37,12 @@ interface ProfileEditorProps {
   onCancel: () => void;
 }
 
-export default function ProfileEditor({ mode, initialValues, onSave, onCancel }: ProfileEditorProps) {
+export default function ProfileEditor({
+  mode,
+  initialValues,
+  onSave,
+  onCancel,
+}: ProfileEditorProps) {
   const [name, setName] = useState(initialValues?.name ?? "");
   const [avatarEmoji, setAvatarEmoji] = useState(initialValues?.avatarEmoji ?? "logo");
   const [passwordEnabled, setPasswordEnabled] = useState(false);
@@ -27,7 +50,8 @@ export default function ProfileEditor({ mode, initialValues, onSave, onCancel }:
   const [confirmPassword, setConfirmPassword] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
 
-  const passwordMismatch = passwordEnabled && password !== confirmPassword && confirmPassword.length > 0;
+  const passwordMismatch =
+    passwordEnabled && password !== confirmPassword && confirmPassword.length > 0;
   const passwordTooShort = passwordEnabled && password.length > 0 && password.length < 4;
 
   const isValid =

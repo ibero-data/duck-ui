@@ -99,7 +99,9 @@ export const createTabSlice: StateCreator<
       }));
       toast.success("All tabs closed successfully!");
     } catch (error: unknown) {
-      toast.error(`Failed to close tabs: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Failed to close tabs: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     }
   },
 });

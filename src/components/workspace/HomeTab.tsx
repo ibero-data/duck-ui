@@ -99,7 +99,7 @@ const iberoDataProducts = [
     link: "https://github.com/ibero-data/yaat",
     Icon: BarChart3,
   },
-    {
+  {
     title: "Glintlog",
     description: "Self-hosted log aggregation. Single binary. Zero dependencies.",
     link: "https://glintlog.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",

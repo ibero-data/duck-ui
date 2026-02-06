@@ -44,7 +44,10 @@ export function tooltipPlugin(xLabels: string[]): uPlot.Plugin {
           const s = u.series[i];
           if (!s.show) continue;
           const val = u.data[i][idx];
-          const color = typeof s.stroke === "function" ? (s.stroke as (self: uPlot, seriesIdx: number) => string)(u, i) : s.stroke;
+          const color =
+            typeof s.stroke === "function"
+              ? (s.stroke as (self: uPlot, seriesIdx: number) => string)(u, i)
+              : s.stroke;
           html += `<div class="uplot-tooltip-row">
             <span class="uplot-tooltip-dot" style="background:${color}"></span>
             <span class="uplot-tooltip-label">${s.label}</span>

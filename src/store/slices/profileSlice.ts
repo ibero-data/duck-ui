@@ -26,7 +26,14 @@ import {
   loadKeyForProfile,
   deleteKeyForProfile,
 } from "@/services/persistence/crypto";
-import type { EditorTab, ConnectionProvider, QueryHistoryItem, AIProviderType, ProviderConfigs, DuckBrainMessage } from "../types";
+import type {
+  EditorTab,
+  ConnectionProvider,
+  QueryHistoryItem,
+  AIProviderType,
+  ProviderConfigs,
+  DuckBrainMessage,
+} from "../types";
 
 const VERIFY_TOKEN_PLAINTEXT = "duck-ui-profile-verify";
 
@@ -197,7 +204,9 @@ export const createProfileSlice: StateCreator<
                 content: String(m.content ?? ""),
                 timestamp: new Date((m.timestamp as string) ?? Date.now()),
                 ...(m.sql ? { sql: String(m.sql) } : {}),
-                ...(m.queryResult ? { queryResult: m.queryResult as DuckBrainMessage["queryResult"] } : {}),
+                ...(m.queryResult
+                  ? { queryResult: m.queryResult as DuckBrainMessage["queryResult"] }
+                  : {}),
               })),
             },
           }));

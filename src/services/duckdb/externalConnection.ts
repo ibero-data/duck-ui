@@ -162,11 +162,13 @@ export const fetchExternalDatabases = async (
                 connection
               );
 
-              const columns: ColumnInfo[] = columnsResult.data.map((col: Record<string, unknown>) => ({
-                name: col.column_name as string,
-                type: col.column_type as string,
-                nullable: col.null === "YES",
-              }));
+              const columns: ColumnInfo[] = columnsResult.data.map(
+                (col: Record<string, unknown>) => ({
+                  name: col.column_name as string,
+                  type: col.column_type as string,
+                  nullable: col.null === "YES",
+                })
+              );
 
               tables.push({
                 name: tableName,

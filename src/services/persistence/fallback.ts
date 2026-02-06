@@ -51,7 +51,10 @@ function openFallbackDb(): Promise<IDBDatabase> {
 
 type StoreName = (typeof STORES)[number];
 
-export async function fallbackPut(store: StoreName, record: Record<string, unknown>): Promise<void> {
+export async function fallbackPut(
+  store: StoreName,
+  record: Record<string, unknown>
+): Promise<void> {
   const db = await openFallbackDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(store, "readwrite");

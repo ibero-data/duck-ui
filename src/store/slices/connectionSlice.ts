@@ -70,7 +70,7 @@ export const createConnectionSlice: StateCreator<
             credentials: Object.keys(credentials).length > 0 ? credentials : undefined,
             environment: connection.environment ?? "APP",
           },
-          encryptionKey,
+          encryptionKey
         ).catch((err) => console.warn("[Connection] Failed to persist:", err));
       }
 
@@ -102,7 +102,7 @@ export const createConnectionSlice: StateCreator<
       },
     }));
     deleteConnectionRepo(id).catch((err) =>
-      console.warn("[Connection] Failed to delete from DB:", err),
+      console.warn("[Connection] Failed to delete from DB:", err)
     );
   },
 

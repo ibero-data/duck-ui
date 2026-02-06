@@ -37,7 +37,9 @@ describe("runMigrations", () => {
     const { mockConn, queries } = createMockConnection();
     await runMigrations(mockConn as any);
 
-    const createSchemaVersion = queries.find((q) => q.includes("CREATE TABLE IF NOT EXISTS schema_version"));
+    const createSchemaVersion = queries.find((q) =>
+      q.includes("CREATE TABLE IF NOT EXISTS schema_version")
+    );
     expect(createSchemaVersion).toBeDefined();
   });
 
@@ -118,9 +120,7 @@ describe("runMigrations", () => {
     const { mockConn, queries } = createMockConnection();
     await runMigrations(mockConn as any);
 
-    const profilesQuery = queries.find(
-      (q) => q.includes("CREATE TABLE IF NOT EXISTS profiles")
-    );
+    const profilesQuery = queries.find((q) => q.includes("CREATE TABLE IF NOT EXISTS profiles"));
     expect(profilesQuery).toBeDefined();
     expect(profilesQuery).toContain("id VARCHAR PRIMARY KEY");
     expect(profilesQuery).toContain("name VARCHAR NOT NULL");
@@ -134,9 +134,7 @@ describe("runMigrations", () => {
     const { mockConn, queries } = createMockConnection();
     await runMigrations(mockConn as any);
 
-    const connQuery = queries.find(
-      (q) => q.includes("CREATE TABLE IF NOT EXISTS connections")
-    );
+    const connQuery = queries.find((q) => q.includes("CREATE TABLE IF NOT EXISTS connections"));
     expect(connQuery).toContain("encrypted_credentials");
     expect(connQuery).toContain("scope VARCHAR NOT NULL");
     expect(connQuery).toContain("config VARCHAR NOT NULL");
@@ -146,8 +144,8 @@ describe("runMigrations", () => {
     const { mockConn, queries } = createMockConnection();
     await runMigrations(mockConn as any);
 
-    const aiQuery = queries.find(
-      (q) => q.includes("CREATE TABLE IF NOT EXISTS ai_provider_configs")
+    const aiQuery = queries.find((q) =>
+      q.includes("CREATE TABLE IF NOT EXISTS ai_provider_configs")
     );
     expect(aiQuery).toContain("encrypted_api_key");
     expect(aiQuery).toContain("provider VARCHAR NOT NULL");

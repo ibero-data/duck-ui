@@ -9,7 +9,10 @@ import { createDuckBrainSlice } from "./slices/duckBrainSlice";
 import { createFileSystemSlice } from "./slices/fileSystemSlice";
 import { createProfileSlice } from "./slices/profileSlice";
 import { saveWorkspace } from "@/services/persistence/repositories/workspaceRepository";
-import { saveProviderConfig, saveConversation } from "@/services/persistence/repositories/aiConfigRepository";
+import {
+  saveProviderConfig,
+  saveConversation,
+} from "@/services/persistence/repositories/aiConfigRepository";
 import { isSystemDbInitialized } from "@/services/persistence/systemDb";
 import type { DuckStoreState } from "./types";
 
@@ -45,9 +48,7 @@ async function persistWorkspaceState(state: DuckStoreState): Promise<void> {
 
   try {
     // Save workspace (tabs, active tab, current DB)
-    const tabsJson = JSON.stringify(
-      state.tabs.map((tab) => ({ ...tab, result: undefined }))
-    );
+    const tabsJson = JSON.stringify(state.tabs.map((tab) => ({ ...tab, result: undefined })));
     if (tabsJson !== lastSavedTabs) {
       await saveWorkspace(currentProfileId, {
         tabs: tabsJson,
@@ -65,9 +66,17 @@ async function persistWorkspaceState(state: DuckStoreState): Promise<void> {
       for (const [provider, config] of Object.entries(configs)) {
         if (config) {
           const apiKey = "apiKey" in config ? (config.apiKey as string) : null;
-          const safeConfig: Record<string, unknown> = { modelId: (config as Record<string, unknown>).modelId };
+          const safeConfig: Record<string, unknown> = {
+            modelId: (config as Record<string, unknown>).modelId,
+          };
           if ("baseUrl" in config) safeConfig.baseUrl = config.baseUrl;
-          await saveProviderConfig(currentProfileId, provider, safeConfig, apiKey ?? null, encryptionKey);
+          await saveProviderConfig(
+            currentProfileId,
+            provider,
+            safeConfig,
+            apiKey ?? null,
+            encryptionKey
+          );
         }
       }
       lastSavedAiProvider = currentProvider;

@@ -83,7 +83,10 @@ function PieChart({
   legendShow?: boolean;
 }) {
   const total = data.reduce((sum, row) => sum + (Number(row[yKey]) || 0), 0);
-  if (total === 0) return <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>;
+  if (total === 0)
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+    );
 
   const slices: { label: string; value: number; pct: number; color: string }[] = [];
   let cumAngle = -Math.PI / 2;
@@ -149,7 +152,10 @@ function PieChart({
         <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center text-xs">
           {slices.map((s, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: s.color }} />
+              <span
+                className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
+                style={{ backgroundColor: s.color }}
+              />
               <span className="text-muted-foreground truncate max-w-[120px]">{s.label}</span>
               <span className="font-medium">{formatNumber(s.value)}</span>
             </div>
@@ -188,7 +194,12 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
 
   // Transform data based on configuration
   const transformedData = useMemo(() => {
-    return transformData(result, localConfig.transform, localConfig.xAxis, localConfig.yAxis || localConfig.series);
+    return transformData(
+      result,
+      localConfig.transform,
+      localConfig.xAxis,
+      localConfig.yAxis || localConfig.series
+    );
   }, [result, localConfig.transform, localConfig.xAxis, localConfig.yAxis, localConfig.series]);
 
   const handleConfigChange = (updates: Partial<ChartConfig>) => {
@@ -238,7 +249,9 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
       await exportChartAsPNG(chartRef.current, fileName, bg);
       toast.success("Chart exported as PNG");
     } catch (error) {
-      toast.error(`Failed to export chart: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Failed to export chart: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     }
   };
 
@@ -274,13 +287,16 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
     });
 
     // Determine Y keys
-    const yKeys: string[] = chartConfig.series?.map((s) => s.column) ?? (chartConfig.yAxis ? [chartConfig.yAxis] : []);
+    const yKeys: string[] =
+      chartConfig.series?.map((s) => s.column) ?? (chartConfig.yAxis ? [chartConfig.yAxis] : []);
     const colors = chartConfig.colors || DEFAULT_COLORS;
     const isDark = theme === "dark";
 
     // Convert to uPlot columnar data: [xs, ...series]
     const xs = chartData.map((_, i) => i);
-    const seriesData = yKeys.map((key) => chartData.map((row) => (Number(row[key]) || 0) as number));
+    const seriesData = yKeys.map((key) =>
+      chartData.map((row) => (Number(row[key]) || 0) as number)
+    );
 
     // For stacked charts, compute stacked values
     const isStacked = chartConfig.type === "stacked_bar" || chartConfig.type === "stacked_area";
@@ -361,7 +377,11 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
       {
         stroke: isDark ? "#888" : "#666",
         grid: chartConfig.showGrid
-          ? { stroke: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)", width: 1, dash: [4, 4] }
+          ? {
+              stroke: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+              width: 1,
+              dash: [4, 4],
+            }
           : { show: false },
         ticks: { stroke: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)", width: 1 },
         values: (_u: uPlot, vals: number[]) => vals.map((v) => formatNumber(v)),
@@ -397,8 +417,8 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
 
     // Stacked: render in reverse order so first series is on top visually
     const data: uPlot.AlignedData = isStacked
-      ? [xs, ...finalSeriesData.reverse()] as uPlot.AlignedData
-      : [xs, ...finalSeriesData] as uPlot.AlignedData;
+      ? ([xs, ...finalSeriesData.reverse()] as uPlot.AlignedData)
+      : ([xs, ...finalSeriesData] as uPlot.AlignedData);
 
     return { uPlotOptions: opts, uPlotData: data };
   }, [chartConfig, transformedData, theme]);
@@ -417,8 +437,8 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
           <div className="text-center space-y-2 max-w-md">
             <h3 className="text-lg font-semibold">Create Your Chart</h3>
             <p className="text-muted-foreground text-sm">
-              Configure chart settings above to visualize your data. Choose a chart type, select your axes, and
-              customize to your needs.
+              Configure chart settings above to visualize your data. Choose a chart type, select
+              your axes, and customize to your needs.
             </p>
             {suggestedTypes.length > 0 && (
               <div className="pt-4">
@@ -515,7 +535,10 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
               {/* X-Axis */}
               <div className="space-y-2">
                 <label className="text-xs font-medium">X-Axis</label>
-                <Select value={localConfig.xAxis || ""} onValueChange={(value) => handleConfigChange({ xAxis: value })}>
+                <Select
+                  value={localConfig.xAxis || ""}
+                  onValueChange={(value) => handleConfigChange({ xAxis: value })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>

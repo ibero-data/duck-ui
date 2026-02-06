@@ -106,9 +106,7 @@ export async function saveConversation(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     // Check if exists
-    const existing = await conn.query(
-      `SELECT id FROM ai_conversations WHERE id = '${id}'`
-    );
+    const existing = await conn.query(`SELECT id FROM ai_conversations WHERE id = '${id}'`);
     if (existing.toArray().length > 0) {
       await conn.query(`
         UPDATE ai_conversations SET messages = '${messagesJson.replace(/'/g, "''")}', title = ${options?.title ? `'${options.title.replace(/'/g, "''")}'` : "NULL"}, updated_at = '${now}'

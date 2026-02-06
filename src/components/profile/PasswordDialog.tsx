@@ -21,7 +21,12 @@ interface PasswordDialogProps {
   onSubmit: (password: string) => Promise<void>;
 }
 
-export default function PasswordDialog({ open, onOpenChange, profile, onSubmit }: PasswordDialogProps) {
+export default function PasswordDialog({
+  open,
+  onOpenChange,
+  profile,
+  onSubmit,
+}: PasswordDialogProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);

@@ -41,7 +41,10 @@ export const exportChartAsPNG = async (
       ctx.drawImage(sourceCanvas, 0, 0);
 
       const blob = await new Promise<Blob>((resolve, reject) => {
-        offscreen.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png");
+        offscreen.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))),
+          "image/png"
+        );
       });
       downloadBlob(blob, fileName);
       return;
@@ -134,7 +137,10 @@ export const copyChartToClipboard = async (
       ctx.drawImage(sourceCanvas, 0, 0);
 
       blob = await new Promise<Blob>((resolve, reject) => {
-        offscreen.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png");
+        offscreen.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))),
+          "image/png"
+        );
       });
     } else {
       // Fallback: html2canvas for SVG-based charts
@@ -147,7 +153,10 @@ export const copyChartToClipboard = async (
       });
 
       blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png");
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))),
+          "image/png"
+        );
       });
     }
 

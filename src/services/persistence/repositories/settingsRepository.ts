@@ -21,7 +21,11 @@ export async function getSetting(
     const rows = result.toArray();
     return rows.length > 0 ? String(rows[0].toJSON().value) : null;
   } else {
-    const record = (await fallbackGet("settings", [profileId, category, key])) as SettingRecord | null;
+    const record = (await fallbackGet("settings", [
+      profileId,
+      category,
+      key,
+    ])) as SettingRecord | null;
     return record?.value ?? null;
   }
 }
