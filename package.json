@@ -1,8 +1,8 @@
 {
   "name": "duck-ui",
   "private": true,
-  "version": "0.0.26",
-  "release_date": "2026-02-06",
+  "version": "0.0.27",
+  "release_date": "2026-02-15",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -87,6 +87,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.23",
+    "baseline-browser-mapping": "^2.9.19",
     "esbuild": "^0.25.12",
     "eslint": "^9.39.2",
     "eslint-plugin-react-hooks": "^7.0.1",

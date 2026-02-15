@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import { initializeWasmConnection } from "@/services/duckdb";
 import type { DuckStoreState, DuckdbSlice, ConnectionProvider } from "../types";
+import { toast } from "sonner";
 
 export const createDuckdbSlice: StateCreator<
   DuckStoreState,
@@ -69,11 +70,29 @@ export const createDuckdbSlice: StateCreator<
         isInitialized: true,
         currentDatabase: "memory",
       });
-      await Promise.all([
-        connection.query(`SET enable_http_metadata_cache=true`),
-        connection.query(`INSTALL arrow`),
-        connection.query(`INSTALL parquet`),
-      ]);
+      // Install extensions individually (non-blocking for offline support)
+      const failedExtensions: string[] = [];
+
+      try {
+        await connection.query(`SET enable_http_metadata_cache=true`);
+      } catch {
+        console.warn("[DuckDB] Failed to set enable_http_metadata_cache");
+      }
+
+      for (const ext of ["arrow", "parquet"]) {
+        try {
+          await connection.query(`INSTALL ${ext}`);
+        } catch {
+          console.warn(`[DuckDB] Failed to install ${ext} extension`);
+          failedExtensions.push(ext);
+        }
+      }
+
+      if (failedExtensions.length > 0) {
+        toast.warning(
+          `Some extensions failed to load (${failedExtensions.join(", ")}). You may be offline — basic SQL features still work.`
+        );
+      }
 
       if (initialConnections[0].scope !== "WASM") {
         await get().setCurrentConnection(initialConnections[0].id);

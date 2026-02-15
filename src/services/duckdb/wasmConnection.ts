@@ -47,8 +47,13 @@ export const initializeWasmConnection = async (): Promise<{
   // Validate immediately
   validateConnection(connection);
 
-  // Install and load extensions
-  await Promise.all([connection.query(`INSTALL excel`), connection.query(`LOAD excel`)]);
+  // Install and load extensions (non-blocking for offline support)
+  try {
+    await connection.query(`INSTALL excel`);
+    await connection.query(`LOAD excel`);
+  } catch (error) {
+    console.warn("[DuckDB] Failed to install/load excel extension:", error);
+  }
 
   // Load embedded databases from public/databases/
   await loadEmbeddedDatabases(db, connection);
