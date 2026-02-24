@@ -74,6 +74,25 @@ docker run -p 5522:5522 \
   ghcr.io/ibero-data/duck-ui:latest
 ```
 
+### Docker - CDN Loading
+
+Load DuckDB WASM assets from CDN instead of the bundled files:
+
+```bash
+docker run -p 5522:5522 \
+  -e DUCK_UI_DUCKDB_WASM_USE_CDN="true" \
+  ghcr.io/ibero-data/duck-ui:latest
+```
+
+Optionally specify a custom CDN base URL:
+
+```bash
+docker run -p 5522:5522 \
+  -e DUCK_UI_DUCKDB_WASM_USE_CDN="true" \
+  -e DUCK_UI_DUCKDB_WASM_BASE_URL="https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev19.0/dist" \
+  ghcr.io/ibero-data/duck-ui:latest
+```
+
 ### Docker Compose Example
 
 Create a `docker-compose.yml` file:
@@ -96,6 +115,10 @@ services:
 
       # Extensions (optional)
       DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: "false"
+
+      # CDN Loading (optional)
+      # DUCK_UI_DUCKDB_WASM_USE_CDN: "true"
+      # DUCK_UI_DUCKDB_WASM_BASE_URL: "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev19.0/dist"
 ```
 
 Start the service:
