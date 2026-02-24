@@ -62,7 +62,7 @@ export async function initializeSystemDb(): Promise<void> {
   try {
     console.info("[SystemDB] Initializing system database (OPFS)...");
 
-    const bundles = resolveDuckdbBundles();
+    const bundles = await resolveDuckdbBundles();
     const bundle = await duckdb.selectBundle(bundles);
     const { worker, revoke } = createDuckdbWorker(bundle.mainWorker!);
     const logger = new duckdb.VoidLogger();

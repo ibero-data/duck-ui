@@ -61,7 +61,7 @@ export const testOPFSConnection = async (
     );
   }
 
-  const bundles = resolveDuckdbBundles();
+  const bundles = await resolveDuckdbBundles();
   const bundle = await duckdb.selectBundle(bundles);
   const { worker, revoke } = createDuckdbWorker(bundle.mainWorker!);
   const logger = new duckdb.VoidLogger();

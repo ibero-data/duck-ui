@@ -17,13 +17,21 @@ These variables allow you to configure Duck-UI to connect to an external DuckDB 
 | `DUCK_UI_EXTERNAL_PASS` | Password for authentication | No | `""` | `"your-password"` |
 | `DUCK_UI_EXTERNAL_DATABASE_NAME` | Database name to connect to | No | `""` | `"analytics"` |
 
-### Extension Settings
+### Runtime Settings
 
 | Variable | Description | Required | Default | Example |
 |----------|-------------|----------|---------|---------|
 | `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow loading unsigned DuckDB extensions | No | `false` | `"true"` |
-| `DUCK_UI_DUCKDB_WASM_USE_CDN` | Enable loading DuckDB WASM and worker files from CDN | No | `false` | `"true"` |
+| `DUCK_UI_DUCKDB_WASM_USE_CDN` | Enable loading DuckDB WASM and worker files from CDN (ignored when `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true` at build time) | No | `false` | `"true"` |
 | `DUCK_UI_DUCKDB_WASM_BASE_URL` | Custom CDN base URL (when `DUCK_UI_DUCKDB_WASM_USE_CDN=true`) | No | Auto (`duckdb.getJsDelivrBundles()`) | `"https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev19.0/dist"` |
+
+### Build-time Settings
+
+| Variable | Description | Required | Default | Example |
+|----------|-------------|----------|---------|---------|
+| `DUCK_UI_DUCKDB_WASM_CDN_ONLY` | Build a CDN-only artifact (local DuckDB WASM files are not bundled). Suitable for edge platforms with strict asset size limits. | No | `false` | `"true"` |
+
+When `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true`, runtime `DUCK_UI_DUCKDB_WASM_USE_CDN=false` cannot switch back to local WASM because local assets are not included in the build.
 
 ::: warning Security Note
 Enabling unsigned extensions may pose security risks. Only enable this in trusted environments.
