@@ -2,7 +2,7 @@
 // Extracted from the monolithic store for testability and modularity.
 
 export { rawResultToJSON, resultToJSON } from "./resultParser";
-export { initializeWasmConnection, loadEmbeddedDatabases, MANUAL_BUNDLES } from "./wasmConnection";
+export { initializeWasmConnection, loadEmbeddedDatabases, resolveDuckdbBundles } from "./wasmConnection";
 export { cleanupOPFSConnection, testOPFSConnection, opfsActivePaths } from "./opfsConnection";
 export {
   executeExternalQuery,

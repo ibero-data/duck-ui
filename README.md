@@ -41,7 +41,7 @@ docker run -p 5522:5522 \
   ghcr.io/ibero-data/duck-ui:latest
 ```
 
-| Variable | Description | Default |
+| Runtime Variable | Description | Default |
 |----------|-------------|---------|
 | `DUCK_UI_EXTERNAL_CONNECTION_NAME` | Name for the external connection | "" |
 | `DUCK_UI_EXTERNAL_HOST` | Host URL for external DuckDB | "" |
@@ -50,6 +50,14 @@ docker run -p 5522:5522 \
 | `DUCK_UI_EXTERNAL_PASS` | Password for external connection | "" |
 | `DUCK_UI_EXTERNAL_DATABASE_NAME` | Database name for external connection | "" |
 | `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow unsigned extensions in DuckDB | false |
+| `DUCK_UI_DUCKDB_WASM_USE_CDN` | Load DuckDB WASM from CDN (ignored when build-time `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true`) | false |
+| `DUCK_UI_DUCKDB_WASM_BASE_URL` | Custom CDN base URL (used when `DUCK_UI_DUCKDB_WASM_USE_CDN=true`) | auto jsDelivr |
+
+| Build-time Variable | Description | Default |
+|----------|-------------|---------|
+| `DUCK_UI_DUCKDB_WASM_CDN_ONLY` | Build a CDN-only artifact (local DuckDB WASM assets are not bundled). | false |
+
+When `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true`, runtime `DUCK_UI_DUCKDB_WASM_USE_CDN=false` cannot switch back to local WASM.
 
 
 

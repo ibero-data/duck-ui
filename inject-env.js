@@ -16,7 +16,11 @@ const envVars = {
     process.env.DUCK_UI_EXTERNAL_DATABASE_NAME || "",
   // Add new configuration for DuckDB settings
   DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS:
-    process.env.DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS === "true" || false
+    process.env.DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS === "true" || false,
+  DUCK_UI_DUCKDB_WASM_USE_CDN:
+    process.env.DUCK_UI_DUCKDB_WASM_USE_CDN === "true" || false,
+  DUCK_UI_DUCKDB_WASM_BASE_URL:
+    process.env.DUCK_UI_DUCKDB_WASM_BASE_URL || ""
 };
 
 const scriptContent = `

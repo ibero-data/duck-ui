@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const buildDuckdbCdnOnly = env.DUCK_UI_DUCKDB_WASM_CDN_ONLY === 'true';
 
   // Manually construct the object to be defined
   // Filter out keys with invalid JS identifier characters (fixes Windows builds where
@@ -28,6 +29,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __DUCK_UI_VERSION__: JSON.stringify(pkg.version),
       __DUCK_UI_RELEASE_DATE__: JSON.stringify(pkg.release_date),
+      __DUCK_UI_BUILD_DUCKDB_CDN_ONLY__: JSON.stringify(buildDuckdbCdnOnly),
       ...processEnvValues // Spread the processed variables
     },
   };

@@ -15,6 +15,8 @@ declare global {
       DUCK_UI_EXTERNAL_PASS: string;
       DUCK_UI_EXTERNAL_DATABASE_NAME: string;
       DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: boolean;
+      DUCK_UI_DUCKDB_WASM_USE_CDN?: boolean;
+      DUCK_UI_DUCKDB_WASM_BASE_URL?: string;
     };
   }
 }

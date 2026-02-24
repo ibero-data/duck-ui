@@ -1,21 +1,87 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
 import { validateConnection } from "./utils";
 
-// Import WASM bundles
-import duckdb_wasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
-import mvp_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url";
-import duckdb_wasm_eh from "@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url";
-import eh_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url";
+const getRuntimeEnv = (): Partial<NonNullable<Window["env"]>> =>
+  (window.env ?? {}) as Partial<NonNullable<Window["env"]>>;
 
-export const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
-  mvp: {
-    mainModule: duckdb_wasm,
-    mainWorker: mvp_worker,
-  },
-  eh: {
-    mainModule: duckdb_wasm_eh,
-    mainWorker: eh_worker,
-  },
+const getCdnBundles = (runtimeEnv: Partial<NonNullable<Window["env"]>>): duckdb.DuckDBBundles => {
+  const configuredBaseUrl = runtimeEnv.DUCK_UI_DUCKDB_WASM_BASE_URL ?? "";
+  if (!configuredBaseUrl) {
+    return duckdb.getJsDelivrBundles();
+  }
+
+  const baseUrl = configuredBaseUrl.replace(/\/+$/, "");
+
+  return {
+    mvp: {
+      mainModule: `${baseUrl}/duckdb-mvp.wasm`,
+      mainWorker: `${baseUrl}/duckdb-browser-mvp.worker.js`,
+    },
+    eh: {
+      mainModule: `${baseUrl}/duckdb-eh.wasm`,
+      mainWorker: `${baseUrl}/duckdb-browser-eh.worker.js`,
+    },
+  };
+};
+
+export const resolveDuckdbBundles: () => Promise<duckdb.DuckDBBundles> =
+  __DUCK_UI_BUILD_DUCKDB_CDN_ONLY__
+    ? async () => getCdnBundles(getRuntimeEnv())
+    : (() => {
+        let localBundlesPromise: Promise<duckdb.DuckDBBundles> | null = null;
+
+        const getLocalBundles = async (): Promise<duckdb.DuckDBBundles> => {
+          if (!localBundlesPromise) {
+            localBundlesPromise = Promise.all([
+              import("@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url"),
+              import("@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url"),
+              import("@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url"),
+              import("@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url"),
+            ]).then(([duckdbWasm, mvpWorker, duckdbWasmEh, ehWorker]) => ({
+              mvp: {
+                mainModule: duckdbWasm.default,
+                mainWorker: mvpWorker.default,
+              },
+              eh: {
+                mainModule: duckdbWasmEh.default,
+                mainWorker: ehWorker.default,
+              },
+            })).catch((error) => {
+              // Allow retry after transient chunk/load failures.
+              localBundlesPromise = null;
+              throw error;
+            });
+          }
+
+          return localBundlesPromise;
+        };
+
+        return async () => {
+          const runtimeEnv = getRuntimeEnv();
+          if (runtimeEnv.DUCK_UI_DUCKDB_WASM_USE_CDN === true) {
+            return getCdnBundles(runtimeEnv);
+          }
+          return getLocalBundles();
+        };
+      })();
+
+export const createDuckdbWorker = (
+  mainWorkerUrl: string
+): { worker: Worker; revoke: () => void } => {
+  if (/^https?:\/\//i.test(mainWorkerUrl)) {
+    const workerUrl = URL.createObjectURL(
+      new Blob([`importScripts(${JSON.stringify(mainWorkerUrl)});`], { type: "text/javascript" })
+    );
+    return {
+      worker: new Worker(workerUrl),
+      revoke: () => URL.revokeObjectURL(workerUrl),
+    };
+  }
+
+  return {
+    worker: new Worker(mainWorkerUrl),
+    revoke: () => {},
+  };
 };
 
 /**
@@ -25,8 +91,9 @@ export const initializeWasmConnection = async (): Promise<{
   db: duckdb.AsyncDuckDB;
   connection: duckdb.AsyncDuckDBConnection;
 }> => {
-  const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-  const worker = new Worker(bundle.mainWorker!);
+  const bundles = await resolveDuckdbBundles();
+  const bundle = await duckdb.selectBundle(bundles);
+  const { worker, revoke } = createDuckdbWorker(bundle.mainWorker!);
   const logger = new duckdb.VoidLogger();
 
   // Check if unsigned extensions are allowed from environment
@@ -35,7 +102,11 @@ export const initializeWasmConnection = async (): Promise<{
   // Create database with configuration
   const db = new duckdb.AsyncDuckDB(logger, worker);
 
-  await db.instantiate(bundle.mainModule);
+  try {
+    await db.instantiate(bundle.mainModule);
+  } finally {
+    revoke();
+  }
 
   const dbConfig: duckdb.DuckDBConfig = {
     allowUnsignedExtensions: allowUnsignedExtensions,
