@@ -22,6 +22,8 @@ These variables allow you to configure Duck-UI to connect to an external DuckDB 
 | Variable | Description | Required | Default | Example |
 |----------|-------------|----------|---------|---------|
 | `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow loading unsigned DuckDB extensions | No | `false` | `"true"` |
+| `DUCK_UI_DUCKDB_WASM_USE_CDN` | Enable loading DuckDB WASM and worker files from CDN | No | `false` | `"true"` |
+| `DUCK_UI_DUCKDB_WASM_BASE_URL` | Custom CDN base URL (when `DUCK_UI_DUCKDB_WASM_USE_CDN=true`) | No | Auto (`duckdb.getJsDelivrBundles()`) | `"https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev19.0/dist"` |
 
 ::: warning Security Note
 Enabling unsigned extensions may pose security risks. Only enable this in trusted environments.

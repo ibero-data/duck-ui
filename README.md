@@ -50,6 +50,8 @@ docker run -p 5522:5522 \
 | `DUCK_UI_EXTERNAL_PASS` | Password for external connection | "" |
 | `DUCK_UI_EXTERNAL_DATABASE_NAME` | Database name for external connection | "" |
 | `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow unsigned extensions in DuckDB | false |
+| `DUCK_UI_DUCKDB_WASM_USE_CDN` | Load DuckDB WASM from CDN | false |
+| `DUCK_UI_DUCKDB_WASM_BASE_URL` | Custom CDN base URL (used when `DUCK_UI_DUCKDB_WASM_USE_CDN=true`) | auto jsDelivr |
 
 
 

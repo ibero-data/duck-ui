@@ -7,7 +7,7 @@
  */
 
 import * as duckdb from "@duckdb/duckdb-wasm";
-import { MANUAL_BUNDLES } from "@/services/duckdb/wasmConnection";
+import { createDuckdbWorker, resolveDuckdbBundles } from "@/services/duckdb/wasmConnection";
 import { runMigrations } from "./migrations";
 
 // Singleton state
@@ -62,12 +62,17 @@ export async function initializeSystemDb(): Promise<void> {
   try {
     console.info("[SystemDB] Initializing system database (OPFS)...");
 
-    const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-    const worker = new Worker(bundle.mainWorker!);
+    const bundles = resolveDuckdbBundles();
+    const bundle = await duckdb.selectBundle(bundles);
+    const { worker, revoke } = createDuckdbWorker(bundle.mainWorker!);
     const logger = new duckdb.VoidLogger();
 
     systemDb = new duckdb.AsyncDuckDB(logger, worker);
-    await systemDb.instantiate(bundle.mainModule);
+    try {
+      await systemDb.instantiate(bundle.mainModule);
+    } finally {
+      revoke();
+    }
 
     await systemDb.open({
       path: `opfs://${SYSTEM_DB_PATH}`,

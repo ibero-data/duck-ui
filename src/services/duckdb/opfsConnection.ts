@@ -1,6 +1,6 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
 import { retryWithBackoff, validateConnection } from "./utils";
-import { MANUAL_BUNDLES } from "./wasmConnection";
+import { createDuckdbWorker, resolveDuckdbBundles } from "./wasmConnection";
 import type { ConnectionProvider } from "@/store/types";
 
 // OPFS connection tracking to prevent concurrent access
@@ -61,12 +61,17 @@ export const testOPFSConnection = async (
     );
   }
 
-  const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-  const worker = new Worker(bundle.mainWorker!);
+  const bundles = resolveDuckdbBundles();
+  const bundle = await duckdb.selectBundle(bundles);
+  const { worker, revoke } = createDuckdbWorker(bundle.mainWorker!);
   const logger = new duckdb.VoidLogger();
   const db = new duckdb.AsyncDuckDB(logger, worker);
 
-  await db.instantiate(bundle.mainModule);
+  try {
+    await db.instantiate(bundle.mainModule);
+  } finally {
+    revoke();
+  }
 
   // Use retry with exponential backoff for OPFS access handle conflicts
   await retryWithBackoff(
