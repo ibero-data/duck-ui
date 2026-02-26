@@ -626,11 +626,10 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     if (!data || !data.length) return;
 
     try {
-      // Dynamic import - only load XLSX when needed
-      const XLSX = await import("xlsx");
+      // Dynamic import - only load ExcelJS when needed
+      const ExcelJS = await import("exceljs");
 
       const dataToExport = table.getFilteredRowModel().rows.map((r) => {
-        // Handle BigInt for XLSX
         const row: Record<string, unknown> = {};
         Object.keys(r.original).forEach((key) => {
           const val = r.original[key];
@@ -639,14 +638,15 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         return row;
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Data");
 
-      // Auto-size columns
+      const keys = Object.keys(dataToExport[0] || {});
       const maxWidth = 50;
-      const colWidths = Object.keys(dataToExport[0] || {}).map((key) => ({
-        wch: Math.min(
+      worksheet.columns = keys.map((key) => ({
+        header: key,
+        key,
+        width: Math.min(
           maxWidth,
           Math.max(
             key.length,
@@ -654,9 +654,19 @@ const DuckUITable: React.FC<DuckTableProps> = ({
           )
         ),
       }));
-      worksheet["!cols"] = colWidths;
 
-      XLSX.writeFile(workbook, `duck-ui-export-${new Date().toISOString().slice(0, 19)}.xlsx`);
+      worksheet.addRows(dataToExport);
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `duck-ui-export-${new Date().toISOString().slice(0, 19)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
       toast.success("Exported to Excel");
     } catch (error) {
@@ -793,7 +803,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     if (!data || !data.length) return;
 
     try {
-      const XLSX = await import("xlsx");
+      const ExcelJS = await import("exceljs");
       const dataToExport = table.getFilteredRowModel().rows.map((r) => {
         const row: Record<string, unknown> = {};
         Object.keys(r.original).forEach((key) => {
@@ -803,14 +813,15 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         return row;
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Data");
 
-      // Auto-size columns
+      const keys = Object.keys(dataToExport[0] || {});
       const maxWidth = 50;
-      const colWidths = Object.keys(dataToExport[0] || {}).map((key) => ({
-        wch: Math.min(
+      worksheet.columns = keys.map((key) => ({
+        header: key,
+        key,
+        width: Math.min(
           maxWidth,
           Math.max(
             key.length,
@@ -818,9 +829,10 @@ const DuckUITable: React.FC<DuckTableProps> = ({
           )
         ),
       }));
-      worksheet["!cols"] = colWidths;
 
-      const xlsxBuffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+      worksheet.addRows(dataToExport);
+
+      const xlsxBuffer = await workbook.xlsx.writeBuffer();
       const fileName = `export-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`;
 
       await fileSystemService.saveFile(folderId, fileName, xlsxBuffer);

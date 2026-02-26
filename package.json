@@ -1,7 +1,7 @@
 {
   "name": "duck-ui",
   "private": true,
-  "version": "0.0.29",
+  "version": "0.0.30",
   "release_date": "2026-02-26",
   "type": "module",
   "scripts": {
@@ -55,9 +55,8 @@
     "fflate": "^0.8.2",
     "framer-motion": "^12.34.3",
     "html2canvas": "^1.4.1",
-    "lodash": "^4.17.23",
     "lucide-react": "^0.546.0",
-    "monaco-editor": "^0.54.0",
+    "monaco-editor": "^0.55.1",
     "openai": "^6.25.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.4",
@@ -74,13 +73,12 @@
     "tailwindcss-animate": "^1.0.7",
     "uplot": "^1.6.32",
     "vaul": "^1.1.2",
-    "xlsx": "^0.18.5",
+    "exceljs": "^4.4.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
-    "@types/lodash": "^4.17.24",
     "@types/node": "^24.10.13",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.14",
@@ -117,7 +115,7 @@
     "url": "https://github.com/ibero-data/duck-ui/issues"
   },
   "homepage": "https://github.com/ibero-data/duck-ui#readme",
-  "resolutions": {
+  "overrides": {
     "dompurify": "^3.2.4",
     "brace-expansion": "^2.0.1"
   }
