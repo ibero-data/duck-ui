@@ -12,10 +12,10 @@ import {
   TestTubeDiagonal,
   Server,
   Building2,
-  Cloud,
   BarChart3,
   Bookmark,
   Logs,
+  PackageCheck,
 } from "lucide-react";
 import { useDuckStore } from "@/store";
 import { motion } from "framer-motion";
@@ -48,6 +48,13 @@ const quickStartActions = [
     description: "Query your own DuckDB instance via HTTP server extension.",
     action: "connect",
   },
+  {
+    title: "NEW! DuckUI Embed",
+    icon: <PackageCheck className="w-5 h-5" />,
+    description: "Embed DuckUI in your own applications.",
+    link: "https://duckui.com/play/",
+
+  },
 ];
 
 const resourceCards = [
@@ -69,7 +76,7 @@ const resourceCards = [
     title: "Duck-UI Documentation",
     Icon: ExternalLink,
     description: "Learn how to make the most of Duck-UI.",
-    link: "https://duckui.com",
+    link: "https://duckui.com/",
     action: "Learn More",
   },
 ];
@@ -86,12 +93,6 @@ const iberoDataProducts = [
     description: "Modern UI for ClickHouse databases",
     link: "https://ch-ui.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
     Icon: Database,
-  },
-  {
-    title: "CH-UI Cloud",
-    description: "Managed ClickHouse interface in the cloud",
-    link: "https://cloud.ch-ui.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
-    Icon: Cloud,
   },
   {
     title: "YAAT",
@@ -234,7 +235,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
               <Button
                 variant="outline"
                 className="h-auto p-6 flex flex-col items-start space-y-3 hover:bg-accent hover:text-accent-foreground group w-full border-2"
-                onClick={() => handleNewAction(action.action)}
+                onClick={() => action.action ? handleNewAction(action.action) : action.link && window.open(action.link, "_blank")}
               >
                 <div className="flex items-center space-x-3 text-primary">
                   <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">

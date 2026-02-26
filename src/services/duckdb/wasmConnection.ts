@@ -37,20 +37,22 @@ export const resolveDuckdbBundles: () => Promise<duckdb.DuckDBBundles> =
               import("@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url"),
               import("@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url"),
               import("@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url"),
-            ]).then(([duckdbWasm, mvpWorker, duckdbWasmEh, ehWorker]) => ({
-              mvp: {
-                mainModule: duckdbWasm.default,
-                mainWorker: mvpWorker.default,
-              },
-              eh: {
-                mainModule: duckdbWasmEh.default,
-                mainWorker: ehWorker.default,
-              },
-            })).catch((error) => {
-              // Allow retry after transient chunk/load failures.
-              localBundlesPromise = null;
-              throw error;
-            });
+            ])
+              .then(([duckdbWasm, mvpWorker, duckdbWasmEh, ehWorker]) => ({
+                mvp: {
+                  mainModule: duckdbWasm.default,
+                  mainWorker: mvpWorker.default,
+                },
+                eh: {
+                  mainModule: duckdbWasmEh.default,
+                  mainWorker: ehWorker.default,
+                },
+              }))
+              .catch((error) => {
+                // Allow retry after transient chunk/load failures.
+                localBundlesPromise = null;
+                throw error;
+              });
           }
 
           return localBundlesPromise;
