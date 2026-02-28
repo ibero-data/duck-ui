@@ -100,7 +100,9 @@ export const createSchemaSlice: StateCreator<
       }
       const wasmConnection = validateConnection(connection);
       set({ isLoading: true });
-      await wasmConnection.query(`DROP TABLE IF EXISTS ${sqlEscapeIdentifier(database)}.${sqlEscapeIdentifier(tableName)}`);
+      await wasmConnection.query(
+        `DROP TABLE IF EXISTS ${sqlEscapeIdentifier(database)}.${sqlEscapeIdentifier(tableName)}`
+      );
       await get().fetchDatabasesAndTablesInfo();
       set({ isLoading: false });
     } catch (error) {
@@ -139,7 +141,9 @@ export const createSchemaSlice: StateCreator<
       await db.registerFileBuffer(fileName, buffer);
       // Handle DuckDB database files (.duckdb, .db, .ddb)
       if (fileType === "duckdb" || fileType === "db" || fileType === "ddb") {
-        await connection.query(`ATTACH DATABASE '${sqlEscapeString(fileName)}' AS ${sqlEscapeIdentifier(tableName)}`);
+        await connection.query(
+          `ATTACH DATABASE '${sqlEscapeString(fileName)}' AS ${sqlEscapeIdentifier(tableName)}`
+        );
         await get().fetchDatabasesAndTablesInfo();
         return;
       }

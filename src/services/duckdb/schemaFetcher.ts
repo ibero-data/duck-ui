@@ -20,7 +20,9 @@ export const fetchWasmDatabases = async (
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tablesResult.toArray().map(async (tbl: any) => {
           const tableName = tbl.table_name.toString();
-          const columnsResult = await connection.query(`DESCRIBE ${sqlEscapeIdentifier(dbName)}.${sqlEscapeIdentifier(tableName)}`);
+          const columnsResult = await connection.query(
+            `DESCRIBE ${sqlEscapeIdentifier(dbName)}.${sqlEscapeIdentifier(tableName)}`
+          );
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const columns: ColumnInfo[] = columnsResult.toArray().map((col: any) => ({
             name: col.column_name.toString(),

@@ -156,7 +156,9 @@ export async function updateLastActive(id: string): Promise<void> {
   const now = new Date().toISOString();
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    await conn.query(`UPDATE profiles SET last_active = ${sqlQuote(now)} WHERE id = ${sqlQuote(id)}`);
+    await conn.query(
+      `UPDATE profiles SET last_active = ${sqlQuote(now)} WHERE id = ${sqlQuote(id)}`
+    );
   } else {
     const existing = (await fallbackGet("profiles", id)) as Profile | null;
     if (existing) {

@@ -19,7 +19,7 @@ const PBKDF2_ITERATIONS = 100_000;
 // ─── Base64 helpers (avoids stack overflow with large arrays) ────────────────
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = '';
+  let binary = "";
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
@@ -96,10 +96,12 @@ export async function loadKeyForProfile(
         resolve(null);
         return;
       }
-      importKey(record.key).then((key) => {
-        const salt = record.salt ? new Uint8Array(record.salt) : undefined;
-        resolve({ key, salt });
-      }).catch(reject);
+      importKey(record.key)
+        .then((key) => {
+          const salt = record.salt ? new Uint8Array(record.salt) : undefined;
+          resolve({ key, salt });
+        })
+        .catch(reject);
     };
     tx.onerror = () => {
       db.close();
@@ -206,8 +208,11 @@ export async function exportKey(key: CryptoKey): Promise<string> {
 
 export async function importKey(exported: string): Promise<CryptoKey> {
   const raw = base64ToUint8Array(exported);
-  return crypto.subtle.importKey("raw", raw, { name: ALGORITHM, length: KEY_LENGTH }, true, [
-    "encrypt",
-    "decrypt",
-  ]);
+  return crypto.subtle.importKey(
+    "raw",
+    raw.buffer as ArrayBuffer,
+    { name: ALGORITHM, length: KEY_LENGTH },
+    true,
+    ["encrypt", "decrypt"]
+  );
 }

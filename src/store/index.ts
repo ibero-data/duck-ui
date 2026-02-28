@@ -22,9 +22,7 @@ export * from "./types";
 // Re-export cloud storage types for use in components
 export type { CloudConnection, CloudSupportStatus } from "@/lib/cloudStorage";
 
-const storeCreator = (
-  ...a: Parameters<StateCreator<DuckStoreState>>
-) => ({
+const storeCreator: StateCreator<DuckStoreState, [["zustand/devtools", never]]> = (...a) => ({
   ...createDuckdbSlice(...a),
   ...createConnectionSlice(...a),
   ...createQuerySlice(...a),
@@ -36,7 +34,7 @@ const storeCreator = (
 });
 
 export const useDuckStore = create<DuckStoreState>()(
-  import.meta.env.DEV ? devtools(storeCreator) : storeCreator
+  devtools(storeCreator, { enabled: import.meta.env.DEV })
 );
 
 // ─── Auto-save: debounced writes to system DB ────────────────────────────────

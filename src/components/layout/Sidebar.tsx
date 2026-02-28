@@ -391,7 +391,9 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                     setTheme(newTheme);
                     const profileId = useDuckStore.getState().currentProfileId;
                     if (profileId) {
-                      setSetting(profileId, "theme", "mode", JSON.stringify(newTheme)).catch(() => {});
+                      setSetting(profileId, "theme", "mode", JSON.stringify(newTheme)).catch(
+                        () => {}
+                      );
                     }
                   }}
                 >

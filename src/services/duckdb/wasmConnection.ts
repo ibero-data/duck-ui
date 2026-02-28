@@ -194,7 +194,9 @@ export const loadEmbeddedDatabases = async (
 
         // Attach the database (derive alias from filename without extension)
         const dbAlias = fileName.replace(/\.db$/i, "").replace(/[^a-zA-Z0-9_]/g, "_");
-        await connection.query(`ATTACH DATABASE '${sqlEscapeString(fileName)}' AS ${sqlEscapeIdentifier(dbAlias)}`);
+        await connection.query(
+          `ATTACH DATABASE '${sqlEscapeString(fileName)}' AS ${sqlEscapeIdentifier(dbAlias)}`
+        );
 
         console.info(`Successfully loaded embedded database: ${dbConfig.name} as ${dbAlias}`);
       } catch (error) {

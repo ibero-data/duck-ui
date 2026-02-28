@@ -86,8 +86,7 @@ export async function updateSavedQuery(
     const conn = getSystemConnection();
     const setClauses: string[] = [`updated_at = ${sqlQuote(now)}`];
     if (updates.name !== undefined) setClauses.push(`name = ${sqlQuote(updates.name)}`);
-    if (updates.sql_text !== undefined)
-      setClauses.push(`sql_text = ${sqlQuote(updates.sql_text)}`);
+    if (updates.sql_text !== undefined) setClauses.push(`sql_text = ${sqlQuote(updates.sql_text)}`);
     if (updates.description !== undefined)
       setClauses.push(
         updates.description
@@ -95,11 +94,11 @@ export async function updateSavedQuery(
           : `description = NULL`
       );
     if (updates.tags !== undefined)
-      setClauses.push(
-        updates.tags ? `tags = ${sqlQuote(updates.tags)}` : `tags = NULL`
-      );
+      setClauses.push(updates.tags ? `tags = ${sqlQuote(updates.tags)}` : `tags = NULL`);
     if (updates.folder !== undefined) setClauses.push(`folder = ${sqlQuote(updates.folder)}`);
-    await conn.query(`UPDATE saved_queries SET ${setClauses.join(", ")} WHERE id = ${sqlQuote(id)}`);
+    await conn.query(
+      `UPDATE saved_queries SET ${setClauses.join(", ")} WHERE id = ${sqlQuote(id)}`
+    );
   } else {
     const existing = (await fallbackGet("saved_queries", id)) as SavedQuery | null;
     if (existing) {
