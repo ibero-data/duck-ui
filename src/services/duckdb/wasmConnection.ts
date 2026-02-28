@@ -1,4 +1,5 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
+import { sqlEscapeString, sqlEscapeIdentifier } from "@/lib/sqlSanitize";
 import { validateConnection } from "./utils";
 
 const getRuntimeEnv = (): Partial<NonNullable<Window["env"]>> =>
@@ -95,7 +96,10 @@ export const initializeWasmConnection = async (): Promise<{
 }> => {
   const bundles = await resolveDuckdbBundles();
   const bundle = await duckdb.selectBundle(bundles);
-  const { worker, revoke } = createDuckdbWorker(bundle.mainWorker!);
+  if (!bundle.mainWorker) {
+    throw new Error("DuckDB WASM bundle is missing the main worker URL");
+  }
+  const { worker, revoke } = createDuckdbWorker(bundle.mainWorker);
   const logger = new duckdb.VoidLogger();
 
   // Check if unsigned extensions are allowed from environment
@@ -110,28 +114,33 @@ export const initializeWasmConnection = async (): Promise<{
     revoke();
   }
 
-  const dbConfig: duckdb.DuckDBConfig = {
-    allowUnsignedExtensions: allowUnsignedExtensions,
-  };
-
-  await db.open(dbConfig);
-
-  const connection = await db.connect();
-  // Validate immediately
-  validateConnection(connection);
-
-  // Install and load extensions (non-blocking for offline support)
   try {
-    await connection.query(`INSTALL excel`);
-    await connection.query(`LOAD excel`);
+    const dbConfig: duckdb.DuckDBConfig = {
+      allowUnsignedExtensions: allowUnsignedExtensions,
+    };
+
+    await db.open(dbConfig);
+
+    const connection = await db.connect();
+    // Validate immediately
+    validateConnection(connection);
+
+    // Install and load extensions (non-blocking for offline support)
+    try {
+      await connection.query(`INSTALL excel`);
+      await connection.query(`LOAD excel`);
+    } catch (error) {
+      console.warn("[DuckDB] Failed to install/load excel extension:", error);
+    }
+
+    // Load embedded databases from public/databases/
+    await loadEmbeddedDatabases(db, connection);
+
+    return { db, connection };
   } catch (error) {
-    console.warn("[DuckDB] Failed to install/load excel extension:", error);
+    await db.terminate();
+    throw error;
   }
-
-  // Load embedded databases from public/databases/
-  await loadEmbeddedDatabases(db, connection);
-
-  return { db, connection };
 };
 
 /**
@@ -185,7 +194,7 @@ export const loadEmbeddedDatabases = async (
 
         // Attach the database (derive alias from filename without extension)
         const dbAlias = fileName.replace(/\.db$/i, "").replace(/[^a-zA-Z0-9_]/g, "_");
-        await connection.query(`ATTACH DATABASE '${fileName}' AS ${dbAlias}`);
+        await connection.query(`ATTACH DATABASE '${sqlEscapeString(fileName)}' AS ${sqlEscapeIdentifier(dbAlias)}`);
 
         console.info(`Successfully loaded embedded database: ${dbConfig.name} as ${dbAlias}`);
       } catch (error) {

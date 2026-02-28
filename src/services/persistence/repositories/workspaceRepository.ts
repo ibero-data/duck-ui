@@ -1,4 +1,4 @@
-import { isUsingOpfs, getSystemConnection } from "../systemDb";
+import { isUsingOpfs, getSystemConnection, sqlQuote } from "../systemDb";
 import { fallbackPut, fallbackGet } from "../fallback";
 
 export interface WorkspaceState {
@@ -23,10 +23,9 @@ export async function saveWorkspace(
 
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    const escapedTabs = data.tabs.replace(/'/g, "''");
     await conn.query(`
       INSERT OR REPLACE INTO workspace_state (profile_id, tabs, active_tab_id, current_connection_id, current_database, updated_at)
-      VALUES ('${profileId}', '${escapedTabs}', ${data.activeTabId ? `'${data.activeTabId}'` : "NULL"}, ${data.currentConnectionId ? `'${data.currentConnectionId}'` : "NULL"}, ${data.currentDatabase ? `'${data.currentDatabase}'` : "NULL"}, '${now}')
+      VALUES (${sqlQuote(profileId)}, ${sqlQuote(data.tabs)}, ${data.activeTabId ? sqlQuote(data.activeTabId) : "NULL"}, ${data.currentConnectionId ? sqlQuote(data.currentConnectionId) : "NULL"}, ${data.currentDatabase ? sqlQuote(data.currentDatabase) : "NULL"}, ${sqlQuote(now)})
     `);
   } else {
     await fallbackPut("workspace_state", {
@@ -44,7 +43,7 @@ export async function loadWorkspace(profileId: string): Promise<WorkspaceState |
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const result = await conn.query(
-      `SELECT * FROM workspace_state WHERE profile_id = '${profileId}'`
+      `SELECT * FROM workspace_state WHERE profile_id = ${sqlQuote(profileId)}`
     );
     const rows = result.toArray();
     if (rows.length === 0) return null;

@@ -1,4 +1,5 @@
 import { rawResultToJSON } from "./resultParser";
+import { sqlEscapeIdentifier, sqlEscapeString } from "@/lib/sqlSanitize";
 import type {
   CurrentConnection,
   ConnectionProvider,
@@ -7,6 +8,30 @@ import type {
   TableInfo,
   DatabaseInfo,
 } from "@/store/types";
+
+/**
+ * Builds a properly formatted URL from a connection's host and port.
+ * Handles scheme prefixing, port detection (ignoring colons in the scheme),
+ * and trailing slash normalisation.
+ */
+const buildConnectionUrl = (host: string, port?: string | number): string => {
+  let url = host;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `https://${url}`;
+  }
+  // Only append port when the hostname portion doesn't already contain one.
+  // Strip the scheme first so the ":" in "https://" isn't matched.
+  if (port) {
+    const hostWithoutScheme = url.replace(/^https?:\/\//, "");
+    if (!hostWithoutScheme.includes(":")) {
+      url = `${url}:${port}`;
+    }
+  }
+  if (!url.endsWith("/")) {
+    url = `${url}/`;
+  }
+  return url;
+};
 
 /**
  * Executes a query against an external connection.
@@ -19,17 +44,7 @@ export const executeExternalQuery = async (
     throw new Error("Host must be defined for external connections.");
   }
 
-  // Construct URL properly - handle schemes and ports
-  let url = connection.host;
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = `https://${url}`;
-  }
-  if (connection.port && !connection.host.includes(":")) {
-    url = `${url}:${connection.port}`;
-  }
-  if (!url.endsWith("/")) {
-    url = `${url}/`;
-  }
+  const url = buildConnectionUrl(connection.host, connection.port);
 
   // Build headers based on auth mode
   const headers: Record<string, string> = {
@@ -81,17 +96,7 @@ export const testExternalConnection = async (connection: ConnectionProvider): Pr
     throw new Error("Host must be defined for external connections.");
   }
 
-  // Construct URL properly
-  let url = connection.host;
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = `https://${url}`;
-  }
-  if (connection.port && !connection.host.includes(":")) {
-    url = `${url}:${connection.port}`;
-  }
-  if (!url.endsWith("/")) {
-    url = `${url}/`;
-  }
+  const url = buildConnectionUrl(connection.host, connection.port);
 
   // Build headers based on auth mode
   const headers: Record<string, string> = {
@@ -148,7 +153,7 @@ export const fetchExternalDatabases = async (
         const dbName = dbRow[dbListResult.columns[0] as string] as string;
         try {
           const tablesResult = await executeExternalQuery(
-            `SELECT table_name FROM information_schema.tables WHERE table_catalog = '${dbName}'`,
+            `SELECT table_name FROM information_schema.tables WHERE table_catalog = '${sqlEscapeString(dbName)}'`,
             connection
           );
 
@@ -158,7 +163,7 @@ export const fetchExternalDatabases = async (
             try {
               // Try to get columns info
               const columnsResult = await executeExternalQuery(
-                `DESCRIBE ${dbName}.${tableName}`,
+                `DESCRIBE ${sqlEscapeIdentifier(dbName)}.${sqlEscapeIdentifier(tableName)}`,
                 connection
               );
 

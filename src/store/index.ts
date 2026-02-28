@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { create, type StateCreator } from "zustand";
 import { devtools } from "zustand/middleware";
 import { createDuckdbSlice } from "./slices/duckdbSlice";
 import { createConnectionSlice } from "./slices/connectionSlice";
@@ -22,17 +22,21 @@ export * from "./types";
 // Re-export cloud storage types for use in components
 export type { CloudConnection, CloudSupportStatus } from "@/lib/cloudStorage";
 
+const storeCreator = (
+  ...a: Parameters<StateCreator<DuckStoreState>>
+) => ({
+  ...createDuckdbSlice(...a),
+  ...createConnectionSlice(...a),
+  ...createQuerySlice(...a),
+  ...createSchemaSlice(...a),
+  ...createTabSlice(...a),
+  ...createDuckBrainSlice(...a),
+  ...createFileSystemSlice(...a),
+  ...createProfileSlice(...a),
+});
+
 export const useDuckStore = create<DuckStoreState>()(
-  devtools((...a) => ({
-    ...createDuckdbSlice(...a),
-    ...createConnectionSlice(...a),
-    ...createQuerySlice(...a),
-    ...createSchemaSlice(...a),
-    ...createTabSlice(...a),
-    ...createDuckBrainSlice(...a),
-    ...createFileSystemSlice(...a),
-    ...createProfileSlice(...a),
-  }))
+  import.meta.env.DEV ? devtools(storeCreator) : storeCreator
 );
 
 // ─── Auto-save: debounced writes to system DB ────────────────────────────────
@@ -97,8 +101,12 @@ async function persistWorkspaceState(state: DuckStoreState): Promise<void> {
   }
 }
 
+let autoSaveUnsubscribe: (() => void) | null = null;
+
 export function startAutoSave(): void {
-  useDuckStore.subscribe((state) => {
+  // Prevent duplicate subscriptions
+  if (autoSaveUnsubscribe) return;
+  autoSaveUnsubscribe = useDuckStore.subscribe((state) => {
     if (!state.isProfileLoaded) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => persistWorkspaceState(state), 2000);

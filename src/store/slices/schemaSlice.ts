@@ -7,6 +7,7 @@ import {
   fetchExternalDatabases,
   fetchWasmDatabases,
 } from "@/services/duckdb";
+import { sqlEscapeIdentifier, sqlEscapeString } from "@/lib/sqlSanitize";
 import type { DuckStoreState, SchemaSlice, DatabaseInfo, ColumnStats, QueryResult } from "../types";
 
 export const createSchemaSlice: StateCreator<
@@ -53,8 +54,8 @@ export const createSchemaSlice: StateCreator<
     const { currentConnection, connection } = get();
     const query =
       databaseName === "main" || databaseName === "memory" || databaseName === ":memory:"
-        ? `SUMMARIZE ${tableName}`
-        : `SUMMARIZE "${databaseName}"."${tableName}"`;
+        ? `SUMMARIZE ${sqlEscapeIdentifier(tableName)}`
+        : `SUMMARIZE ${sqlEscapeIdentifier(databaseName)}.${sqlEscapeIdentifier(tableName)}`;
 
     try {
       let result: QueryResult;
@@ -99,7 +100,7 @@ export const createSchemaSlice: StateCreator<
       }
       const wasmConnection = validateConnection(connection);
       set({ isLoading: true });
-      await wasmConnection.query(`DROP TABLE IF EXISTS "${database}"."${tableName}"`);
+      await wasmConnection.query(`DROP TABLE IF EXISTS ${sqlEscapeIdentifier(database)}.${sqlEscapeIdentifier(tableName)}`);
       await get().fetchDatabasesAndTablesInfo();
       set({ isLoading: false });
     } catch (error) {
@@ -138,7 +139,7 @@ export const createSchemaSlice: StateCreator<
       await db.registerFileBuffer(fileName, buffer);
       // Handle DuckDB database files (.duckdb, .db, .ddb)
       if (fileType === "duckdb" || fileType === "db" || fileType === "ddb") {
-        await connection.query(`ATTACH DATABASE '${fileName}' AS ${tableName}`);
+        await connection.query(`ATTACH DATABASE '${sqlEscapeString(fileName)}' AS ${sqlEscapeIdentifier(tableName)}`);
         await get().fetchDatabasesAndTablesInfo();
         return;
       }
@@ -164,29 +165,29 @@ export const createSchemaSlice: StateCreator<
           all_varchar=${allVarcharOption},
           ignore_errors=${ignoreErrorsOption},
           null_padding=${nullPaddingOption},
-          delim='${delimiterOption}'
+          delim='${sqlEscapeString(delimiterOption)}'
         `;
 
         await connection.query(`
-          CREATE OR REPLACE ${createType} "${tableName}" AS
-          SELECT * FROM read_csv('${fileName}', ${optionsString})
+          CREATE OR REPLACE ${createType} ${sqlEscapeIdentifier(tableName)} AS
+          SELECT * FROM read_csv('${sqlEscapeString(fileName)}', ${optionsString})
         `);
       } else if (fileType.toLowerCase() === "json") {
         await connection.query(`
-          CREATE OR REPLACE ${createType} "${tableName}" AS
-          SELECT * FROM read_json('${fileName}', auto_detect=true, ignore_errors=true)
+          CREATE OR REPLACE ${createType} ${sqlEscapeIdentifier(tableName)} AS
+          SELECT * FROM read_json('${sqlEscapeString(fileName)}', auto_detect=true, ignore_errors=true)
         `);
       } else {
         await connection.query(`
-          CREATE OR REPLACE ${createType} "${tableName}" AS
-          SELECT * FROM read_${fileType.toLowerCase()}('${fileName}')
+          CREATE OR REPLACE ${createType} ${sqlEscapeIdentifier(tableName)} AS
+          SELECT * FROM read_${fileType.toLowerCase()}('${sqlEscapeString(fileName)}')
         `);
       }
       const verification = await connection.query(`
         SELECT COUNT(*) AS count
         FROM information_schema.tables
-        WHERE table_name = '${tableName}'
-          AND table_schema = '${database}'
+        WHERE table_name = '${sqlEscapeString(tableName)}'
+          AND table_schema = '${sqlEscapeString(database)}'
       `);
       if (verification.toArray()[0][0] === 0) {
         throw new Error(`${createType} creation verification failed`);

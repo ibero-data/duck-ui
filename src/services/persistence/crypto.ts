@@ -16,6 +16,25 @@ const IV_LENGTH = 12; // 96 bits recommended for AES-GCM
 const SALT_LENGTH = 16;
 const PBKDF2_ITERATIONS = 100_000;
 
+// ─── Base64 helpers (avoids stack overflow with large arrays) ────────────────
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 // ─── IndexedDB key storage ───────────────────────────────────────────────────
 
 function openKeyDatabase(): Promise<IDBDatabase> {
@@ -46,10 +65,19 @@ export async function storeKeyForProfile(
     if (salt) {
       record.salt = Array.from(salt);
     }
-    const request = store.put(record);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve();
-    tx.oncomplete = () => db.close();
+    store.put(record);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? new Error("Transaction aborted"));
+    };
   });
 }
 
@@ -61,8 +89,8 @@ export async function loadKeyForProfile(
     const tx = db.transaction(KEY_STORE_NAME, "readonly");
     const store = tx.objectStore(KEY_STORE_NAME);
     const request = store.get(profileId);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
+    tx.oncomplete = () => {
+      db.close();
       const record = request.result;
       if (!record) {
         resolve(null);
@@ -71,9 +99,16 @@ export async function loadKeyForProfile(
       importKey(record.key).then((key) => {
         const salt = record.salt ? new Uint8Array(record.salt) : undefined;
         resolve({ key, salt });
-      });
+      }).catch(reject);
     };
-    tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? new Error("Transaction aborted"));
+    };
   });
 }
 
@@ -82,10 +117,19 @@ export async function deleteKeyForProfile(profileId: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(KEY_STORE_NAME, "readwrite");
     const store = tx.objectStore(KEY_STORE_NAME);
-    const request = store.delete(profileId);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve();
-    tx.oncomplete = () => db.close();
+    store.delete(profileId);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? new Error("Transaction aborted"));
+    };
   });
 }
 
@@ -142,11 +186,11 @@ export async function encrypt(plaintext: string, key: CryptoKey): Promise<string
   const combined = new Uint8Array(iv.length + ciphertext.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(ciphertext), iv.length);
-  return btoa(String.fromCharCode(...combined));
+  return uint8ArrayToBase64(combined);
 }
 
 export async function decrypt(encoded: string, key: CryptoKey): Promise<string> {
-  const combined = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+  const combined = base64ToUint8Array(encoded);
   const iv = combined.slice(0, IV_LENGTH);
   const ciphertext = combined.slice(IV_LENGTH);
   const plaintext = await crypto.subtle.decrypt({ name: ALGORITHM, iv }, key, ciphertext);
@@ -157,11 +201,11 @@ export async function decrypt(encoded: string, key: CryptoKey): Promise<string> 
 
 export async function exportKey(key: CryptoKey): Promise<string> {
   const raw = await crypto.subtle.exportKey("raw", key);
-  return btoa(String.fromCharCode(...new Uint8Array(raw)));
+  return uint8ArrayToBase64(new Uint8Array(raw));
 }
 
 export async function importKey(exported: string): Promise<CryptoKey> {
-  const raw = Uint8Array.from(atob(exported), (c) => c.charCodeAt(0));
+  const raw = base64ToUint8Array(exported);
   return crypto.subtle.importKey("raw", raw, { name: ALGORITHM, length: KEY_LENGTH }, true, [
     "encrypt",
     "decrypt",

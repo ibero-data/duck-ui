@@ -1,6 +1,6 @@
 import { generateUUID } from "@/lib/utils";
-import { isUsingOpfs, getSystemConnection } from "../systemDb";
-import { fallbackPut, fallbackGetAll, fallbackClear } from "../fallback";
+import { isUsingOpfs, getSystemConnection, sqlQuote } from "../systemDb";
+import { fallbackPut, fallbackGetAll, fallbackDelete } from "../fallback";
 
 export interface HistoryEntry {
   id: string;
@@ -41,7 +41,7 @@ export async function addHistoryEntry(
     const conn = getSystemConnection();
     await conn.query(`
       INSERT INTO query_history (id, profile_id, connection_id, sql_text, error, duration_ms, row_count, executed_at)
-      VALUES ('${id}', '${profileId}', ${entry.connection_id ? `'${entry.connection_id}'` : "NULL"}, '${sqlText.replace(/'/g, "''")}', ${entry.error ? `'${entry.error.replace(/'/g, "''")}'` : "NULL"}, ${entry.duration_ms ?? "NULL"}, ${entry.row_count ?? "NULL"}, '${now}')
+      VALUES (${sqlQuote(id)}, ${sqlQuote(profileId)}, ${entry.connection_id ? sqlQuote(entry.connection_id) : "NULL"}, ${sqlQuote(sqlText)}, ${entry.error ? sqlQuote(entry.error) : "NULL"}, ${entry.duration_ms ?? "NULL"}, ${entry.row_count ?? "NULL"}, ${sqlQuote(now)})
     `);
   } else {
     await fallbackPut("query_history", { ...entry });
@@ -58,7 +58,7 @@ export async function getHistory(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const result = await conn.query(
-      `SELECT * FROM query_history WHERE profile_id = '${profileId}' ORDER BY executed_at DESC LIMIT ${limit} OFFSET ${offset}`
+      `SELECT * FROM query_history WHERE profile_id = ${sqlQuote(profileId)} ORDER BY executed_at DESC LIMIT ${limit} OFFSET ${offset}`
     );
     return result.toArray().map((row) => {
       const r = row.toJSON();
@@ -85,10 +85,14 @@ export async function getHistory(
 export async function clearHistory(profileId: string): Promise<void> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    await conn.query(`DELETE FROM query_history WHERE profile_id = '${profileId}'`);
+    await conn.query(`DELETE FROM query_history WHERE profile_id = ${sqlQuote(profileId)}`);
   } else {
-    // For fallback, clear all (no efficient profile filtering in IndexedDB without indexes)
-    await fallbackClear("query_history");
+    // For fallback, only delete history entries belonging to this profile
+    const all = (await fallbackGetAll("query_history")) as HistoryEntry[];
+    const toDelete = all.filter((item) => item.profile_id === profileId);
+    for (const item of toDelete) {
+      await fallbackDelete("query_history", item.id);
+    }
   }
 }
 
@@ -96,7 +100,7 @@ export async function getHistoryCount(profileId: string): Promise<number> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const result = await conn.query(
-      `SELECT COUNT(*) as cnt FROM query_history WHERE profile_id = '${profileId}'`
+      `SELECT COUNT(*) as cnt FROM query_history WHERE profile_id = ${sqlQuote(profileId)}`
     );
     return Number(result.toArray()[0]?.toJSON().cnt ?? 0);
   } else {

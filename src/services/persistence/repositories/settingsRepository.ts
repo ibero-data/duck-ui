@@ -1,4 +1,4 @@
-import { isUsingOpfs, getSystemConnection } from "../systemDb";
+import { isUsingOpfs, getSystemConnection, sqlQuote } from "../systemDb";
 import { fallbackPut, fallbackGet, fallbackGetAll, fallbackDelete } from "../fallback";
 
 export interface SettingRecord {
@@ -16,7 +16,7 @@ export async function getSetting(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const result = await conn.query(
-      `SELECT value FROM settings WHERE profile_id = '${profileId}' AND category = '${category}' AND key = '${key}'`
+      `SELECT value FROM settings WHERE profile_id = ${sqlQuote(profileId)} AND category = ${sqlQuote(category)} AND key = ${sqlQuote(key)}`
     );
     const rows = result.toArray();
     return rows.length > 0 ? String(rows[0].toJSON().value) : null;
@@ -38,10 +38,9 @@ export async function setSetting(
 ): Promise<void> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    const escapedValue = value.replace(/'/g, "''");
     await conn.query(`
       INSERT OR REPLACE INTO settings (profile_id, category, key, value)
-      VALUES ('${profileId}', '${category}', '${key}', '${escapedValue}')
+      VALUES (${sqlQuote(profileId)}, ${sqlQuote(category)}, ${sqlQuote(key)}, ${sqlQuote(value)})
     `);
   } else {
     await fallbackPut("settings", { profile_id: profileId, category, key, value });
@@ -55,7 +54,7 @@ export async function getSettingsByCategory(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const result = await conn.query(
-      `SELECT key, value FROM settings WHERE profile_id = '${profileId}' AND category = '${category}'`
+      `SELECT key, value FROM settings WHERE profile_id = ${sqlQuote(profileId)} AND category = ${sqlQuote(category)}`
     );
     const settings: Record<string, string> = {};
     for (const row of result.toArray()) {
@@ -83,7 +82,7 @@ export async function deleteSetting(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     await conn.query(
-      `DELETE FROM settings WHERE profile_id = '${profileId}' AND category = '${category}' AND key = '${key}'`
+      `DELETE FROM settings WHERE profile_id = ${sqlQuote(profileId)} AND category = ${sqlQuote(category)} AND key = ${sqlQuote(key)}`
     );
   } else {
     await fallbackDelete("settings", [profileId, category, key]);

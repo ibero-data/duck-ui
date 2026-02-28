@@ -269,7 +269,14 @@ const AppInitializer = ({ children }: AppInitializerProps) => {
 const App = () => {
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
+      // Only prompt when there are SQL tabs with unsaved content
+      const state = useDuckStore.getState();
+      const hasUnsavedWork = state.tabs.some(
+        (t) => t.type === "sql" && typeof t.content === "string" && t.content.trim().length > 0
+      );
+      if (hasUnsavedWork) {
+        e.preventDefault();
+      }
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);

@@ -6,6 +6,7 @@ import type { editor } from "monaco-editor";
 import { toast } from "sonner";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { format } from "sql-formatter";
+import { sqlEscapeString } from "@/lib/sqlSanitize";
 
 // Types
 export interface EditorInstance {
@@ -36,11 +37,6 @@ self.MonacoEnvironment = {
   getWorker(_workerId: string) {
     return new editorWorker();
   },
-};
-
-// Helper function to escape single quotes for SQL queries
-const escape = (str: string): string => {
-  return str.replace(/'/g, "''");
 };
 
 // Create editor instance
@@ -241,7 +237,7 @@ monaco.languages.registerCompletionItemProvider("sql", {
       return { suggestions: [] };
     }
     try {
-      const escapedText = escape(textInRange);
+      const escapedText = sqlEscapeString(textInRange);
       const query = `select suggestion from sql_auto_complete('${escapedText}')`;
       const items: AutocompleteItem[] = await queryNative<AutocompleteItem>(connection, query);
 

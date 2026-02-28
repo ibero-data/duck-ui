@@ -4,20 +4,25 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/components/theme/theme-provider";
-import { useNavigate } from "react-router";
+import { useDuckStore, type EditorTabType } from "@/store";
 import ConnectionSwitcher from "./ConnectionSwitcher";
 
 export const MobileNavDrawer = () => {
   const [open, setOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const navigate = useNavigate();
+  const { tabs, setActiveTab, createTab } = useDuckStore();
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
-  const handleNavigation = (path: string) => {
-    navigate(path);
+  const openOrFocusTab = (type: EditorTabType, title: string) => {
+    const existing = tabs.find((t) => t.type === type);
+    if (existing) {
+      setActiveTab(existing.id);
+    } else {
+      createTab(type, "", title);
+    }
     setOpen(false);
   };
 
@@ -56,14 +61,14 @@ export const MobileNavDrawer = () => {
             <Button
               variant="ghost"
               className="w-full justify-start"
-              onClick={() => handleNavigation("/")}
+              onClick={() => openOrFocusTab("home", "Home")}
             >
               Home
             </Button>
             <Button
               variant="ghost"
               className="w-full justify-start"
-              onClick={() => handleNavigation("/connections")}
+              onClick={() => openOrFocusTab("connections", "Connections")}
             >
               <Cable className="mr-2 h-4 w-4" />
               Manage Connections
@@ -71,7 +76,7 @@ export const MobileNavDrawer = () => {
             <Button
               variant="ghost"
               className="w-full justify-start"
-              onClick={() => handleNavigation("/brain")}
+              onClick={() => openOrFocusTab("brain", "Duck Brain")}
             >
               <Brain className="mr-2 h-4 w-4" />
               Duck Brain Settings

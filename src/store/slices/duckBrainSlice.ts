@@ -4,6 +4,9 @@ import { generateUUID } from "@/lib/utils";
 import { executeExternalQuery, resultToJSON, validateConnection } from "@/services/duckdb";
 import type { DuckStoreState, DuckBrainSlice, DuckBrainMessage, QueryResult } from "../types";
 
+// Track the duckBrainService subscription to prevent leaks
+let duckBrainServiceUnsubscribe: (() => void) | null = null;
+
 export const createDuckBrainSlice: StateCreator<
   DuckStoreState,
   [["zustand/devtools", never]],
@@ -28,7 +31,11 @@ export const createDuckBrainSlice: StateCreator<
   initializeDuckBrain: async (modelId) => {
     const { duckBrainService } = await import("@/lib/duckBrain");
 
-    duckBrainService.subscribe((serviceState) => {
+    // Unsubscribe from previous subscription to prevent leaks
+    if (duckBrainServiceUnsubscribe) {
+      duckBrainServiceUnsubscribe();
+    }
+    duckBrainServiceUnsubscribe = duckBrainService.subscribe((serviceState) => {
       set((state) => ({
         duckBrain: {
           ...state.duckBrain,

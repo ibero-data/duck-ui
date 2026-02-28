@@ -5,6 +5,7 @@
 
 import { useDuckStore } from "@/store";
 import { generateUUID } from "@/lib/utils";
+import { sqlEscapeString } from "@/lib/sqlSanitize";
 
 // Cloud provider types
 export type CloudProviderType = "s3" | "gcs" | "azure";
@@ -344,10 +345,10 @@ class CloudStorageService {
           await duckConn.query(`
             CREATE OR REPLACE SECRET ${secretName} (
               TYPE s3,
-              KEY_ID '${conn.accessKeyId}',
-              SECRET '${conn.secretAccessKey}',
-              REGION '${conn.region || "us-east-1"}'
-              ${conn.endpoint ? `, ENDPOINT '${conn.endpoint}'` : ""}
+              KEY_ID '${sqlEscapeString(conn.accessKeyId || "")}',
+              SECRET '${sqlEscapeString(conn.secretAccessKey || "")}',
+              REGION '${sqlEscapeString(conn.region || "us-east-1")}'
+              ${conn.endpoint ? `, ENDPOINT '${sqlEscapeString(conn.endpoint)}'` : ""}
             )
           `);
           break;
@@ -357,8 +358,8 @@ class CloudStorageService {
           await duckConn.query(`
             CREATE OR REPLACE SECRET ${secretName} (
               TYPE gcs,
-              KEY_ID '${conn.hmacKeyId}',
-              SECRET '${conn.hmacSecret}'
+              KEY_ID '${sqlEscapeString(conn.hmacKeyId || "")}',
+              SECRET '${sqlEscapeString(conn.hmacSecret || "")}'
             )
           `);
           break;
@@ -367,8 +368,8 @@ class CloudStorageService {
           await duckConn.query(`
             CREATE OR REPLACE SECRET ${secretName} (
               TYPE azure,
-              ACCOUNT_NAME '${conn.accountName}',
-              ACCOUNT_KEY '${conn.accountKey}'
+              ACCOUNT_NAME '${sqlEscapeString(conn.accountName || "")}',
+              ACCOUNT_KEY '${sqlEscapeString(conn.accountKey || "")}'
             )
           `);
           break;

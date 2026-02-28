@@ -5,7 +5,9 @@ import pkg from './package.json';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
+  // Only load DUCK_UI_ prefixed env vars to prevent leaking CI secrets
+  // (e.g., GITHUB_TOKEN, GHCR_PAT) into the JS bundle
+  const env = loadEnv(mode, process.cwd(), 'DUCK_UI_');
   const buildDuckdbCdnOnly = env.DUCK_UI_DUCKDB_WASM_CDN_ONLY === 'true';
 
   // Manually construct the object to be defined

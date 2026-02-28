@@ -1,5 +1,5 @@
 import { generateUUID } from "@/lib/utils";
-import { isUsingOpfs, getSystemConnection } from "../systemDb";
+import { isUsingOpfs, getSystemConnection, sqlQuote } from "../systemDb";
 import { fallbackPut, fallbackGet, fallbackGetAll, fallbackDelete } from "../fallback";
 
 export interface Profile {
@@ -25,7 +25,7 @@ export async function createProfile(
     const conn = getSystemConnection();
     await conn.query(`
       INSERT INTO profiles (id, name, avatar_emoji, has_password, password_verify_token, created_at, last_active)
-      VALUES ('${id}', '${name.replace(/'/g, "''")}', '${avatarEmoji}', ${hasPassword}, ${passwordVerifyToken ? `'${passwordVerifyToken.replace(/'/g, "''")}'` : "NULL"}, '${now}', '${now}')
+      VALUES (${sqlQuote(id)}, ${sqlQuote(name)}, ${sqlQuote(avatarEmoji)}, ${hasPassword}, ${passwordVerifyToken ? sqlQuote(passwordVerifyToken) : "NULL"}, ${sqlQuote(now)}, ${sqlQuote(now)})
     `);
   } else {
     await fallbackPut("profiles", {
@@ -53,7 +53,7 @@ export async function createProfile(
 export async function getProfile(id: string): Promise<Profile | null> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    const result = await conn.query(`SELECT * FROM profiles WHERE id = '${id}'`);
+    const result = await conn.query(`SELECT * FROM profiles WHERE id = ${sqlQuote(id)}`);
     const rows = result.toArray();
     if (rows.length === 0) return null;
     const row = rows[0].toJSON();
@@ -105,17 +105,17 @@ export async function updateProfile(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const setClauses: string[] = [];
-    if (updates.name !== undefined) setClauses.push(`name = '${updates.name.replace(/'/g, "''")}'`);
+    if (updates.name !== undefined) setClauses.push(`name = ${sqlQuote(updates.name)}`);
     if (updates.avatar_emoji !== undefined)
-      setClauses.push(`avatar_emoji = '${updates.avatar_emoji}'`);
+      setClauses.push(`avatar_emoji = ${sqlQuote(updates.avatar_emoji)}`);
     if (updates.has_password !== undefined)
       setClauses.push(`has_password = ${updates.has_password}`);
     if (updates.password_verify_token !== undefined)
       setClauses.push(
-        `password_verify_token = ${updates.password_verify_token ? `'${updates.password_verify_token.replace(/'/g, "''")}'` : "NULL"}`
+        `password_verify_token = ${updates.password_verify_token ? sqlQuote(updates.password_verify_token) : "NULL"}`
       );
     if (setClauses.length > 0) {
-      await conn.query(`UPDATE profiles SET ${setClauses.join(", ")} WHERE id = '${id}'`);
+      await conn.query(`UPDATE profiles SET ${setClauses.join(", ")} WHERE id = ${sqlQuote(id)}`);
     }
   } else {
     const existing = (await fallbackGet("profiles", id)) as Profile | null;
@@ -128,15 +128,23 @@ export async function updateProfile(
 export async function deleteProfile(id: string): Promise<void> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    // Cascade delete all profile data
-    await conn.query(`DELETE FROM settings WHERE profile_id = '${id}'`);
-    await conn.query(`DELETE FROM connections WHERE profile_id = '${id}'`);
-    await conn.query(`DELETE FROM query_history WHERE profile_id = '${id}'`);
-    await conn.query(`DELETE FROM workspace_state WHERE profile_id = '${id}'`);
-    await conn.query(`DELETE FROM ai_provider_configs WHERE profile_id = '${id}'`);
-    await conn.query(`DELETE FROM ai_conversations WHERE profile_id = '${id}'`);
-    await conn.query(`DELETE FROM saved_queries WHERE profile_id = '${id}'`);
-    await conn.query(`DELETE FROM profiles WHERE id = '${id}'`);
+    const qid = sqlQuote(id);
+    // Cascade delete all profile data in a transaction
+    await conn.query(`BEGIN TRANSACTION`);
+    try {
+      await conn.query(`DELETE FROM settings WHERE profile_id = ${qid}`);
+      await conn.query(`DELETE FROM connections WHERE profile_id = ${qid}`);
+      await conn.query(`DELETE FROM query_history WHERE profile_id = ${qid}`);
+      await conn.query(`DELETE FROM workspace_state WHERE profile_id = ${qid}`);
+      await conn.query(`DELETE FROM ai_provider_configs WHERE profile_id = ${qid}`);
+      await conn.query(`DELETE FROM ai_conversations WHERE profile_id = ${qid}`);
+      await conn.query(`DELETE FROM saved_queries WHERE profile_id = ${qid}`);
+      await conn.query(`DELETE FROM profiles WHERE id = ${qid}`);
+      await conn.query(`COMMIT`);
+    } catch (error) {
+      await conn.query(`ROLLBACK`);
+      throw error;
+    }
   } else {
     await fallbackDelete("profiles", id);
     // Fallback doesn't have indexes on profile_id, so cascade is skipped
@@ -148,7 +156,7 @@ export async function updateLastActive(id: string): Promise<void> {
   const now = new Date().toISOString();
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    await conn.query(`UPDATE profiles SET last_active = '${now}' WHERE id = '${id}'`);
+    await conn.query(`UPDATE profiles SET last_active = ${sqlQuote(now)} WHERE id = ${sqlQuote(id)}`);
   } else {
     const existing = (await fallbackGet("profiles", id)) as Profile | null;
     if (existing) {

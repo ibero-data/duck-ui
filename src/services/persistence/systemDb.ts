@@ -10,11 +10,27 @@ import * as duckdb from "@duckdb/duckdb-wasm";
 import { createDuckdbWorker, resolveDuckdbBundles } from "@/services/duckdb/wasmConnection";
 import { runMigrations } from "./migrations";
 
+/** Escape a string value for safe use in SQL single-quoted literals */
+export function sqlEscape(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+/** Escape and quote a string value for use in SQL WHERE clauses etc. Returns 'escaped_value' */
+export function sqlQuote(value: string): string {
+  return `'${sqlEscape(value)}'`;
+}
+
+/** Escape and double-quote an identifier (table name, column name, etc.) */
+export function sqlIdentifier(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
 // Singleton state
 let systemDb: duckdb.AsyncDuckDB | null = null;
 let systemConnection: duckdb.AsyncDuckDBConnection | null = null;
 let opfsAvailable: boolean | null = null;
 let initialized = false;
+let initPromise: Promise<void> | null = null;
 
 const SYSTEM_DB_PATH = "duck-ui-system.db";
 
@@ -47,8 +63,16 @@ export async function isOpfsAvailable(): Promise<boolean> {
 /**
  * Initialize the system database. Opens a DuckDB WASM instance with OPFS persistence.
  * Must be called before any repository functions.
+ * Uses a Promise-based lock to prevent double-init races.
  */
-export async function initializeSystemDb(): Promise<void> {
+export function initializeSystemDb(): Promise<void> {
+  if (!initPromise) {
+    initPromise = doInitialize();
+  }
+  return initPromise;
+}
+
+async function doInitialize(): Promise<void> {
   if (initialized) return;
 
   const useOpfs = await isOpfsAvailable();
@@ -139,6 +163,7 @@ export async function closeSystemDb(): Promise<void> {
     systemDb = null;
   }
   initialized = false;
+  initPromise = null;
 }
 
 // Internal cleanup helper (used on init failure)

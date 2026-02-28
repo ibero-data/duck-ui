@@ -1,5 +1,5 @@
 import { generateUUID } from "@/lib/utils";
-import { isUsingOpfs, getSystemConnection } from "../systemDb";
+import { isUsingOpfs, getSystemConnection, sqlQuote } from "../systemDb";
 import { encrypt, decrypt } from "../crypto";
 import { fallbackPut, fallbackGetAll, fallbackGet } from "../fallback";
 
@@ -38,7 +38,7 @@ export async function saveProviderConfig(
     const conn = getSystemConnection();
     await conn.query(`
       INSERT OR REPLACE INTO ai_provider_configs (profile_id, provider, config, encrypted_api_key)
-      VALUES ('${profileId}', '${provider}', '${configJson.replace(/'/g, "''")}', ${encryptedKey ? `'${encryptedKey.replace(/'/g, "''")}'` : "NULL"})
+      VALUES (${sqlQuote(profileId)}, ${sqlQuote(provider)}, ${sqlQuote(configJson)}, ${encryptedKey ? sqlQuote(encryptedKey) : "NULL"})
     `);
   } else {
     await fallbackPut("ai_provider_configs", {
@@ -59,7 +59,7 @@ export async function getProviderConfigs(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const result = await conn.query(
-      `SELECT * FROM ai_provider_configs WHERE profile_id = '${profileId}'`
+      `SELECT * FROM ai_provider_configs WHERE profile_id = ${sqlQuote(profileId)}`
     );
     records = result.toArray().map((row) => {
       const r = row.toJSON();
@@ -106,16 +106,16 @@ export async function saveConversation(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     // Check if exists
-    const existing = await conn.query(`SELECT id FROM ai_conversations WHERE id = '${id}'`);
+    const existing = await conn.query(`SELECT id FROM ai_conversations WHERE id = ${sqlQuote(id)}`);
     if (existing.toArray().length > 0) {
       await conn.query(`
-        UPDATE ai_conversations SET messages = '${messagesJson.replace(/'/g, "''")}', title = ${options?.title ? `'${options.title.replace(/'/g, "''")}'` : "NULL"}, updated_at = '${now}'
-        WHERE id = '${id}'
+        UPDATE ai_conversations SET messages = ${sqlQuote(messagesJson)}, title = ${options?.title ? sqlQuote(options.title) : "NULL"}, updated_at = ${sqlQuote(now)}
+        WHERE id = ${sqlQuote(id)}
       `);
     } else {
       await conn.query(`
         INSERT INTO ai_conversations (id, profile_id, title, messages, provider, created_at, updated_at)
-        VALUES ('${id}', '${profileId}', ${options?.title ? `'${options.title.replace(/'/g, "''")}'` : "NULL"}, '${messagesJson.replace(/'/g, "''")}', ${options?.provider ? `'${options.provider}'` : "NULL"}, '${now}', '${now}')
+        VALUES (${sqlQuote(id)}, ${sqlQuote(profileId)}, ${options?.title ? sqlQuote(options.title) : "NULL"}, ${sqlQuote(messagesJson)}, ${options?.provider ? sqlQuote(options.provider) : "NULL"}, ${sqlQuote(now)}, ${sqlQuote(now)})
       `);
     }
   } else {
@@ -138,7 +138,7 @@ export async function getConversations(profileId: string): Promise<AIConversatio
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const result = await conn.query(
-      `SELECT * FROM ai_conversations WHERE profile_id = '${profileId}' ORDER BY updated_at DESC`
+      `SELECT * FROM ai_conversations WHERE profile_id = ${sqlQuote(profileId)} ORDER BY updated_at DESC`
     );
     return result.toArray().map((row) => {
       const r = row.toJSON();

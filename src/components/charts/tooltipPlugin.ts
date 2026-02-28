@@ -1,6 +1,15 @@
 import uPlot from "uplot";
 import { formatNumber } from "@/lib/chartUtils";
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function tooltipPlugin(xLabels: string[]): uPlot.Plugin {
   let tooltip: HTMLDivElement;
   let over: HTMLElement;
@@ -37,7 +46,7 @@ export function tooltipPlugin(xLabels: string[]): uPlot.Plugin {
           return;
         }
 
-        const xLabel = xLabels[idx] ?? String(u.data[0][idx]);
+        const xLabel = escapeHtml(xLabels[idx] ?? String(u.data[0][idx]));
         let html = `<div class="uplot-tooltip-title">${xLabel}</div>`;
 
         for (let i = 1; i < u.series.length; i++) {
@@ -48,9 +57,11 @@ export function tooltipPlugin(xLabels: string[]): uPlot.Plugin {
             typeof s.stroke === "function"
               ? (s.stroke as (self: uPlot, seriesIdx: number) => string)(u, i)
               : s.stroke;
+          const safeLabel = escapeHtml(s.label ?? "");
+          const safeColor = escapeHtml(String(color ?? ""));
           html += `<div class="uplot-tooltip-row">
-            <span class="uplot-tooltip-dot" style="background:${color}"></span>
-            <span class="uplot-tooltip-label">${s.label}</span>
+            <span class="uplot-tooltip-dot" style="background:${safeColor}"></span>
+            <span class="uplot-tooltip-label">${safeLabel}</span>
             <span class="uplot-tooltip-value">${val != null ? formatNumber(val as number) : "\u2014"}</span>
           </div>`;
         }

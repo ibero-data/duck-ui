@@ -14,9 +14,11 @@ export const cleanupOPFSConnection = async (
   connection: duckdb.AsyncDuckDBConnection | null,
   path?: string
 ): Promise<void> => {
-  if (db && connection) {
+  if (db) {
     try {
-      await connection.close();
+      if (connection) {
+        await connection.close();
+      }
       await db.terminate();
       // Critical: Wait for file handles to be fully released by browser
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -61,9 +63,16 @@ export const testOPFSConnection = async (
     );
   }
 
+  // Reserve the path immediately to prevent concurrent access (TOCTOU)
+  opfsActivePaths.add(opfsPath);
+
   const bundles = await resolveDuckdbBundles();
   const bundle = await duckdb.selectBundle(bundles);
-  const { worker, revoke } = createDuckdbWorker(bundle.mainWorker!);
+  if (!bundle.mainWorker) {
+    opfsActivePaths.delete(opfsPath);
+    throw new Error("DuckDB WASM bundle is missing the main worker URL");
+  }
+  const { worker, revoke } = createDuckdbWorker(bundle.mainWorker);
   const logger = new duckdb.VoidLogger();
   const db = new duckdb.AsyncDuckDB(logger, worker);
 
@@ -73,36 +82,39 @@ export const testOPFSConnection = async (
     revoke();
   }
 
-  // Use retry with exponential backoff for OPFS access handle conflicts
-  await retryWithBackoff(
-    async () => {
-      try {
-        await db.open({
-          path: `opfs://${opfsPath}`,
-          accessMode: duckdb.DuckDBAccessMode.AUTOMATIC,
-        });
-      } catch (error) {
-        const err = error as Error;
-        if (err.message.includes("createSyncAccessHandle")) {
-          throw new Error(
-            `OPFS access handle conflict for "${opfsPath}". The file may still be in use. Retrying...`
-          );
+  try {
+    // Use retry with exponential backoff for OPFS access handle conflicts
+    await retryWithBackoff(
+      async () => {
+        try {
+          await db.open({
+            path: `opfs://${opfsPath}`,
+            accessMode: duckdb.DuckDBAccessMode.AUTOMATIC,
+          });
+        } catch (error) {
+          const err = error as Error;
+          if (err.message.includes("createSyncAccessHandle")) {
+            throw new Error(
+              `OPFS access handle conflict for "${opfsPath}". The file may still be in use. Retrying...`
+            );
+          }
+          throw error;
         }
-        throw error;
-      }
-    },
-    4,
-    1500
-  ); // 4 retries with 1.5s base delay (1.5s, 3s, 6s, 12s)
+      },
+      4,
+      1500
+    ); // 4 retries with 1.5s base delay (1.5s, 3s, 6s, 12s)
 
-  const connection = await db.connect();
-  validateConnection(connection);
+    const connection = await db.connect();
+    validateConnection(connection);
 
-  // Verify connection with a basic query
-  await connection.query(`SHOW TABLES`);
+    // Verify connection with a basic query
+    await connection.query(`SHOW TABLES`);
 
-  // Mark path as active
-  opfsActivePaths.add(opfsPath);
-
-  return { db, connection };
+    return { db, connection };
+  } catch (error) {
+    opfsActivePaths.delete(opfsPath);
+    await db.terminate().catch(() => {});
+    throw error;
+  }
 };

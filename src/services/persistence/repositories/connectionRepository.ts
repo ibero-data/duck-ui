@@ -1,5 +1,5 @@
 import { generateUUID } from "@/lib/utils";
-import { isUsingOpfs, getSystemConnection } from "../systemDb";
+import { isUsingOpfs, getSystemConnection, sqlQuote } from "../systemDb";
 import { encrypt, decrypt } from "../crypto";
 import { fallbackPut, fallbackGetAll, fallbackDelete } from "../fallback";
 
@@ -40,7 +40,7 @@ export async function saveConnection(
     const conn = getSystemConnection();
     await conn.query(`
       INSERT INTO connections (id, profile_id, name, scope, config, encrypted_credentials, environment, created_at)
-      VALUES ('${id}', '${profileId}', '${input.name.replace(/'/g, "''")}', '${input.scope}', '${configJson.replace(/'/g, "''")}', ${encryptedCreds ? `'${encryptedCreds.replace(/'/g, "''")}'` : "NULL"}, '${input.environment ?? "APP"}', '${now}')
+      VALUES (${sqlQuote(id)}, ${sqlQuote(profileId)}, ${sqlQuote(input.name)}, ${sqlQuote(input.scope)}, ${sqlQuote(configJson)}, ${encryptedCreds ? sqlQuote(encryptedCreds) : "NULL"}, ${sqlQuote(input.environment ?? "APP")}, ${sqlQuote(now)})
     `);
   } else {
     await fallbackPut("connections", {
@@ -86,7 +86,7 @@ export async function getConnections(
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
     const result = await conn.query(
-      `SELECT * FROM connections WHERE profile_id = '${profileId}' ORDER BY created_at`
+      `SELECT * FROM connections WHERE profile_id = ${sqlQuote(profileId)} ORDER BY created_at`
     );
     records = result.toArray().map((row) => {
       const r = row.toJSON();
@@ -132,7 +132,7 @@ export async function getConnections(
 export async function deleteConnection(id: string): Promise<void> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    await conn.query(`DELETE FROM connections WHERE id = '${id}'`);
+    await conn.query(`DELETE FROM connections WHERE id = ${sqlQuote(id)}`);
   } else {
     await fallbackDelete("connections", id);
   }

@@ -23,6 +23,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useDuckStore, type EditorTabType } from "@/store";
+import { setSetting } from "@/services/persistence/repositories/settingsRepository";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -290,7 +291,9 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   <Search className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Search (⌘K)</TooltipContent>
+              <TooltipContent side="right">
+                Search ({navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}K)
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
@@ -383,7 +386,14 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   variant="ghost"
                   size="icon"
                   className="mx-auto h-9 w-9"
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  onClick={() => {
+                    const newTheme = theme === "dark" ? "light" : "dark";
+                    setTheme(newTheme);
+                    const profileId = useDuckStore.getState().currentProfileId;
+                    if (profileId) {
+                      setSetting(profileId, "theme", "mode", JSON.stringify(newTheme)).catch(() => {});
+                    }
+                  }}
                 >
                   {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>

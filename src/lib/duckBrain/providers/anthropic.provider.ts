@@ -122,10 +122,15 @@ export class AnthropicProvider implements AIProvider {
                 throw new Error(parsed.error?.message || "Unknown error");
               }
             } catch (parseErr) {
-              // Ignore parse errors for incomplete chunks
-              if (parseErr instanceof Error && parseErr.message !== "Unknown error") {
-                // Only throw if it's an actual error from the API
+              // Re-throw actual API errors (from parsed.type === "error" above)
+              if (
+                parseErr instanceof Error &&
+                parseErr.message !== "Unexpected end of JSON input" &&
+                !parseErr.message.startsWith("Unexpected token")
+              ) {
+                throw parseErr;
               }
+              // Otherwise ignore JSON parse errors for incomplete SSE chunks
             }
           }
         }

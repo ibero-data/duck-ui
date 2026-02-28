@@ -1,5 +1,5 @@
 import { generateUUID } from "@/lib/utils";
-import { isUsingOpfs, getSystemConnection } from "../systemDb";
+import { isUsingOpfs, getSystemConnection, sqlQuote } from "../systemDb";
 import { fallbackPut, fallbackGetAll, fallbackGet, fallbackDelete } from "../fallback";
 
 export interface SavedQuery {
@@ -38,7 +38,7 @@ export async function saveQuery(
     const conn = getSystemConnection();
     await conn.query(`
       INSERT INTO saved_queries (id, profile_id, name, sql_text, description, tags, folder, created_at, updated_at)
-      VALUES ('${id}', '${profileId}', '${input.name.replace(/'/g, "''")}', '${input.sqlText.replace(/'/g, "''")}', ${input.description ? `'${input.description.replace(/'/g, "''")}'` : "NULL"}, ${tagsJson ? `'${tagsJson.replace(/'/g, "''")}'` : "NULL"}, '${record.folder}', '${now}', '${now}')
+      VALUES (${sqlQuote(id)}, ${sqlQuote(profileId)}, ${sqlQuote(input.name)}, ${sqlQuote(input.sqlText)}, ${input.description ? sqlQuote(input.description) : "NULL"}, ${tagsJson ? sqlQuote(tagsJson) : "NULL"}, ${sqlQuote(record.folder)}, ${sqlQuote(now)}, ${sqlQuote(now)})
     `);
   } else {
     await fallbackPut("saved_queries", { ...record });
@@ -50,8 +50,8 @@ export async function saveQuery(
 export async function getSavedQueries(profileId: string, folder?: string): Promise<SavedQuery[]> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    let sql = `SELECT * FROM saved_queries WHERE profile_id = '${profileId}'`;
-    if (folder) sql += ` AND folder = '${folder}'`;
+    let sql = `SELECT * FROM saved_queries WHERE profile_id = ${sqlQuote(profileId)}`;
+    if (folder) sql += ` AND folder = ${sqlQuote(folder)}`;
     sql += ` ORDER BY updated_at DESC`;
     const result = await conn.query(sql);
     return result.toArray().map((row) => {
@@ -84,22 +84,22 @@ export async function updateSavedQuery(
 
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    const setClauses: string[] = [`updated_at = '${now}'`];
-    if (updates.name !== undefined) setClauses.push(`name = '${updates.name.replace(/'/g, "''")}'`);
+    const setClauses: string[] = [`updated_at = ${sqlQuote(now)}`];
+    if (updates.name !== undefined) setClauses.push(`name = ${sqlQuote(updates.name)}`);
     if (updates.sql_text !== undefined)
-      setClauses.push(`sql_text = '${updates.sql_text.replace(/'/g, "''")}'`);
+      setClauses.push(`sql_text = ${sqlQuote(updates.sql_text)}`);
     if (updates.description !== undefined)
       setClauses.push(
         updates.description
-          ? `description = '${updates.description.replace(/'/g, "''")}'`
+          ? `description = ${sqlQuote(updates.description)}`
           : `description = NULL`
       );
     if (updates.tags !== undefined)
       setClauses.push(
-        updates.tags ? `tags = '${updates.tags.replace(/'/g, "''")}'` : `tags = NULL`
+        updates.tags ? `tags = ${sqlQuote(updates.tags)}` : `tags = NULL`
       );
-    if (updates.folder !== undefined) setClauses.push(`folder = '${updates.folder}'`);
-    await conn.query(`UPDATE saved_queries SET ${setClauses.join(", ")} WHERE id = '${id}'`);
+    if (updates.folder !== undefined) setClauses.push(`folder = ${sqlQuote(updates.folder)}`);
+    await conn.query(`UPDATE saved_queries SET ${setClauses.join(", ")} WHERE id = ${sqlQuote(id)}`);
   } else {
     const existing = (await fallbackGet("saved_queries", id)) as SavedQuery | null;
     if (existing) {
@@ -111,7 +111,7 @@ export async function updateSavedQuery(
 export async function deleteSavedQuery(id: string): Promise<void> {
   if (isUsingOpfs()) {
     const conn = getSystemConnection();
-    await conn.query(`DELETE FROM saved_queries WHERE id = '${id}'`);
+    await conn.query(`DELETE FROM saved_queries WHERE id = ${sqlQuote(id)}`);
   } else {
     await fallbackDelete("saved_queries", id);
   }
