@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
 
   // Manually construct the object to be defined
   // Filter out keys with invalid JS identifier characters (fixes Windows builds where
-  // env vars like "=::" exist). See: https://github.com/ibero-data/duck-ui/issues/26
+  // env vars like "=::" exist). See: https://github.com/caioricciuti/duck-ui/issues/26
   const processEnvValues: Record<string, string> = {};
   for (const key in env) {
     if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {

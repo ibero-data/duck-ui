@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
  * Generate a UUID v4 string. Uses crypto.randomUUID() when available (secure
  * contexts / HTTPS), falls back to a crypto.getRandomValues()-based polyfill
  * for HTTP environments (e.g. Docker without TLS).
- * See: https://github.com/ibero-data/duck-ui/issues/21
+ * See: https://github.com/caioricciuti/duck-ui/issues/21
  */
 export function generateUUID(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

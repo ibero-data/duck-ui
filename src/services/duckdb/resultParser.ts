@@ -3,7 +3,7 @@ import type { QueryResult, ExternalQueryResponse } from "@/store/types";
 /**
  * Converts a raw result (from an external HTTP endpoint) into a QueryResult.
  * Handles JSONCompact format, NDJSON, and plain JSON array-of-objects responses.
- * See: https://github.com/ibero-data/duck-ui/issues/24
+ * See: https://github.com/caioricciuti/duck-ui/issues/24
  */
 export const rawResultToJSON = (rawResult: string): QueryResult => {
   const trimmed = rawResult.trim();

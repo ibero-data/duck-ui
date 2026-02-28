@@ -53,7 +53,6 @@ const quickStartActions = [
     icon: <PackageCheck className="w-5 h-5" />,
     description: "Embed DuckUI in your own applications.",
     link: "https://duckui.com/play/",
-
   },
 ];
 
@@ -61,7 +60,7 @@ const resourceCards = [
   {
     title: "Star us on GitHub!",
     description: "Support our project by starring it on GitHub.",
-    link: "https://github.com/ibero-data/duck-ui",
+    link: "https://github.com/caioricciuti/duck-ui",
     Icon: Github,
     action: "Star on GitHub",
   },
@@ -235,7 +234,11 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
               <Button
                 variant="outline"
                 className="h-auto p-6 flex flex-col items-start space-y-3 hover:bg-accent hover:text-accent-foreground group w-full border-2"
-                onClick={() => action.action ? handleNewAction(action.action) : action.link && window.open(action.link, "_blank")}
+                onClick={() =>
+                  action.action
+                    ? handleNewAction(action.action)
+                    : action.link && window.open(action.link, "_blank")
+                }
               >
                 <div className="flex items-center space-x-3 text-primary">
                   <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">

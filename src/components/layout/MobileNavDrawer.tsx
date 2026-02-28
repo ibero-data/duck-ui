@@ -88,7 +88,7 @@ export const MobileNavDrawer = () => {
               className="w-full justify-start"
               onClick={() =>
                 handleExternalLink(
-                  "https://github.com/ibero-data/duck-ui?utm_source=duck-ui&utm_medium=mobile-nav"
+                  "https://github.com/caioricciuti/duck-ui?utm_source=duck-ui&utm_medium=mobile-nav"
                 )
               }
             >

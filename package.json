@@ -1,8 +1,8 @@
 {
   "name": "duck-ui",
   "private": true,
-  "version": "0.0.30",
-  "release_date": "2026-02-26",
+  "version": "0.0.31",
+  "release_date": "2026-02-28",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -79,12 +79,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
-    "@types/node": "^24.10.13",
+    "@types/node": "^24.11.0",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
-    "autoprefixer": "^10.4.24",
+    "autoprefixer": "^10.4.27",
     "baseline-browser-mapping": "^2.10.0",
     "esbuild": "^0.25.12",
     "eslint": "^9.39.3",
@@ -106,15 +106,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ibero-data/duck-ui.git"
+    "url": "git+https://github.com/caioricciuti/duck-ui.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/ibero-data/duck-ui/issues"
+    "url": "https://github.com/caioricciuti/duck-ui/issues"
   },
-  "homepage": "https://github.com/ibero-data/duck-ui#readme",
+  "homepage": "https://github.com/caioricciuti/duck-ui#readme",
   "overrides": {
     "dompurify": "^3.2.4",
     "brace-expansion": "^2.0.1"

@@ -142,7 +142,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
   ];
 
   const externalLinks = [
-    { to: "https://github.com/ibero-data/duck-ui", label: "GitHub", icon: Github },
+    { to: "https://github.com/caioricciuti/duck-ui", label: "GitHub", icon: Github },
     { to: "https://duckui.com", label: "Documentation", icon: BookOpen },
   ];
 
@@ -410,7 +410,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
             </TooltipProvider>
             <DropdownMenuContent side="right" align="end">
               <DropdownMenuItem
-                onClick={() => window.open("https://github.com/ibero-data/duck-ui", "_blank")}
+                onClick={() => window.open("https://github.com/caioricciuti/duck-ui", "_blank")}
               >
                 <Github className="h-4 w-4 mr-2" />
                 GitHub
