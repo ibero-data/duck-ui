@@ -43,7 +43,7 @@ interface TreeNodeProps {
   refreshData: () => void;
 }
 
-const TreeNode: React.FC<TreeNodeProps> = ({
+const TreeNode: React.FC<TreeNodeProps> = React.memo(({
   node,
   level,
   searchTerm,
@@ -55,13 +55,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const toggleOpen = useCallback(() => setIsOpen((open) => !open), []);
 
-  const {
-    createTab,
-    executeQuery,
-    deleteTable,
-    fetchDatabasesAndTablesInfo,
-    fetchTableColumnStats,
-  } = useDuckStore();
+  const createTab = useDuckStore((s) => s.createTab);
+  const executeQuery = useDuckStore((s) => s.executeQuery);
+  const deleteTable = useDuckStore((s) => s.deleteTable);
+  const fetchDatabasesAndTablesInfo = useDuckStore((s) => s.fetchDatabasesAndTablesInfo);
+  const fetchTableColumnStats = useDuckStore((s) => s.fetchTableColumnStats);
 
   // Fetch column stats when table is expanded
   useEffect(() => {
@@ -194,9 +192,19 @@ const TreeNode: React.FC<TreeNodeProps> = ({
       <ContextMenu>
         <ContextMenuTrigger>
           <div
+            role="treeitem"
+            aria-expanded={node.children ? isOpen : undefined}
+            aria-level={level + 1}
+            tabIndex={0}
             className={`flex items-center py-1 px-2 hover:bg-secondary hover:rounded-md cursor-pointer truncate
               ${level > 0 ? "ml-4" : ""}`}
             onClick={toggleOpen}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggleOpen();
+              }
+            }}
           >
             <div className="flex-grow flex items-center">
               {node.children ? (
@@ -279,6 +287,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
       </ContextMenu>
     </>
   ) : null;
-};
+});
 
 export default TreeNode;

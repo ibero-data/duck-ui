@@ -18,16 +18,14 @@ interface ConnectionSwitcherProps {
 }
 
 export default function ConnectionSwitcher({ className }: ConnectionSwitcherProps) {
-  const {
-    connectionList,
-    currentConnection,
-    setCurrentConnection,
-    isLoading,
-    fetchDatabasesAndTablesInfo,
-    tabs,
-    createTab,
-    setActiveTab,
-  } = useDuckStore();
+  const connectionList = useDuckStore((s) => s.connectionList);
+  const currentConnection = useDuckStore((s) => s.currentConnection);
+  const setCurrentConnection = useDuckStore((s) => s.setCurrentConnection);
+  const isLoading = useDuckStore((s) => s.isLoading);
+  const fetchDatabasesAndTablesInfo = useDuckStore((s) => s.fetchDatabasesAndTablesInfo);
+  const tabs = useDuckStore((s) => s.tabs);
+  const createTab = useDuckStore((s) => s.createTab);
+  const setActiveTab = useDuckStore((s) => s.setActiveTab);
   const [isOpen, setIsOpen] = React.useState(false);
 
   // Helper to open or focus Connections tab

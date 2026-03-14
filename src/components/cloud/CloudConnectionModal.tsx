@@ -93,7 +93,8 @@ export function CloudConnectionModal({
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
 
-  const { addCloudConnection, cloudSupportStatus } = useDuckStore();
+  const addCloudConnection = useDuckStore((s) => s.addCloudConnection);
+  const cloudSupportStatus = useDuckStore((s) => s.cloudSupportStatus);
 
   const form = useForm<CloudConnectionFormData>({
     resolver: zodResolver(cloudConnectionSchema),

@@ -1,14 +1,15 @@
 /**
  * System Database Service
  *
- * Manages a dedicated DuckDB WASM instance at opfs://duck-ui-system.db for
- * persisting profiles, settings, connections, query history, and other app state.
- * Falls back to IndexedDB for browsers without OPFS support.
+ * Manages persistence for profiles, settings, connections, query history,
+ * and other app state using IndexedDB.
+ *
+ * Previously attempted OPFS with a dedicated DuckDB WASM instance, but
+ * IndexedDB is more appropriate for lightweight metadata and avoids
+ * creating a heavyweight second DuckDB instance (worker + 34MB WASM).
  */
 
-import * as duckdb from "@duckdb/duckdb-wasm";
-import { createDuckdbWorker, resolveDuckdbBundles } from "@/services/duckdb/wasmConnection";
-import { runMigrations } from "./migrations";
+import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
 
 /** Escape a string value for safe use in SQL single-quoted literals */
 export function sqlEscape(value: string): string {
@@ -26,42 +27,27 @@ export function sqlIdentifier(name: string): string {
 }
 
 // Singleton state
-let systemDb: duckdb.AsyncDuckDB | null = null;
-let systemConnection: duckdb.AsyncDuckDBConnection | null = null;
-let opfsAvailable: boolean | null = null;
 let initialized = false;
 let initPromise: Promise<void> | null = null;
 
-const SYSTEM_DB_PATH = "duck-ui-system.db";
-
 /**
  * Check whether OPFS is available in this browser.
- * DuckDB WASM requires createSyncAccessHandle which is not available in all browsers.
+ * Used by connection code to determine if OPFS connections are possible.
  */
 export async function isOpfsAvailable(): Promise<boolean> {
-  if (opfsAvailable !== null) return opfsAvailable;
-
   try {
     const root = await navigator.storage.getDirectory();
-    // Probe by trying to create and delete a test file
-    const testHandle = await root.getFileHandle(".duck-ui-opfs-test", { create: true });
-    // If we get here, OPFS basic access works. Check sync access handle support.
-    const syncHandle = await (
-      testHandle as unknown as { createSyncAccessHandle: () => Promise<{ close: () => void }> }
-    ).createSyncAccessHandle();
-    syncHandle.close();
-    await root.removeEntry(".duck-ui-opfs-test");
-    opfsAvailable = true;
+    const testName = ".duck-ui-opfs-test";
+    await root.getFileHandle(testName, { create: true });
+    await root.removeEntry(testName);
+    return true;
   } catch {
-    // OPFS or sync access handle not supported
-    opfsAvailable = false;
+    return false;
   }
-
-  return opfsAvailable;
 }
 
 /**
- * Initialize the system database. Opens a DuckDB WASM instance with OPFS persistence.
+ * Initialize the system database. Sets up IndexedDB persistence.
  * Must be called before any repository functions.
  * Uses a Promise-based lock to prevent double-init races.
  */
@@ -74,65 +60,23 @@ export function initializeSystemDb(): Promise<void> {
 
 async function doInitialize(): Promise<void> {
   if (initialized) return;
-
-  const useOpfs = await isOpfsAvailable();
-
-  if (!useOpfs) {
-    console.info("[SystemDB] OPFS not available, using IndexedDB fallback");
-    initialized = true;
-    return;
-  }
-
-  try {
-    console.info("[SystemDB] Initializing system database (OPFS)...");
-
-    const bundles = await resolveDuckdbBundles();
-    const bundle = await duckdb.selectBundle(bundles);
-    const { worker, revoke } = createDuckdbWorker(bundle.mainWorker!);
-    const logger = new duckdb.VoidLogger();
-
-    systemDb = new duckdb.AsyncDuckDB(logger, worker);
-    try {
-      await systemDb.instantiate(bundle.mainModule);
-    } finally {
-      revoke();
-    }
-
-    await systemDb.open({
-      path: `opfs://${SYSTEM_DB_PATH}`,
-      accessMode: duckdb.DuckDBAccessMode.READ_WRITE,
-    });
-
-    systemConnection = await systemDb.connect();
-    await runMigrations(systemConnection);
-
-    initialized = true;
-    console.info("[SystemDB] System database ready");
-  } catch (error) {
-    console.error("[SystemDB] Failed to initialize:", error);
-    // Fall back to IndexedDB mode
-    await cleanupSystemDb();
-    opfsAvailable = false;
-    initialized = true;
-    console.info("[SystemDB] Falling back to IndexedDB mode");
-  }
+  console.info("[SystemDB] Using IndexedDB persistence");
+  initialized = true;
 }
 
 /**
- * Get the system database connection. Throws if not initialized or OPFS unavailable.
+ * Get the system database connection. Throws since system DB now uses IndexedDB.
  */
-export function getSystemConnection(): duckdb.AsyncDuckDBConnection {
-  if (!systemConnection) {
-    throw new Error("System database not initialized or OPFS not available");
-  }
-  return systemConnection;
+export function getSystemConnection(): AsyncDuckDBConnection {
+  throw new Error("System database uses IndexedDB — no DuckDB connection available");
 }
 
 /**
  * Check if the system DB is using OPFS (vs IndexedDB fallback).
+ * Always returns false since system DB now exclusively uses IndexedDB.
  */
 export function isUsingOpfs(): boolean {
-  return initialized && systemConnection !== null;
+  return false;
 }
 
 /**
@@ -143,41 +87,9 @@ export function isSystemDbInitialized(): boolean {
 }
 
 /**
- * Close the system database connection and terminate the worker.
+ * Close the system database connection. No-op since system DB uses IndexedDB.
  */
 export async function closeSystemDb(): Promise<void> {
-  if (systemConnection) {
-    try {
-      await systemConnection.close();
-    } catch {
-      // Ignore close errors
-    }
-    systemConnection = null;
-  }
-  if (systemDb) {
-    try {
-      await systemDb.terminate();
-    } catch {
-      // Ignore termination errors
-    }
-    systemDb = null;
-  }
   initialized = false;
   initPromise = null;
-}
-
-// Internal cleanup helper (used on init failure)
-async function cleanupSystemDb(): Promise<void> {
-  try {
-    if (systemConnection) await systemConnection.close();
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (systemDb) await systemDb.terminate();
-  } catch {
-    /* ignore */
-  }
-  systemDb = null;
-  systemConnection = null;
 }

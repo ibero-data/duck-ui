@@ -154,7 +154,7 @@ export const loadEmbeddedDatabases = async (
     // Fetch the manifest file
     const manifestResponse = await fetch("/databases/manifest.json");
     if (!manifestResponse.ok) {
-      console.info("No embedded databases manifest found");
+      console.debug("No embedded databases manifest found");
       return;
     }
 
@@ -162,7 +162,7 @@ export const loadEmbeddedDatabases = async (
     const databases = manifest.databases || [];
 
     if (databases.length === 0) {
-      console.info("No embedded databases configured");
+      console.debug("No embedded databases configured");
       return;
     }
 

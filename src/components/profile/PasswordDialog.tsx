@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -58,6 +59,9 @@ export default function PasswordDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Unlock Profile</DialogTitle>
+          <DialogDescription className="sr-only">
+            Enter your password to unlock this profile
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex flex-col items-center gap-2">

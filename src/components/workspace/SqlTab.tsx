@@ -35,9 +35,11 @@ interface SqlTabProps {
 }
 
 const SqlTab: React.FC<SqlTabProps> = ({ tabId }) => {
-  const { tabs, isExecuting, updateTabChartConfig, duckBrain } = useDuckStore();
+  const tabs = useDuckStore((s) => s.tabs);
+  const isExecuting = useDuckStore((s) => !!s.executingTabs[tabId]);
+  const updateTabChartConfig = useDuckStore((s) => s.updateTabChartConfig);
+  const isPanelOpen = useDuckStore((s) => s.duckBrain.isPanelOpen);
   const currentTab = tabs.find((tab) => tab.id === tabId);
-  const isPanelOpen = duckBrain.isPanelOpen;
 
   const renderResults = () => {
     if (!currentTab || currentTab.type !== "sql") {

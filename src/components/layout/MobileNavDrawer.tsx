@@ -10,7 +10,9 @@ import ConnectionSwitcher from "./ConnectionSwitcher";
 export const MobileNavDrawer = () => {
   const [open, setOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const { tabs, setActiveTab, createTab } = useDuckStore();
+  const tabs = useDuckStore((s) => s.tabs);
+  const setActiveTab = useDuckStore((s) => s.setActiveTab);
+  const createTab = useDuckStore((s) => s.createTab);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");

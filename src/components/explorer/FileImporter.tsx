@@ -594,7 +594,8 @@ const FileDetails: React.FC<FileDetailsProps> = ({
 };
 
 const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen }) => {
-  const { importFile, executeQuery } = useDuckStore();
+  const importFile = useDuckStore((s) => s.importFile);
+  const executeQuery = useDuckStore((s) => s.executeQuery);
   const [activeTab, setActiveTab] = useState("upload");
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [tableNames, setTableNames] = useState<Record<string, string>>({});

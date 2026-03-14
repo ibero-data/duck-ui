@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Play, Loader2, Lightbulb, Command, Edit, Share2, Brain, Bookmark } from "lucide-react";
+import { Play, Loader2, Lightbulb, Command, Edit, Share2, Brain, Bookmark, ListTree } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDuckStore } from "@/store";
 import { useTheme } from "../theme/theme-provider";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import FloatingActionButton from "@/components/common/FloatingActionButton";
 import { copyQueryURL } from "@/hooks/useQueryFromURL";
 import SaveQueryDialog from "@/components/saved-queries/SaveQueryDialog";
+import { ExplainPlanViewer } from "@/components/workspace/ExplainPlanViewer";
 
 interface SqlEditorProps {
   tabId: string;
@@ -23,15 +24,13 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
   const { theme } = useTheme();
-  const {
-    tabs,
-    executeQuery,
-    isExecuting,
-    updateTabTitle,
-    toggleBrainPanel,
-    duckBrain,
-    currentProfileId,
-  } = useDuckStore();
+  const tabs = useDuckStore((s) => s.tabs);
+  const executeQuery = useDuckStore((s) => s.executeQuery);
+  const isExecuting = useDuckStore((s) => !!s.executingTabs[tabId]);
+  const updateTabTitle = useDuckStore((s) => s.updateTabTitle);
+  const toggleBrainPanel = useDuckStore((s) => s.toggleBrainPanel);
+  const duckBrain = useDuckStore((s) => s.duckBrain);
+  const currentProfileId = useDuckStore((s) => s.currentProfileId);
   const monacoConfig = useMonacoConfig(theme);
 
   const currentTab = tabs.find((tab) => tab.id === tabId);
@@ -41,6 +40,8 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(title);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [explainOpen, setExplainOpen] = useState(false);
+  const [explainText, setExplainText] = useState("");
 
   // Stable callback for query execution
   const stableExecuteCallback = useCallback(
@@ -119,6 +120,33 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     setIsEditingTitle(true);
   };
 
+  const handleExplainQuery = async () => {
+    const editor = editorInstanceRef.current?.editor;
+    if (!editor || isExecuting) return;
+
+    const query = editor.getValue().trim();
+    if (!query) return;
+
+    try {
+      // Run without tabId so the result is returned without overwriting the tab's data
+      const result = await executeQuery(`EXPLAIN ANALYZE ${query}`);
+      if (result && result.data?.length > 0) {
+        // DuckDB returns rows with explain_key / explain_value — the analyzed_plan row has the full plan
+        const planRow = result.data.find(
+          (row) => row["explain_key"] === "analyzed_plan"
+        );
+        const planText = planRow
+          ? String(planRow["explain_value"])
+          : result.data.map((row) => String(row["explain_value"] ?? "")).join("\n");
+        setExplainText(planText);
+        setExplainOpen(true);
+      }
+    } catch (error) {
+      console.error("Explain failed:", error);
+      toast.error("Explain query failed");
+    }
+  };
+
   const handleShareQuery = async () => {
     const editor = editorInstanceRef.current?.editor;
     if (!editor) return;
@@ -167,6 +195,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
                 size="icon"
                 onClick={handleTitleEdit}
                 className="group-hover:opacity-100 transition-opacity hidden md:flex"
+                aria-label="Edit tab title"
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -254,6 +283,24 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleExplainQuery}
+                  disabled={isExecuting}
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                >
+                  <ListTree className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Explain Plan</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             onClick={handleExecuteQuery}
             disabled={isExecuting}
@@ -289,6 +336,12 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
         onOpenChange={setSaveDialogOpen}
         defaultName={currentTitle}
         sqlText={currentContent}
+      />
+
+      <ExplainPlanViewer
+        open={explainOpen}
+        onOpenChange={setExplainOpen}
+        explainText={explainText}
       />
     </div>
   );

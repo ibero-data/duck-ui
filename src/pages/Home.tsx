@@ -6,6 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import WorkspaceTabs from "@/components/workspace/WorkspaceTabs";
+import CommandPalette from "@/components/command-palette/CommandPalette";
 
 export default function Home() {
   const [dataExplorerOpen, setDataExplorerOpen] = useState(false);
@@ -13,16 +14,17 @@ export default function Home() {
 
   return (
     <div className="h-screen w-full flex overflow-hidden">
+      <CommandPalette />
       {/* Sidebar - Desktop only */}
-      <div className="hidden md:flex">
+      <aside className="hidden md:flex">
         <Sidebar
           isExplorerOpen={isExplorerVisible}
           onToggleExplorer={() => setIsExplorerVisible(!isExplorerVisible)}
         />
-      </div>
+      </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden">
         {/* Desktop Layout - ResizablePanels */}
         <div className="hidden md:flex h-full">
           <ResizablePanelGroup direction="horizontal">
@@ -78,7 +80,7 @@ export default function Home() {
             <WorkspaceTabs />
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

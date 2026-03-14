@@ -80,7 +80,7 @@ const resourceCards = [
   },
 ];
 
-const iberoDataProducts = [
+const caioRicciutiProducts = [
   {
     title: "Ibero Data",
     description: "Data engineering & analytics solutions",
@@ -94,30 +94,28 @@ const iberoDataProducts = [
     Icon: Database,
   },
   {
-    title: "YAAT",
+    title: "Etiquetta",
     description: "Simple, privacy-friendly web analytics",
-    link: "https://github.com/ibero-data/yaat",
+    link: "https://github.com/caioricciuti/etiquetta",
     Icon: BarChart3,
   },
   {
-    title: "Glintlog",
-    description: "Self-hosted log aggregation. Single binary. Zero dependencies.",
-    link: "https://glintlog.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
+    title: "Dev Cockpit",
+    description: "Get Under the Hood of Your Apple Silicon.",
+    link: "https://devcockpit.app?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
     Icon: Logs,
   },
 ];
 
 const HomeTab = () => {
-  const {
-    createTab,
-    queryHistory,
-    error,
-    tabs,
-    setActiveTab,
-    currentProfile,
-    currentProfileId,
-    savedQueriesVersion,
-  } = useDuckStore();
+  const createTab = useDuckStore((s) => s.createTab);
+  const queryHistory = useDuckStore((s) => s.queryHistory);
+  const error = useDuckStore((s) => s.error);
+  const tabs = useDuckStore((s) => s.tabs);
+  const setActiveTab = useDuckStore((s) => s.setActiveTab);
+  const currentProfile = useDuckStore((s) => s.currentProfile);
+  const currentProfileId = useDuckStore((s) => s.currentProfileId);
+  const savedQueriesVersion = useDuckStore((s) => s.savedQueriesVersion);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [recentItems, setRecentItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -274,7 +272,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
               Resources
             </TabsTrigger>
             <TabsTrigger value="iberodata" className="data-[state=active]:text-primary px-6">
-              Ibero Data
+              Caio Ricciuti
             </TabsTrigger>
           </TabsList>
 
@@ -424,7 +422,7 @@ SELECT * FROM 'https://shell.duckdb.org/data/tpch/0_01/parquet/orders.parquet' L
 
           <TabsContent value="iberodata" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {iberoDataProducts.map((product, index) => (
+              {caioRicciutiProducts.map((product, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 20 }}

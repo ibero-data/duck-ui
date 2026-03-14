@@ -23,6 +23,18 @@ export default defineConfig(({ mode }) => {
   return {
     base: process.env.DUCK_UI_BASEPATH ?? '/',
     plugins: [react(), tailwindcss()],
+    server: {
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+      },
+    },
+    preview: {
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

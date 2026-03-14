@@ -27,8 +27,10 @@ interface SavedQueriesPanelProps {
 }
 
 export default function SavedQueriesPanel({ onClose }: SavedQueriesPanelProps) {
-  const { currentProfileId, createTab, savedQueriesVersion, bumpSavedQueriesVersion } =
-    useDuckStore();
+  const currentProfileId = useDuckStore((s) => s.currentProfileId);
+  const createTab = useDuckStore((s) => s.createTab);
+  const savedQueriesVersion = useDuckStore((s) => s.savedQueriesVersion);
+  const bumpSavedQueriesVersion = useDuckStore((s) => s.bumpSavedQueriesVersion);
   const [queries, setQueries] = useState<SavedQuery[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);

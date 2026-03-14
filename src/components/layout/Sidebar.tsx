@@ -3,7 +3,7 @@
  * Minimalist icon-only sidebar with tooltips
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Home,
   Database,
@@ -16,7 +16,6 @@ import {
   BookOpen,
   Search,
   History,
-  ExternalLink,
   Circle,
   Settings,
   Bookmark,
@@ -34,18 +33,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
 import { useTheme } from "@/components/theme/theme-provider";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
 import QueryHistory from "../workspace/QueryHistory";
 import SavedQueriesPanel from "@/components/saved-queries/SavedQueriesPanel";
 import PasswordDialog from "@/components/profile/PasswordDialog";
@@ -58,17 +47,14 @@ interface SidebarProps {
 
 export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarProps) {
   const { theme, setTheme } = useTheme();
-  const {
-    tabs,
-    activeTabId,
-    createTab,
-    setActiveTab,
-    currentConnection,
-    currentProfile,
-    profiles,
-    switchProfile,
-  } = useDuckStore();
-  const [searchOpen, setSearchOpen] = useState(false);
+  const tabs = useDuckStore((s) => s.tabs);
+  const activeTabId = useDuckStore((s) => s.activeTabId);
+  const createTab = useDuckStore((s) => s.createTab);
+  const setActiveTab = useDuckStore((s) => s.setActiveTab);
+  const currentConnection = useDuckStore((s) => s.currentConnection);
+  const currentProfile = useDuckStore((s) => s.currentProfile);
+  const profiles = useDuckStore((s) => s.profiles);
+  const switchProfile = useDuckStore((s) => s.switchProfile);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [savedQueriesOpen, setSavedQueriesOpen] = useState(false);
   const [switchTarget, setSwitchTarget] = useState<(typeof profiles)[0] | null>(null);
@@ -123,35 +109,12 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
     }
   };
 
-  // Keyboard shortcut for search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setSearchOpen((open) => !open);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  const navItems = [
-    { type: "home" as EditorTabType, label: "Home" },
-    { type: "connections" as EditorTabType, label: "Connections" },
-    { type: "brain" as EditorTabType, label: "Duck Brain" },
-    { type: "settings" as EditorTabType, label: "Settings" },
-  ];
-
-  const externalLinks = [
-    { to: "https://github.com/caioricciuti/duck-ui", label: "GitHub", icon: Github },
-    { to: "https://duckui.com", label: "Documentation", icon: BookOpen },
-  ];
 
   const otherProfiles = profiles.filter((p) => p.id !== currentProfile?.id);
 
   return (
     <>
-      <div className="flex flex-col h-full w-16 border-r bg-background shrink-0">
+      <nav aria-label="Main navigation" className="flex flex-col h-full w-16 border-r bg-background shrink-0">
         {/* Profile Avatar */}
         <div className="flex items-center justify-center w-16 h-10 border-b">
           <DropdownMenu>
@@ -213,6 +176,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   size="icon"
                   className="mx-auto h-9 w-9"
                   onClick={() => openOrFocusTab("home", "Home")}
+                  aria-label="Home"
                 >
                   <Home className="h-4 w-4" />
                 </Button>
@@ -230,6 +194,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   size="icon"
                   className="mx-auto h-9 w-9"
                   onClick={onToggleExplorer}
+                  aria-label={isExplorerOpen ? "Hide Explorer" : "Show Explorer"}
                 >
                   <Database className="h-4 w-4" />
                 </Button>
@@ -251,6 +216,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   size="icon"
                   className="mx-auto h-9 w-9"
                   onClick={() => openOrFocusTab("connections", "Connections")}
+                  aria-label="Connections"
                 >
                   <Cable className="h-4 w-4" />
                 </Button>
@@ -268,6 +234,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   size="icon"
                   className="mx-auto h-9 w-9"
                   onClick={() => openOrFocusTab("brain", "Duck Brain")}
+                  aria-label="Duck Brain"
                 >
                   <Brain className="h-4 w-4" />
                 </Button>
@@ -286,7 +253,12 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   variant="ghost"
                   size="icon"
                   className="mx-auto h-9 w-9"
-                  onClick={() => setSearchOpen(true)}
+                  onClick={() => {
+                    document.dispatchEvent(
+                      new KeyboardEvent("keydown", { key: "k", metaKey: true })
+                    );
+                  }}
+                  aria-label="Search"
                 >
                   <Search className="h-4 w-4" />
                 </Button>
@@ -306,6 +278,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   size="icon"
                   className="mx-auto h-9 w-9"
                   onClick={openSavedQueries}
+                  aria-label="Saved Queries"
                 >
                   <Bookmark className="h-4 w-4" />
                 </Button>
@@ -323,6 +296,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   size="icon"
                   className="mx-auto h-9 w-9"
                   onClick={openHistory}
+                  aria-label="Query History"
                 >
                   <History className="h-4 w-4" />
                 </Button>
@@ -343,6 +317,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   size="icon"
                   className="mx-auto h-9 w-9 relative"
                   onClick={() => openOrFocusTab("connections", "Connections")}
+                  aria-label="Connection status"
                 >
                   <Circle
                     className={`h-3 w-3 ${getConnectionColor(currentConnection?.scope)}`}
@@ -370,6 +345,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   size="icon"
                   className="mx-auto h-9 w-9"
                   onClick={() => openOrFocusTab("settings", "Settings")}
+                  aria-label="Settings"
                 >
                   <Settings className="h-4 w-4" />
                 </Button>
@@ -396,6 +372,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                       );
                     }
                   }}
+                  aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                 >
                   {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
@@ -412,7 +389,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="mx-auto h-9 w-9">
+                    <Button variant="ghost" size="icon" className="mx-auto h-9 w-9" aria-label="Help">
                       <HelpCircle className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -434,69 +411,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
-
-      {/* Command Dialog */}
-      <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
-        <CommandInput placeholder="Type a command or search..." />
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Navigation">
-            {navItems.map((item) => (
-              <CommandItem
-                key={item.type}
-                onSelect={() => {
-                  openOrFocusTab(item.type, item.label);
-                  setSearchOpen(false);
-                }}
-              >
-                {item.label}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          <CommandGroup heading="External Links">
-            {externalLinks.map((item) => (
-              <CommandItem
-                key={item.to}
-                onSelect={() => {
-                  window.open(item.to, "_blank");
-                  setSearchOpen(false);
-                }}
-              >
-                <item.icon className="mr-2 h-4 w-4" />
-                {item.label}
-                <ExternalLink className="ml-auto h-3 w-3" />
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          <CommandSeparator />
-          <CommandGroup heading="Actions">
-            <CommandItem
-              onSelect={() => {
-                setTheme(theme === "dark" ? "light" : "dark");
-                toast.info(`Theme changed to ${theme === "dark" ? "light" : "dark"}`);
-                setSearchOpen(false);
-              }}
-            >
-              {theme === "dark" ? (
-                <Sun className="mr-2 h-4 w-4" />
-              ) : (
-                <Moon className="mr-2 h-4 w-4" />
-              )}
-              {theme === "dark" ? "Light Theme" : "Dark Theme"}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => {
-                openOrFocusTab("connections", "Connections");
-                setSearchOpen(false);
-              }}
-            >
-              <Cable className="mr-2 h-4 w-4" />
-              Manage Connections
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
+      </nav>
 
       {/* Query History Panel */}
       {historyOpen && (

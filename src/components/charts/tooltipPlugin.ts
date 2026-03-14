@@ -1,5 +1,5 @@
 import uPlot from "uplot";
-import { formatNumber } from "@/lib/chartUtils";
+import { formatNumberWithSuffix } from "@/lib/chartUtils";
 
 function escapeHtml(str: string): string {
   return str
@@ -10,9 +10,14 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#039;");
 }
 
-export function tooltipPlugin(xLabels: string[]): uPlot.Plugin {
+export interface TooltipPluginOptions {
+  stacked?: boolean;
+}
+
+export function tooltipPlugin(xLabels: string[], opts?: TooltipPluginOptions): uPlot.Plugin {
   let tooltip: HTMLDivElement;
   let over: HTMLElement;
+  const isStacked = opts?.stacked ?? false;
 
   return {
     hooks: {
@@ -49,20 +54,42 @@ export function tooltipPlugin(xLabels: string[]): uPlot.Plugin {
         const xLabel = escapeHtml(xLabels[idx] ?? String(u.data[0][idx]));
         let html = `<div class="uplot-tooltip-title">${xLabel}</div>`;
 
+        let total = 0;
+        const rows: { label: string; color: string; val: number | null }[] = [];
+
         for (let i = 1; i < u.series.length; i++) {
           const s = u.series[i];
           if (!s.show) continue;
-          const val = u.data[i][idx];
+          const rawVal = u.data[i][idx];
+          const val = rawVal != null ? (rawVal as number) : null;
           const color =
             typeof s.stroke === "function"
               ? (s.stroke as (self: uPlot, seriesIdx: number) => string)(u, i)
               : s.stroke;
           const safeLabel = typeof s.label === "string" ? escapeHtml(s.label) : "";
           const safeColor = typeof color === "string" ? escapeHtml(color) : "";
+
+          if (val != null) total += val;
+          rows.push({ label: safeLabel, color: safeColor, val });
+        }
+
+        for (const row of rows) {
+          const formatted = row.val != null ? formatNumberWithSuffix(row.val) : "\u2014";
+          const pct =
+            isStacked && row.val != null && total > 0
+              ? ` <span class="uplot-tooltip-pct">(${((row.val / total) * 100).toFixed(1)}%)</span>`
+              : "";
           html += `<div class="uplot-tooltip-row">
-            <span class="uplot-tooltip-dot" style="background:${safeColor}"></span>
-            <span class="uplot-tooltip-label">${safeLabel}</span>
-            <span class="uplot-tooltip-value">${val != null ? formatNumber(val as number) : "\u2014"}</span>
+            <span class="uplot-tooltip-dot" style="background:${row.color}"></span>
+            <span class="uplot-tooltip-label">${row.label}</span>
+            <span class="uplot-tooltip-value">${formatted}${pct}</span>
+          </div>`;
+        }
+
+        if (isStacked && rows.length > 1) {
+          html += `<div class="uplot-tooltip-total">
+            <span class="uplot-tooltip-label">Total</span>
+            <span class="uplot-tooltip-value">${formatNumberWithSuffix(total)}</span>
           </div>`;
         }
 

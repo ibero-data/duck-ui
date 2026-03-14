@@ -27,8 +27,9 @@ WORKDIR /app
 # Copy the build directory from the first stage to the second stage
 COPY --from=build /app/dist /app
 
-# Copy the injection script
+# Copy the injection script and serve config (COOP/COEP headers for OPFS)
 COPY inject-env.js /app/
+COPY serve.json /app/
 
 # Install just serve for serving the built app
 RUN bun add serve
@@ -51,4 +52,4 @@ RUN chown -R duck-user:duck-group /app
 USER duck-user
 
 # Run the injection script then serve using bunx
-CMD bun inject-env.js && bunx serve -s -l 5522
+CMD bun inject-env.js && bunx serve -s -l 5522 -c serve.json

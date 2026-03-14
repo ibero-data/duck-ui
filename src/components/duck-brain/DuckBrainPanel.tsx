@@ -22,19 +22,17 @@ interface DuckBrainPanelProps {
   tabId: string;
 }
 
-const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
-  const {
-    duckBrain,
-    databases,
-    toggleBrainPanel,
-    initializeDuckBrain,
-    generateSQL,
-    abortGeneration,
-    clearBrainMessages,
-    executeQueryInChat,
-    updateTabQuery,
-    setAIProvider,
-  } = useDuckStore();
+const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => {
+  const duckBrain = useDuckStore((s) => s.duckBrain);
+  const databases = useDuckStore((s) => s.databases);
+  const toggleBrainPanel = useDuckStore((s) => s.toggleBrainPanel);
+  const initializeDuckBrain = useDuckStore((s) => s.initializeDuckBrain);
+  const generateSQL = useDuckStore((s) => s.generateSQL);
+  const abortGeneration = useDuckStore((s) => s.abortGeneration);
+  const clearBrainMessages = useDuckStore((s) => s.clearBrainMessages);
+  const executeQueryInChat = useDuckStore((s) => s.executeQueryInChat);
+  const updateTabQuery = useDuckStore((s) => s.updateTabQuery);
+  const setAIProvider = useDuckStore((s) => s.setAIProvider);
 
   const {
     modelStatus,
@@ -324,7 +322,7 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = ({ tabId }) => {
       </div>
     </div>
   );
-};
+});
 
 // Header component
 interface HeaderProps {

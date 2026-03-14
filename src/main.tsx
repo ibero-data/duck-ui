@@ -16,8 +16,10 @@ import { listProfiles } from "@/services/persistence/repositories/profileReposit
 import ProfilePicker from "@/components/profile/ProfilePicker";
 import type { Profile } from "@/store/types";
 
-// Import httpfs test utility for console access (window.testHttpfs)
-import "@/lib/cloudStorage/testHttpfs";
+// Import httpfs test utility for console access (window.testHttpfs) — dev only
+if (import.meta.env.DEV) {
+  import("@/lib/cloudStorage/testHttpfs");
+}
 
 interface LoadingScreenProps {
   message: string;
@@ -66,7 +68,8 @@ const ProfileBootstrap = ({ children }: { children: React.ReactNode }) => {
   const [ready, setReady] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [bootProfiles, setBootProfiles] = useState<Profile[]>([]);
-  const { createProfile, loadProfile } = useDuckStore();
+  const createProfile = useDuckStore((s) => s.createProfile);
+  const loadProfile = useDuckStore((s) => s.loadProfile);
   const bootedRef = useRef(false);
 
   useEffect(() => {
@@ -253,7 +256,9 @@ async function migrateFromLocalStorage(profileId: string): Promise<void> {
 }
 
 const AppInitializer = ({ children }: AppInitializerProps) => {
-  const { initialize, isInitialized, isLoading } = useDuckStore();
+  const initialize = useDuckStore((s) => s.initialize);
+  const isInitialized = useDuckStore((s) => s.isInitialized);
+  const isLoading = useDuckStore((s) => s.isLoading);
 
   useEffect(() => {
     initialize();

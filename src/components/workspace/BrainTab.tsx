@@ -35,7 +35,10 @@ import { AVAILABLE_MODELS, type ModelConfig } from "@/lib/duckBrain";
 import { OPENAI_MODELS, ANTHROPIC_MODELS } from "@/lib/duckBrain/providers/types";
 
 const BrainTab = () => {
-  const { duckBrain, initializeDuckBrain, setAIProvider, updateProviderConfig } = useDuckStore();
+  const duckBrain = useDuckStore((s) => s.duckBrain);
+  const initializeDuckBrain = useDuckStore((s) => s.initializeDuckBrain);
+  const setAIProvider = useDuckStore((s) => s.setAIProvider);
+  const updateProviderConfig = useDuckStore((s) => s.updateProviderConfig);
   const [isClearing, setIsClearing] = useState(false);
   const [cacheSize, setCacheSize] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});

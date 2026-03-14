@@ -152,23 +152,16 @@ class CloudStorageService {
       }
     }
 
-    // Test 3: Check if HTTPS URLs work (may work even without httpfs)
+    // Test 3: Check if read_parquet function is available
     try {
-      // Just check if the function exists, don't actually fetch
-      await connection.query(`SELECT typeof(read_parquet) AS t`);
-      status.httpsSupported = true;
+      const result = await connection.query(`
+        SELECT function_name FROM duckdb_functions()
+        WHERE function_name = 'read_parquet'
+        LIMIT 1
+      `);
+      status.httpsSupported = result.toArray().length > 0;
     } catch {
-      // Try alternate check
-      try {
-        const result = await connection.query(`
-          SELECT function_name FROM duckdb_functions()
-          WHERE function_name = 'read_parquet'
-          LIMIT 1
-        `);
-        status.httpsSupported = result.toArray().length > 0;
-      } catch {
-        status.httpsSupported = false;
-      }
+      status.httpsSupported = false;
     }
 
     // Test 4: S3 is supported if httpfs + secrets work

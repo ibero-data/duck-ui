@@ -301,6 +301,7 @@ export interface ConnectionSlice {
 export interface QuerySlice {
   queryHistory: QueryHistoryItem[];
   isExecuting: boolean;
+  executingTabs: Record<string, boolean>;
 
   executeQuery: (query: string, tabId?: string) => Promise<QueryResult | void>;
   clearHistory: () => void;

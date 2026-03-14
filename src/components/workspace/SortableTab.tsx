@@ -1,3 +1,4 @@
+import React from "react";
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { TabsTrigger } from "@/components/ui/tabs";
@@ -17,13 +18,14 @@ interface SortableTabProps {
   isActive: boolean;
 }
 
-function SortableTab({ tab, isActive }: SortableTabProps) {
+const SortableTab = React.memo(function SortableTab({ tab, isActive }: SortableTabProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.id,
     disabled: tab.id === "home",
   });
 
-  const { isExecuting, closeTab } = useDuckStore();
+  const isExecuting = useDuckStore((s) => !!s.executingTabs[tab.id]);
+  const closeTab = useDuckStore((s) => s.closeTab);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -113,6 +115,6 @@ function SortableTab({ tab, isActive }: SortableTabProps) {
       </TabsTrigger>
     </div>
   );
-}
+});
 
 export default SortableTab;

@@ -6,6 +6,15 @@ import type { ConnectionProvider } from "@/store/types";
 // OPFS connection tracking to prevent concurrent access
 export const opfsActivePaths = new Set<string>();
 
+/** Normalize an OPFS path: strip leading slash, ensure .db extension. */
+function normalizeOpfsPath(path: string): string {
+  let normalized = path.startsWith("/") ? path.slice(1) : path;
+  if (!normalized.endsWith(".db")) {
+    normalized = `${normalized}.db`;
+  }
+  return normalized;
+}
+
 /**
  * Centralized OPFS connection cleanup with proper handle release.
  */
@@ -23,14 +32,14 @@ export const cleanupOPFSConnection = async (
       // Critical: Wait for file handles to be fully released by browser
       await new Promise((resolve) => setTimeout(resolve, 2000));
       if (path) {
-        opfsActivePaths.delete(path);
+        opfsActivePaths.delete(normalizeOpfsPath(path));
       }
     } catch (error) {
       console.error("OPFS cleanup error:", error);
       // Still wait even if cleanup failed - handles may still release
       await new Promise((resolve) => setTimeout(resolve, 2000));
       if (path) {
-        opfsActivePaths.delete(path);
+        opfsActivePaths.delete(normalizeOpfsPath(path));
       }
     }
   }
@@ -45,16 +54,23 @@ export const testOPFSConnection = async (
   db: duckdb.AsyncDuckDB;
   connection: duckdb.AsyncDuckDBConnection;
 }> => {
+  // Fail fast if cross-origin isolation is not active (SharedArrayBuffer unavailable)
+  if (!self.crossOriginIsolated) {
+    throw new Error(
+      "OPFS requires cross-origin isolation (SharedArrayBuffer). " +
+        "The server must send headers: " +
+        "Cross-Origin-Opener-Policy: same-origin and " +
+        "Cross-Origin-Embedder-Policy: credentialless (or require-corp). " +
+        "Safari does not support credentialless — use require-corp instead."
+    );
+  }
+
   const { path } = conn;
   if (!path) {
     throw new Error("Path must be defined for OPFS connections.");
   }
 
-  // Normalize path: remove leading slash and ensure .db extension
-  let opfsPath = path.startsWith("/") ? path.slice(1) : path;
-  if (!opfsPath.endsWith(".db")) {
-    opfsPath = `${opfsPath}.db`;
-  }
+  const opfsPath = normalizeOpfsPath(path);
 
   // Check if path is already in use
   if (opfsActivePaths.has(opfsPath)) {
@@ -66,55 +82,85 @@ export const testOPFSConnection = async (
   // Reserve the path immediately to prevent concurrent access (TOCTOU)
   opfsActivePaths.add(opfsPath);
 
-  const bundles = await resolveDuckdbBundles();
-  const bundle = await duckdb.selectBundle(bundles);
-  if (!bundle.mainWorker) {
-    opfsActivePaths.delete(opfsPath);
-    throw new Error("DuckDB WASM bundle is missing the main worker URL");
-  }
-  const { worker, revoke } = createDuckdbWorker(bundle.mainWorker);
-  const logger = new duckdb.VoidLogger();
-  const db = new duckdb.AsyncDuckDB(logger, worker);
+  // Timeout to prevent indefinite hangs when SharedArrayBuffer is unavailable
+  // (missing Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy headers)
+  const TIMEOUT_MS = 30_000;
 
-  try {
-    await db.instantiate(bundle.mainModule);
-  } finally {
-    revoke();
-  }
+  const connectionLogic = async (): Promise<{
+    db: duckdb.AsyncDuckDB;
+    connection: duckdb.AsyncDuckDBConnection;
+  }> => {
+    const bundles = await resolveDuckdbBundles();
+    const bundle = await duckdb.selectBundle(bundles);
+    if (!bundle.mainWorker) {
+      opfsActivePaths.delete(opfsPath);
+      throw new Error("DuckDB WASM bundle is missing the main worker URL");
+    }
+    const { worker, revoke } = createDuckdbWorker(bundle.mainWorker);
+    const logger = new duckdb.VoidLogger();
+    const db = new duckdb.AsyncDuckDB(logger, worker);
 
-  try {
-    // Use retry with exponential backoff for OPFS access handle conflicts
-    await retryWithBackoff(
-      async () => {
-        try {
-          await db.open({
-            path: `opfs://${opfsPath}`,
-            accessMode: duckdb.DuckDBAccessMode.AUTOMATIC,
-          });
-        } catch (error) {
-          const err = error as Error;
-          if (err.message.includes("createSyncAccessHandle")) {
-            throw new Error(
-              `OPFS access handle conflict for "${opfsPath}". The file may still be in use. Retrying...`
-            );
+    try {
+      await db.instantiate(bundle.mainModule);
+    } finally {
+      revoke();
+    }
+
+    try {
+      // Use retry with exponential backoff for OPFS access handle conflicts
+      await retryWithBackoff(
+        async () => {
+          try {
+            await db.open({
+              path: `opfs://${opfsPath}`,
+              accessMode: duckdb.DuckDBAccessMode.AUTOMATIC,
+            });
+          } catch (error) {
+            const err = error as Error;
+            if (err.message.includes("createSyncAccessHandle")) {
+              throw new Error(
+                `OPFS access handle conflict for "${opfsPath}". The file may still be in use. Retrying...`
+              );
+            }
+            throw error;
           }
-          throw error;
-        }
-      },
-      4,
-      1500
-    ); // 4 retries with 1.5s base delay (1.5s, 3s, 6s, 12s)
+        },
+        4,
+        1500
+      ); // 4 retries with 1.5s base delay (1.5s, 3s, 6s, 12s)
 
-    const connection = await db.connect();
-    validateConnection(connection);
+      const connection = await db.connect();
+      validateConnection(connection);
 
-    // Verify connection with a basic query
-    await connection.query(`SHOW TABLES`);
+      // Verify connection with a basic query
+      await connection.query(`SHOW TABLES`);
 
-    return { db, connection };
+      return { db, connection };
+    } catch (error) {
+      opfsActivePaths.delete(opfsPath);
+      await db.terminate().catch(() => {});
+      throw error;
+    }
+  };
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            `OPFS connection timed out after ${TIMEOUT_MS / 1000}s. ` +
+              `This usually means the server is missing Cross-Origin-Opener-Policy ` +
+              `and Cross-Origin-Embedder-Policy headers required for SharedArrayBuffer.`
+          )
+        ),
+      TIMEOUT_MS
+    );
+  });
+
+  try {
+    return await Promise.race([connectionLogic(), timeoutPromise]);
   } catch (error) {
     opfsActivePaths.delete(opfsPath);
-    await db.terminate().catch(() => {});
     throw error;
   }
 };

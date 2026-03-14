@@ -16,7 +16,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Settings, Trash2, UserPlus } from "lucide-react";
 import { useTheme } from "@/components/theme/theme-provider";
 import { useDuckStore } from "@/store";
@@ -29,15 +35,13 @@ import type { Profile } from "@/store/types";
 
 export default function SettingsTab() {
   const { theme, setTheme } = useTheme();
-  const {
-    currentProfile,
-    currentProfileId,
-    profiles,
-    createProfile,
-    updateProfile,
-    deleteProfile,
-    switchProfile,
-  } = useDuckStore();
+  const currentProfile = useDuckStore((s) => s.currentProfile);
+  const currentProfileId = useDuckStore((s) => s.currentProfileId);
+  const profiles = useDuckStore((s) => s.profiles);
+  const createProfile = useDuckStore((s) => s.createProfile);
+  const updateProfile = useDuckStore((s) => s.updateProfile);
+  const deleteProfile = useDuckStore((s) => s.deleteProfile);
+  const switchProfile = useDuckStore((s) => s.switchProfile);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [switchTarget, setSwitchTarget] = useState<Profile | null>(null);
@@ -259,6 +263,7 @@ export default function SettingsTab() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create Profile</DialogTitle>
+            <DialogDescription className="sr-only">Create a new user profile</DialogDescription>
           </DialogHeader>
           <ProfileEditor
             mode="create"

@@ -38,7 +38,22 @@ export const createConnectionSlice: StateCreator<
         if (opfsDb && opfsConnection) {
           await cleanupOPFSConnection(opfsDb, opfsConnection, currentConnection?.path);
         }
-        await testOPFSConnection(connection);
+        const opfsInstance = await testOPFSConnection(connection);
+        // Store the connection to avoid leaking handles and path locks
+        set({
+          db: opfsInstance.db,
+          connection: opfsInstance.connection,
+          opfsDb: opfsInstance.db,
+          opfsConnection: opfsInstance.connection,
+          currentConnection: {
+            environment: connection.environment,
+            id: connection.id,
+            name: connection.name,
+            scope: connection.scope,
+            path: connection.path,
+          },
+          currentDatabase: connection.path?.replace(/\.db$/, "") || "opfs",
+        });
       }
 
       set((state) => ({
@@ -195,8 +210,11 @@ export const createConnectionSlice: StateCreator<
         });
       }
 
-      set({ isLoading: false });
-      await get().fetchDatabasesAndTablesInfo();
+      try {
+        await get().fetchDatabasesAndTablesInfo();
+      } catch {
+        // Schema fetch failure shouldn't prevent connection from completing
+      }
       toast.success(`Connected to ${connectionProvider.name}`);
     } catch (error) {
       set({

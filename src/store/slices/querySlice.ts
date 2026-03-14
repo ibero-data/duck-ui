@@ -19,11 +19,16 @@ export const createQuerySlice: StateCreator<
 > = (set, get) => ({
   queryHistory: [],
   isExecuting: false,
+  executingTabs: {},
 
   executeQuery: async (query, tabId?) => {
     const { currentConnection, connection } = get();
     try {
-      set({ isExecuting: true, error: null });
+      set((state) => ({
+        isExecuting: true,
+        executingTabs: tabId ? { ...state.executingTabs, [tabId]: true } : state.executingTabs,
+        error: null,
+      }));
       let queryResult: QueryResult;
       if (currentConnection?.scope === "External") {
         queryResult = await executeExternalQuery(query, currentConnection);
@@ -34,11 +39,16 @@ export const createQuerySlice: StateCreator<
         queryResult = resultToJSON(result);
       }
       // Update query history and update tab result if applicable.
-      set((state) => ({
-        queryHistory: updateHistory(state.queryHistory, query),
-        tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, result: queryResult } : tab)),
-        isExecuting: false,
-      }));
+      set((state) => {
+        const newExecutingTabs = { ...state.executingTabs };
+        if (tabId) delete newExecutingTabs[tabId];
+        return {
+          queryHistory: updateHistory(state.queryHistory, query),
+          tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, result: queryResult } : tab)),
+          isExecuting: false,
+          executingTabs: newExecutingTabs,
+        };
+      });
       // Persist to DB (fire-and-forget)
       const { currentProfileId } = get();
       if (currentProfileId) {
@@ -58,12 +68,17 @@ export const createQuerySlice: StateCreator<
         rowCount: 0,
         error: errorMessage,
       };
-      set((state) => ({
-        queryHistory: updateHistory(state.queryHistory, query, errorMessage),
-        tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, result: errorResult } : tab)),
-        isExecuting: false,
-        error: errorMessage,
-      }));
+      set((state) => {
+        const newExecutingTabs = { ...state.executingTabs };
+        if (tabId) delete newExecutingTabs[tabId];
+        return {
+          queryHistory: updateHistory(state.queryHistory, query, errorMessage),
+          tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, result: errorResult } : tab)),
+          isExecuting: false,
+          executingTabs: newExecutingTabs,
+          error: errorMessage,
+        };
+      });
       // Persist to DB (fire-and-forget)
       const { currentProfileId } = get();
       if (currentProfileId) {

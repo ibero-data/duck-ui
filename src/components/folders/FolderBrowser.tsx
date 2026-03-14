@@ -378,14 +378,12 @@ const MountedFolderNode: React.FC<MountedFolderNodeProps> = ({
 };
 
 const FolderBrowser: React.FC<FolderBrowserProps> = ({ onFileSelect, onFileImport, className }) => {
-  const {
-    mountedFolders,
-    isFileSystemSupported,
-    initFileSystem,
-    mountFolder,
-    unmountFolder,
-    refreshFolderPermissions,
-  } = useDuckStore();
+  const mountedFolders = useDuckStore((s) => s.mountedFolders);
+  const isFileSystemSupported = useDuckStore((s) => s.isFileSystemSupported);
+  const initFileSystem = useDuckStore((s) => s.initFileSystem);
+  const mountFolder = useDuckStore((s) => s.mountFolder);
+  const unmountFolder = useDuckStore((s) => s.unmountFolder);
+  const refreshFolderPermissions = useDuckStore((s) => s.refreshFolderPermissions);
 
   const [isInitialized, setIsInitialized] = useState(false);
 

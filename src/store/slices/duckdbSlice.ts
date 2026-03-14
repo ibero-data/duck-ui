@@ -21,6 +21,7 @@ export const createDuckdbSlice: StateCreator<
   currentDatabase: "memory",
 
   initialize: async () => {
+    console.info(`[DuckDB] crossOriginIsolated: ${self.crossOriginIsolated}`);
     const initialConnections: ConnectionProvider[] = [];
 
     const {

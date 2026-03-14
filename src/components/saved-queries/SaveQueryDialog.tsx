@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -31,7 +32,8 @@ export default function SaveQueryDialog({
   const [name, setName] = useState(defaultName);
   const [description, setDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const { currentProfileId, bumpSavedQueriesVersion } = useDuckStore();
+  const currentProfileId = useDuckStore((s) => s.currentProfileId);
+  const bumpSavedQueriesVersion = useDuckStore((s) => s.bumpSavedQueriesVersion);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -65,6 +67,9 @@ export default function SaveQueryDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Save Query</DialogTitle>
+          <DialogDescription className="sr-only">
+            Save the current query for later use
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">

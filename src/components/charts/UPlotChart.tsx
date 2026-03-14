@@ -6,9 +6,10 @@ interface UPlotChartProps {
   options: Omit<uPlot.Options, "width" | "height">;
   data: uPlot.AlignedData;
   className?: string;
+  onInit?: (chart: uPlot) => void;
 }
 
-export default function UPlotChart({ options, data, className }: UPlotChartProps) {
+export default function UPlotChart({ options, data, className, onInit }: UPlotChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<uPlot | null>(null);
 
@@ -19,8 +20,10 @@ export default function UPlotChart({ options, data, className }: UPlotChartProps
     if (width === 0 || height === 0) return;
 
     chartRef.current?.destroy();
-    chartRef.current = new uPlot({ ...options, width, height }, data, el);
-  }, [options, data]);
+    const chart = new uPlot({ ...options, width, height }, data, el);
+    chartRef.current = chart;
+    onInit?.(chart);
+  }, [options, data, onInit]);
 
   useEffect(() => {
     create();

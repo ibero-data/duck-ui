@@ -137,15 +137,13 @@ function CloudConnectionItem({
 export default function CloudBrowser() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const {
-    cloudConnections,
-    cloudSupportStatus,
-    isCloudStorageInitialized,
-    initCloudStorage,
-    connectCloudStorage,
-    disconnectCloudStorage,
-    removeCloudConnection,
-  } = useDuckStore();
+  const cloudConnections = useDuckStore((s) => s.cloudConnections);
+  const cloudSupportStatus = useDuckStore((s) => s.cloudSupportStatus);
+  const isCloudStorageInitialized = useDuckStore((s) => s.isCloudStorageInitialized);
+  const initCloudStorage = useDuckStore((s) => s.initCloudStorage);
+  const connectCloudStorage = useDuckStore((s) => s.connectCloudStorage);
+  const disconnectCloudStorage = useDuckStore((s) => s.disconnectCloudStorage);
+  const removeCloudConnection = useDuckStore((s) => s.removeCloudConnection);
 
   // Initialize cloud storage on mount
   useEffect(() => {

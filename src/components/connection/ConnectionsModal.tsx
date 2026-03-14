@@ -106,7 +106,7 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({
   });
 
   const currentScope = form.watch("scope");
-  const { isLoadingExternalConnection } = useDuckStore();
+  const isLoadingExternalConnection = useDuckStore((s) => s.isLoadingExternalConnection);
 
   const handleSubmit = async (values: ConnectionFormValues) => {
     await onSubmit(values);
@@ -187,7 +187,11 @@ SELECT httpserve_start('0.0.0.0', 9999, '');`}
                       <FormItem>
                         <FormLabel>Host URL</FormLabel>
                         <FormControl>
-                          <Input placeholder="http://localhost:9999" {...field} />
+                          <Input
+                            placeholder="http://localhost:9999"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
                         </FormControl>
                         <FormDescription>Full URL including protocol (http/https)</FormDescription>
                         <FormMessage />
@@ -202,7 +206,7 @@ SELECT httpserve_start('0.0.0.0', 9999, '');`}
                       <FormItem>
                         <FormLabel>Database (optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="my_database" {...field} />
+                          <Input placeholder="my_database" {...field} value={field.value ?? ""} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -241,7 +245,7 @@ SELECT httpserve_start('0.0.0.0', 9999, '');`}
                           <FormItem>
                             <FormLabel>Username</FormLabel>
                             <FormControl>
-                              <Input placeholder="user" {...field} />
+                              <Input placeholder="user" {...field} value={field.value ?? ""} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -254,7 +258,12 @@ SELECT httpserve_start('0.0.0.0', 9999, '');`}
                           <FormItem>
                             <FormLabel>Password</FormLabel>
                             <FormControl>
-                              <Input type="password" placeholder="********" {...field} />
+                              <Input
+                                type="password"
+                                placeholder="********"
+                                {...field}
+                                value={field.value ?? ""}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -271,7 +280,12 @@ SELECT httpserve_start('0.0.0.0', 9999, '');`}
                         <FormItem>
                           <FormLabel>API Key</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Enter API key" {...field} />
+                            <Input
+                              type="password"
+                              placeholder="Enter API key"
+                              {...field}
+                              value={field.value ?? ""}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -298,7 +312,7 @@ SELECT httpserve_start('0.0.0.0', 9999, '');`}
                       <FormItem>
                         <FormLabel>Database File</FormLabel>
                         <FormControl>
-                          <Input placeholder="my_data.db" {...field} />
+                          <Input placeholder="my_data.db" {...field} value={field.value ?? ""} />
                         </FormControl>
                         <FormDescription>
                           Filename for your database (e.g., data.db)

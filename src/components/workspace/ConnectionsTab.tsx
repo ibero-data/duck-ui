@@ -63,17 +63,15 @@ const connectionSchema = z.discriminatedUnion("scope", [opfsSchema, externalSche
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
 const ConnectionsTab = () => {
-  const {
-    connectionList,
-    addConnection,
-    updateConnection,
-    deleteConnection,
-    getConnection,
-    setCurrentConnection,
-    currentConnection,
-    isLoadingExternalConnection,
-    isLoading,
-  } = useDuckStore();
+  const connectionList = useDuckStore((s) => s.connectionList);
+  const addConnection = useDuckStore((s) => s.addConnection);
+  const updateConnection = useDuckStore((s) => s.updateConnection);
+  const deleteConnection = useDuckStore((s) => s.deleteConnection);
+  const getConnection = useDuckStore((s) => s.getConnection);
+  const setCurrentConnection = useDuckStore((s) => s.setCurrentConnection);
+  const currentConnection = useDuckStore((s) => s.currentConnection);
+  const isLoadingExternalConnection = useDuckStore((s) => s.isLoadingExternalConnection);
+  const isLoading = useDuckStore((s) => s.isLoading);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(null);

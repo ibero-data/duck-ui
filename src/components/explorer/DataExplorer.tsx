@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, lazy, Suspense } from "react";
 import { useDuckStore } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Database, EllipsisVertical, FileUp, Plus, RefreshCw, Server } from "lucide-react";
-import FileImporter from "./FileImporter";
+
+const FileImporter = lazy(() => import("./FileImporter"));
 import TreeNode, { TreeNodeData } from "./TreeNode";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,15 +23,14 @@ import { toast } from "sonner";
 
 export default function DataExplorer() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const {
-    databases,
-    isLoading,
-    currentConnection,
-    importFile,
-    fetchDatabasesAndTablesInfo,
-    isFileSystemSupported,
-    schemaFetchError,
-  } = useDuckStore();
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const databases = useDuckStore((s) => s.databases);
+  const isLoading = useDuckStore((s) => s.isLoading);
+  const currentConnection = useDuckStore((s) => s.currentConnection);
+  const importFile = useDuckStore((s) => s.importFile);
+  const fetchDatabasesAndTablesInfo = useDuckStore((s) => s.fetchDatabasesAndTablesInfo);
+  const isFileSystemSupported = useDuckStore((s) => s.isFileSystemSupported);
+  const schemaFetchError = useDuckStore((s) => s.schemaFetchError);
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,8 +86,46 @@ export default function DataExplorer() {
   const treeData = buildTreeData();
   const isExternal = currentConnection?.scope === "External";
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("Files") && !isExternal) {
+      setIsDraggingOver(true);
+    }
+  }, [isExternal]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set false if we're leaving the container (not entering a child)
+    if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDraggingOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    if (isExternal || !e.dataTransfer.files.length) return;
+    setIsSheetOpen(true);
+  }, [isExternal]);
+
   return (
-    <Card className="h-full overflow-hidden border-none">
+    <Card
+      className="h-full overflow-hidden border-none relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none">
+          <div className="text-center">
+            <FileUp className="h-10 w-10 text-primary mx-auto mb-2" />
+            <p className="text-sm font-medium text-primary">Drop files to import</p>
+          </div>
+        </div>
+      )}
       {isLoading && (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">Loading databases...</p>
@@ -139,11 +177,13 @@ export default function DataExplorer() {
             )}
           </div>
 
-          <FileImporter
-            isSheetOpen={isSheetOpen}
-            setIsSheetOpen={setIsSheetOpen}
-            context={"notEmpty"}
-          />
+          <Suspense fallback={null}>
+            <FileImporter
+              isSheetOpen={isSheetOpen}
+              setIsSheetOpen={setIsSheetOpen}
+              context={"notEmpty"}
+            />
+          </Suspense>
         </div>
       </CardHeader>
 
@@ -164,7 +204,7 @@ export default function DataExplorer() {
                   Databases
                 </span>
               </div>
-              <ul className="ml-2">
+              <ul className="ml-2" role="tree" aria-label="Database schema">
                 {treeData.map((node, index) => (
                   <TreeNode
                     key={index}

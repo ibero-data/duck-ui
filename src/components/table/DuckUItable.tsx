@@ -1699,4 +1699,4 @@ const DuckUITable: React.FC<DuckTableProps> = ({
   );
 };
 
-export default DuckUITable;
+export default React.memo(DuckUITable);

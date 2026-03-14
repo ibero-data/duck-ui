@@ -225,3 +225,19 @@ body {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.uplot-tooltip-pct {
+  opacity: 0.6;
+  font-weight: 400;
+}
+.uplot-tooltip-total {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #e2e8f0;
+  font-weight: 600;
+}
+.dark .uplot-tooltip-total {
+  border-top-color: #334155;
+}

@@ -5,7 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { Profile } from "@/store/types";
 import PasswordDialog from "./PasswordDialog";
 import ProfileEditor from "./ProfileEditor";
@@ -128,6 +134,7 @@ export default function ProfilePicker({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create Profile</DialogTitle>
+            <DialogDescription className="sr-only">Create a new user profile</DialogDescription>
           </DialogHeader>
           <ProfileEditor
             mode="create"
