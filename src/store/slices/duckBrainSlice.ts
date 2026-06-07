@@ -77,7 +77,10 @@ export const createDuckBrainSlice: StateCreator<
       return null;
     }
 
-    if (isExternalProvider) {
+    // Chrome Built-in AI runs on-device and needs no configuration.
+    const needsConfig = isExternalProvider && aiProvider !== "chrome-ai";
+
+    if (needsConfig) {
       if (aiProvider === "openai-compatible") {
         const config = providerConfigs["openai-compatible"];
         if (!config?.baseUrl || !config?.modelId) {
@@ -122,14 +125,20 @@ export const createDuckBrainSlice: StateCreator<
 
       if (isExternalProvider) {
         const { createProvider } = await import("@/lib/duckBrain/providers");
-        const config = providerConfigs[aiProvider as "openai" | "anthropic" | "openai-compatible"]!;
-        const provider = createProvider(aiProvider as "openai" | "anthropic" | "openai-compatible");
+        const provider = createProvider(aiProvider);
 
-        await provider.initialize({
-          apiKey: "apiKey" in config ? config.apiKey : undefined,
-          modelId: config.modelId,
-          baseUrl: "baseUrl" in config ? config.baseUrl : undefined,
-        });
+        if (aiProvider === "chrome-ai") {
+          // On-device, no credentials.
+          await provider.initialize({});
+        } else {
+          const config =
+            providerConfigs[aiProvider as "openai" | "anthropic" | "openai-compatible"]!;
+          await provider.initialize({
+            apiKey: "apiKey" in config ? config.apiKey : undefined,
+            modelId: config.modelId,
+            baseUrl: "baseUrl" in config ? config.baseUrl : undefined,
+          });
+        }
 
         await provider.generateStreaming(
           messages,
@@ -388,7 +397,9 @@ export const createDuckBrainSlice: StateCreator<
       duckBrain: {
         ...state.duckBrain,
         aiProvider: provider,
-        modelStatus: provider === "webllm" ? "idle" : "ready",
+        // webllm and chrome-ai must be initialized before use; cloud providers are
+        // ready once their API key is set.
+        modelStatus: provider === "webllm" || provider === "chrome-ai" ? "idle" : "ready",
         error: null,
       },
     }));
@@ -416,6 +427,34 @@ export const createDuckBrainSlice: StateCreator<
     const { aiProvider, providerConfigs } = duckBrain;
 
     if (aiProvider === "webllm") {
+      return;
+    }
+
+    // Chrome Built-in AI: on-device, no config — just verify availability.
+    if (aiProvider === "chrome-ai") {
+      set((state) => ({
+        duckBrain: { ...state.duckBrain, modelStatus: "loading", error: null },
+      }));
+      try {
+        const { createProvider } = await import("@/lib/duckBrain/providers");
+        const provider = createProvider("chrome-ai");
+        await provider.initialize({});
+        await provider.cleanup();
+        set((state) => ({
+          duckBrain: {
+            ...state.duckBrain,
+            modelStatus: "ready",
+            currentModel: "Gemini Nano (on-device)",
+          },
+        }));
+        toast.success("Chrome Built-in AI is ready");
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Chrome AI unavailable";
+        set((state) => ({
+          duckBrain: { ...state.duckBrain, modelStatus: "error", error: errorMessage },
+        }));
+        toast.error(errorMessage);
+      }
       return;
     }
 

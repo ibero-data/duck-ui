@@ -52,7 +52,11 @@ export const createTabSlice: StateCreator<
 
   createTab: (type = "sql", content = "", title) => {
     const isNotebook = type === "notebook";
-    const defaultContent = isNotebook ? serializeCells([createDefaultCell("sql")]) : content;
+    const defaultContent = isNotebook
+      ? typeof content === "string" && content.trim().length > 0
+        ? content
+        : serializeCells([createDefaultCell("sql")])
+      : content;
     const defaultTitle = isNotebook ? "Untitled Notebook" : "Untitled Query";
 
     const newTab: EditorTab = {
@@ -65,6 +69,7 @@ export const createTabSlice: StateCreator<
       tabs: [...state.tabs, newTab],
       activeTabId: newTab.id,
     }));
+    return newTab.id;
   },
 
   closeTab: (tabId) => {

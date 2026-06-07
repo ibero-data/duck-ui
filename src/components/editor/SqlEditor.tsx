@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import FloatingActionButton from "@/components/common/FloatingActionButton";
-import { copyQueryURL } from "@/hooks/useQueryFromURL";
+import { ShareDialog } from "@/components/share/ShareDialog";
+import type { EditorTab } from "@/store/types";
 import SaveQueryDialog from "@/components/saved-queries/SaveQueryDialog";
 import { ExplainPlanViewer } from "@/components/workspace/ExplainPlanViewer";
 
@@ -52,6 +53,8 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [explainOpen, setExplainOpen] = useState(false);
   const [explainText, setExplainText] = useState("");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareTab, setShareTab] = useState<EditorTab | null>(null);
 
   // Stable callback for query execution
   const stableExecuteCallback = useCallback(
@@ -155,7 +158,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     }
   };
 
-  const handleShareQuery = async () => {
+  const handleShareQuery = () => {
     const editor = editorInstanceRef.current?.editor;
     if (!editor) return;
 
@@ -165,12 +168,17 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
       return;
     }
 
-    const success = await copyQueryURL(query, false);
-    if (success) {
-      toast.success("Query URL copied to clipboard");
-    } else {
-      toast.error("Failed to copy URL");
-    }
+    // Capture the live editor content plus the tab's current chart config.
+    setShareTab({
+      id: tabId,
+      title: currentTitle || currentTab?.title || "Shared Query",
+      type: "sql",
+      content: query,
+      chartConfig: currentTab?.chartConfig,
+      // Carry the result so the share dialog can offer its columns as embed filters.
+      result: currentTab?.result ?? null,
+    });
+    setShareDialogOpen(true);
   };
 
   return (
@@ -252,7 +260,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>Copy shareable URL</p>
+                <p>Share query &amp; chart</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -351,6 +359,8 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
         onOpenChange={setExplainOpen}
         explainText={explainText}
       />
+
+      <ShareDialog open={shareDialogOpen} onOpenChange={setShareDialogOpen} tab={shareTab} />
     </div>
   );
 };

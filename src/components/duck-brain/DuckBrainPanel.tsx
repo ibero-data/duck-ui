@@ -66,6 +66,8 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
       if (config?.baseUrl && config?.modelId) {
         return { name: config.modelId, isCloud: true };
       }
+    } else if (aiProvider === "chrome-ai") {
+      return { name: "Gemini Nano", isCloud: false };
     }
     // Default to local model
     const localModel = AVAILABLE_MODELS.find((m) => m.id === duckBrain.currentModel);
@@ -83,6 +85,11 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
         value: "webllm",
         label: localModel?.displayName || "Local Model",
       });
+    }
+
+    // Add Chrome Built-in AI when it's the active, ready provider
+    if (aiProvider === "chrome-ai" && modelStatus === "ready") {
+      providers.push({ value: "chrome-ai", label: "Gemini Nano (Chrome)" });
     }
 
     // Add OpenAI if configured
@@ -115,7 +122,7 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
     }
 
     return providers;
-  }, [modelStatus, duckBrain.currentModel, providerConfigs]);
+  }, [modelStatus, duckBrain.currentModel, providerConfigs, aiProvider]);
 
   const handleSend = useCallback(
     async (message: string) => {

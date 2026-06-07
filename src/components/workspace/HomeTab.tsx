@@ -16,6 +16,9 @@ import {
   Bookmark,
   Logs,
   PackageCheck,
+  Sparkles,
+  Play,
+  Bot,
 } from "lucide-react";
 import { useDuckStore } from "@/store";
 import { motion } from "framer-motion";
@@ -28,6 +31,7 @@ import {
   getSavedQueries,
   type SavedQuery,
 } from "@/services/persistence/repositories/savedQueryRepository";
+import { demoDatasets, type DemoDataset } from "@/lib/demoDatasets";
 
 const quickStartActions = [
   {
@@ -82,17 +86,19 @@ const resourceCards = [
 
 const caioRicciutiProducts = [
   {
-    title: "Ibero Data",
-    description: "Data engineering & analytics solutions",
-    link: "https://iberodata.es?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
-    Icon: Building2,
-  },
-  {
     title: "CH-UI",
-    description: "Modern UI for ClickHouse databases",
+    description:
+      "Your ClickHouse, one workspace SQL editor, dashboards, pipelines, governance, scheduling, and an AI copilot",
     link: "https://ch-ui.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
     Icon: Database,
   },
+  {
+    title: "Caio Ricciuti",
+    description: "Data engineering & analytics solutions",
+    link: "https://caioricciuti.com?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
+    Icon: Building2,
+  },
+
   {
     title: "Etiquetta",
     description: "Simple, privacy-friendly web analytics",
@@ -105,10 +111,18 @@ const caioRicciutiProducts = [
     link: "https://devcockpit.app?utm_source=duck-ui&utm_medium=app&utm_campaign=cross-promo",
     Icon: Logs,
   },
+  {
+    title: "Glyphic",
+    description: "Glyphic gives you a visual interface to configure, manage, and use Claude Code.",
+    link: "https://github.com/caioricciuti/glyphic?",
+    Icon: Bot,
+  },
 ];
 
 const HomeTab = () => {
   const createTab = useDuckStore((s) => s.createTab);
+  const executeQuery = useDuckStore((s) => s.executeQuery);
+  const updateTabChartConfig = useDuckStore((s) => s.updateTabChartConfig);
   const queryHistory = useDuckStore((s) => s.queryHistory);
   const error = useDuckStore((s) => s.error);
   const tabs = useDuckStore((s) => s.tabs);
@@ -173,6 +187,18 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
       // Open Connections tab instead of modal
       openOrFocusTab("connections", "Connections");
     }
+  };
+
+  const handleOpenDemo = (dataset: DemoDataset) => {
+    const tabId = createTab("sql", dataset.query, dataset.name);
+    if (!tabId) return;
+    if (dataset.chartConfig) {
+      updateTabChartConfig(tabId, dataset.chartConfig);
+    }
+    // Auto-run so the user lands on populated results immediately.
+    setTimeout(() => {
+      executeQuery(dataset.query, tabId).catch(console.error);
+    }, 100);
   };
 
   const getUsersRecentItems = async () => {
@@ -252,8 +278,15 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
           ))}
         </motion.div>
 
-        <Tabs defaultValue="recent" className="space-y-6">
+        <Tabs defaultValue="sample" className="space-y-6">
           <TabsList className="h-11">
+            <TabsTrigger
+              value="sample"
+              className="flex items-center gap-2 data-[state=active]:text-primary px-6"
+            >
+              <Sparkles className="w-3 h-3" />
+              Sample Data
+            </TabsTrigger>
             <TabsTrigger
               value="recent"
               className="flex items-center gap-2 data-[state=active]:text-primary px-6"
@@ -275,6 +308,46 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
               Caio Ricciuti
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="sample" className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              No data yet? Click a dataset to load it instantly from a public source and start
+              querying — nothing leaves your browser.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              {demoDatasets.map((dataset, index) => (
+                <motion.div
+                  key={dataset.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <Card
+                    className="group hover:bg-accent/50 hover:border-primary/50 cursor-pointer transition-colors h-full flex flex-col border-2"
+                    onClick={() => handleOpenDemo(dataset)}
+                  >
+                    <CardHeader className="flex-1">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                          <Database className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="truncate">{dataset.name}</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs text-muted-foreground">
+                        {dataset.description}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardFooter className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {dataset.rows} · {dataset.source}
+                      </span>
+                      <Play className="w-3.5 h-3.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </CardFooter>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </TabsContent>
 
           <TabsContent value="recent" className="space-y-6">
             {loading ? (

@@ -29,6 +29,8 @@ import {
   EyeOff,
   Server,
   Link,
+  Chrome,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_MODELS, type ModelConfig } from "@/lib/duckBrain";
@@ -39,6 +41,7 @@ const BrainTab = () => {
   const initializeDuckBrain = useDuckStore((s) => s.initializeDuckBrain);
   const setAIProvider = useDuckStore((s) => s.setAIProvider);
   const updateProviderConfig = useDuckStore((s) => s.updateProviderConfig);
+  const initializeExternalProvider = useDuckStore((s) => s.initializeExternalProvider);
   const [isClearing, setIsClearing] = useState(false);
   const [cacheSize, setCacheSize] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
@@ -274,6 +277,14 @@ const BrainTab = () => {
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <Button
+              variant={aiProvider === "chrome-ai" ? "default" : "outline"}
+              onClick={() => handleProviderChange("chrome-ai")}
+              className="flex items-center gap-2"
+            >
+              <Chrome className="h-4 w-4" />
+              Chrome Built-in
+            </Button>
+            <Button
               variant={aiProvider === "webllm" ? "default" : "outline"}
               onClick={() => handleProviderChange("webllm")}
               className="flex items-center gap-2"
@@ -314,6 +325,46 @@ const BrainTab = () => {
                 <strong>100% Local AI</strong> - Models run entirely in your browser.
               </AlertDescription>
             </Alert>
+          )}
+
+          {aiProvider === "chrome-ai" && (
+            <div className="space-y-3 pt-2">
+              <Alert>
+                <Sparkles className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>On-device Gemini Nano</strong> — runs in Chrome itself. Free, private, no
+                  API key, no model download from us. Requires Chrome 138+ on desktop with built-in
+                  AI enabled.
+                </AlertDescription>
+              </Alert>
+
+              {modelStatus === "ready" && currentModel?.includes("Gemini") ? (
+                <Alert>
+                  <Check className="h-4 w-4 text-green-500" />
+                  <AlertDescription>
+                    Chrome Built-in AI is ready. Ask a question in the Brain panel.
+                  </AlertDescription>
+                </Alert>
+              ) : modelStatus === "error" && error ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              ) : null}
+
+              <Button
+                onClick={() => initializeExternalProvider()}
+                disabled={modelStatus === "loading"}
+                className="flex items-center gap-2"
+              >
+                {modelStatus === "loading" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Chrome className="h-4 w-4" />
+                )}
+                {modelStatus === "loading" ? "Checking…" : "Enable Chrome Built-in AI"}
+              </Button>
+            </div>
           )}
 
           {aiProvider === "openai" && (

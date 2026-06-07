@@ -134,7 +134,7 @@ export interface ExternalQueryResponse {
 // AI Provider Types
 //
 
-export type AIProviderType = "webllm" | "openai" | "anthropic" | "openai-compatible";
+export type AIProviderType = "webllm" | "openai" | "anthropic" | "chrome-ai" | "openai-compatible";
 
 export interface ProviderConfigs {
   openai?: { apiKey: string; modelId: string };
@@ -340,7 +340,7 @@ export interface TabSlice {
   tabs: EditorTab[];
   activeTabId: string | null;
 
-  createTab: (type?: EditorTabType, title?: string, content?: EditorTab["content"]) => void;
+  createTab: (type?: EditorTabType, content?: string, title?: string) => string;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTabQuery: (tabId: string, query: string) => void;
