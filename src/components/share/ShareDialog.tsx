@@ -48,7 +48,7 @@ interface ShareDialogProps {
  */
 export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
   const [links, setLinks] = useState<ShareLinks | null>(null);
-  const [building, setBuilding] = useState(false);
+  const [building, setBuilding] = useState(open && !!tab);
   const [copied, setCopied] = useState<"link" | "iframe" | "webcomponent" | null>(null);
   const [params, setParams] = useState<SharedParam[]>([]);
 
@@ -63,17 +63,21 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
     return cols.map((name, i) => ({ name, type: types[i] ?? "" }));
   }, [tab?.result]);
 
-  // Reset selected params whenever the shared tab changes.
-  useEffect(() => {
+  // Reset dialog state whenever the share target changes (state adjustment
+  // during render, per react.dev — avoids setState inside an effect).
+  const shareKey = `${tab?.id}|${open}`;
+  const [prevShareKey, setPrevShareKey] = useState(shareKey);
+  if (shareKey !== prevShareKey) {
+    setPrevShareKey(shareKey);
     setParams([]);
-  }, [tab?.id, open]);
+    setLinks(null);
+    setCopied(null);
+    setBuilding(open && !!tab);
+  }
 
   useEffect(() => {
     if (!open || !tab) return;
     let cancelled = false;
-    setBuilding(true);
-    setLinks(null);
-    setCopied(null);
     buildShareLinks(tab, true, params)
       .then((built) => {
         if (!cancelled) setLinks(built);
@@ -91,6 +95,7 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
   }, [open, tab, params]);
 
   const toggleParam = (column: string, type: string) => {
+    setBuilding(true);
     setParams((prev) => {
       if (prev.some((p) => p.column === column)) {
         return prev.filter((p) => p.column !== column);
@@ -101,6 +106,7 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
   };
 
   const setParamType = (column: string, type: ParamType) => {
+    setBuilding(true);
     setParams((prev) => prev.map((p) => (p.column === column ? { ...p, type } : p)));
   };
 

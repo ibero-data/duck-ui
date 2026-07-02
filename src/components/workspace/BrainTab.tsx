@@ -45,16 +45,7 @@ const BrainTab = () => {
   const [isClearing, setIsClearing] = useState(false);
   const [cacheSize, setCacheSize] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
-  const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({});
-  const [isTesting, setIsTesting] = useState(false);
-
-  // OpenAI-compatible provider inputs
-  const [compatibleBaseUrl, setCompatibleBaseUrl] = useState("");
-  const [compatibleModelId, setCompatibleModelId] = useState("");
-  const [compatibleApiKey, setCompatibleApiKey] = useState("");
-
-  useEffect(() => {
-    checkCacheSize();
+  const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>(() => {
     const inputs: Record<string, string> = {};
     if (duckBrain.providerConfigs.openai?.apiKey) {
       inputs.openai = duckBrain.providerConfigs.openai.apiKey;
@@ -62,30 +53,36 @@ const BrainTab = () => {
     if (duckBrain.providerConfigs.anthropic?.apiKey) {
       inputs.anthropic = duckBrain.providerConfigs.anthropic.apiKey;
     }
-    setApiKeyInputs(inputs);
+    return inputs;
+  });
+  const [isTesting, setIsTesting] = useState(false);
 
-    // Initialize openai-compatible inputs
-    const compatibleConfig = duckBrain.providerConfigs["openai-compatible"];
-    if (compatibleConfig) {
-      setCompatibleBaseUrl(compatibleConfig.baseUrl || "");
-      setCompatibleModelId(compatibleConfig.modelId || "");
-      setCompatibleApiKey(compatibleConfig.apiKey || "");
-    }
-  }, []);
+  // OpenAI-compatible provider inputs
+  const initialCompatible = duckBrain.providerConfigs["openai-compatible"];
+  const [compatibleBaseUrl, setCompatibleBaseUrl] = useState(initialCompatible?.baseUrl ?? "");
+  const [compatibleModelId, setCompatibleModelId] = useState(initialCompatible?.modelId ?? "");
+  const [compatibleApiKey, setCompatibleApiKey] = useState(initialCompatible?.apiKey ?? "");
 
-  const checkCacheSize = async () => {
-    try {
-      if ("storage" in navigator && "estimate" in navigator.storage) {
-        const estimate = await navigator.storage.estimate();
-        if (estimate.usage) {
-          const sizeInMB = (estimate.usage / (1024 * 1024)).toFixed(1);
-          setCacheSize(`${sizeInMB} MB`);
-        }
-      }
-    } catch {
-      // Ignore errors
+  const checkCacheSize = () => {
+    if ("storage" in navigator && "estimate" in navigator.storage) {
+      navigator.storage
+        .estimate()
+        .then((estimate) => {
+          if (estimate.usage) {
+            const sizeInMB = (estimate.usage / (1024 * 1024)).toFixed(1);
+            setCacheSize(`${sizeInMB} MB`);
+          }
+        })
+        .catch(() => {
+          // Ignore errors
+        });
     }
   };
+
+  useEffect(() => {
+    checkCacheSize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClearCache = async () => {
     setIsClearing(true);

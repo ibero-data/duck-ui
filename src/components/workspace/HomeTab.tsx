@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,7 +8,6 @@ import {
   BookOpen,
   Database,
   ExternalLink,
-  Loader2,
   TestTubeDiagonal,
   Server,
   Building2,
@@ -130,23 +129,30 @@ const HomeTab = () => {
   const currentProfile = useDuckStore((s) => s.currentProfile);
   const currentProfileId = useDuckStore((s) => s.currentProfileId);
   const savedQueriesVersion = useDuckStore((s) => s.savedQueriesVersion);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [recentItems, setRecentItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
-  const [savedLoading, setSavedLoading] = useState(false);
+  // null = not loaded yet (shows skeleton); refreshes keep the stale list visible
+  const [savedQueries, setSavedQueries] = useState<SavedQuery[] | null>(null);
 
-  useEffect(() => {
-    getUsersRecentItems();
-  }, []);
+  const recentItems = useMemo(
+    () =>
+      queryHistory.slice(0, 6).map((h) => ({
+        cleaned_query: h.query,
+        latest_event_time: h.timestamp,
+        query_kind: "query",
+      })),
+    [queryHistory]
+  );
 
   useEffect(() => {
     if (!currentProfileId) return;
-    setSavedLoading(true);
+    let cancelled = false;
     getSavedQueries(currentProfileId)
-      .then(setSavedQueries)
-      .catch(console.error)
-      .finally(() => setSavedLoading(false));
+      .then((queries) => {
+        if (!cancelled) setSavedQueries(queries);
+      })
+      .catch(console.error);
+    return () => {
+      cancelled = true;
+    };
   }, [currentProfileId, savedQueriesVersion]);
 
   const formatDate = (dateString: string) => {
@@ -201,23 +207,6 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
     }, 100);
   };
 
-  const getUsersRecentItems = async () => {
-    setLoading(true);
-    try {
-      const recentQueries = await Promise.resolve(
-        queryHistory.slice(0, 6).map((h) => ({
-          cleaned_query: h.query,
-          latest_event_time: h.timestamp,
-          query_kind: "query",
-        }))
-      );
-      setRecentItems(recentQueries);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
   const truncateQuery = (query: string, length: number = 50) => {
     return query.length > length ? `${query.slice(0, length)}...` : query;
   };
@@ -292,7 +281,6 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
               className="flex items-center gap-2 data-[state=active]:text-primary px-6"
             >
               Recent Queries
-              {loading && <Loader2 className="w-3 h-3 animate-spin" />}
             </TabsTrigger>
             <TabsTrigger
               value="saved"
@@ -350,21 +338,7 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
           </TabsContent>
 
           <TabsContent value="recent" className="space-y-6">
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                {[1, 2, 3].map((i) => (
-                  <Card key={i} className="space-y-2">
-                    <CardHeader>
-                      <Skeleton className="h-4 w-[250px]" />
-                      <Skeleton className="h-4 w-[200px]" />
-                    </CardHeader>
-                    <CardFooter>
-                      <Skeleton className="h-4 w-[150px]" />
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : error ? (
+            {error ? (
               <Card className="p-4 text-center text-muted-foreground">{error}</Card>
             ) : recentItems.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground border-dashed">
@@ -405,7 +379,7 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
           </TabsContent>
 
           <TabsContent value="saved" className="space-y-6">
-            {savedLoading ? (
+            {savedQueries === null ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 {[1, 2, 3].map((i) => (
                   <Card key={i} className="space-y-2">
