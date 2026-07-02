@@ -5,6 +5,7 @@ import {
   tabToSharePayload,
   buildShareLinks,
   queryReadsRemoteSource,
+  queryReproducesForViewers,
   type SharePayload,
 } from "@/lib/share";
 import type { EditorTab } from "@/store/types";
@@ -118,6 +119,25 @@ describe("queryReadsRemoteSource", () => {
   it("treats local-table queries as non-remote", () => {
     expect(queryReadsRemoteSource("SELECT * FROM my_table")).toBe(false);
     expect(queryReadsRemoteSource("SELECT count(*) FROM sales GROUP BY region")).toBe(false);
+  });
+});
+
+describe("queryReproducesForViewers", () => {
+  it("accepts remote-source queries", () => {
+    expect(queryReproducesForViewers("SELECT * FROM read_parquet('https://x/y.parquet')")).toBe(
+      true
+    );
+  });
+
+  it("accepts table-free queries", () => {
+    expect(queryReproducesForViewers("SELECT 42 AS answer")).toBe(true);
+    expect(queryReproducesForViewers("SELECT version()")).toBe(true);
+  });
+
+  it("rejects local-table queries", () => {
+    expect(queryReproducesForViewers("SELECT * FROM my_table")).toBe(false);
+    expect(queryReproducesForViewers("SELECT a FROM t1 JOIN t2 USING (id)")).toBe(false);
+    expect(queryReproducesForViewers("SELECT * FROM generate_series(1, 10)")).toBe(false);
   });
 });
 

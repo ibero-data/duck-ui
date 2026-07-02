@@ -18,16 +18,13 @@ export const createQuerySlice: StateCreator<
   QuerySlice
 > = (set, get) => ({
   queryHistory: [],
-  isExecuting: false,
   executingTabs: {},
 
   executeQuery: async (query, tabId?) => {
     const { currentConnection, connection } = get();
     try {
       set((state) => ({
-        isExecuting: true,
         executingTabs: tabId ? { ...state.executingTabs, [tabId]: true } : state.executingTabs,
-        error: null,
       }));
       let queryResult: QueryResult;
       if (currentConnection?.scope === "External") {
@@ -45,7 +42,6 @@ export const createQuerySlice: StateCreator<
         return {
           queryHistory: updateHistory(state.queryHistory, query),
           tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, result: queryResult } : tab)),
-          isExecuting: false,
           executingTabs: newExecutingTabs,
         };
       });
@@ -74,11 +70,11 @@ export const createQuerySlice: StateCreator<
         const newExecutingTabs = { ...state.executingTabs };
         if (tabId) delete newExecutingTabs[tabId];
         return {
+          // Query failures live on the tab result; the global `error` is
+          // reserved for DuckDB initialization problems.
           queryHistory: updateHistory(state.queryHistory, query, errorMessage),
           tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, result: errorResult } : tab)),
-          isExecuting: false,
           executingTabs: newExecutingTabs,
-          error: errorMessage,
         };
       });
       // Persist to DB (fire-and-forget)

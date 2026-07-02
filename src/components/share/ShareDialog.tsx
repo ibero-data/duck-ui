@@ -24,7 +24,7 @@ import {
 import { toast } from "sonner";
 import {
   buildShareLinks,
-  queryReadsRemoteSource,
+  queryReproducesForViewers,
   type ShareLinks,
   type SharedParam,
 } from "@/lib/share";
@@ -54,7 +54,7 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
 
   const hasChart = !!tab?.chartConfig;
   const sql = typeof tab?.content === "string" ? tab.content : "";
-  const remoteSource = sql ? queryReadsRemoteSource(sql) : true;
+  const remoteSource = sql ? queryReproducesForViewers(sql) : true;
 
   // Result columns available to expose as interactive embed filters.
   const columns = useMemo(() => {

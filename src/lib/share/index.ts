@@ -272,3 +272,13 @@ export function queryReadsRemoteSource(sql: string): boolean {
     sql
   );
 }
+
+/**
+ * Whether a shared query will reproduce in a viewer's browser: it either
+ * reads from a remote source, or has no FROM/JOIN clause at all (constant
+ * expressions like SELECT 42 read no table). Conservative: anything with a
+ * FROM on a non-remote source still warns.
+ */
+export function queryReproducesForViewers(sql: string): boolean {
+  return queryReadsRemoteSource(sql) || !/\b(from|join)\b/i.test(sql);
+}
