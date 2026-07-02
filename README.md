@@ -132,6 +132,25 @@ The output will be in the `dist` directory.
 
 3. Open your browser and navigate to `http://localhost:5522`.
 
+### Embedding databases at build time
+
+Duck-UI can ship with pre-loaded DuckDB databases: drop your `.db` files into
+`public/databases/`, list them in `public/databases/manifest.json`, and they
+are fetched and attached (read-only into the WASM engine) automatically on
+startup — great for demo data and self-contained dashboards.
+
+```json
+{
+  "databases": [
+    { "name": "My Database", "file": "my-database.db", "autoLoad": true }
+  ]
+}
+```
+
+Rebuild (or rebuild the Docker image) and the databases appear in the Data
+Explorer on boot. See `public/databases/README.md` for the full manifest
+format.
+
 ## Usage
 
 ### SQL Editor

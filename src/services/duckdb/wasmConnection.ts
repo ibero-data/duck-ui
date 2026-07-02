@@ -151,8 +151,9 @@ export const loadEmbeddedDatabases = async (
   connection: duckdb.AsyncDuckDBConnection
 ): Promise<void> => {
   try {
-    // Fetch the manifest file
-    const manifestResponse = await fetch("/databases/manifest.json");
+    // Fetch the manifest file (BASE_URL-aware for subpath deployments)
+    const base = import.meta.env.BASE_URL ?? "/";
+    const manifestResponse = await fetch(`${base}databases/manifest.json`);
     if (!manifestResponse.ok) {
       console.debug("No embedded databases manifest found");
       return;
@@ -179,7 +180,7 @@ export const loadEmbeddedDatabases = async (
         console.info(`Loading embedded database: ${dbConfig.name}`);
 
         // Fetch the database file
-        const dbFileResponse = await fetch(`/databases/${dbConfig.file}`);
+        const dbFileResponse = await fetch(`${base}databases/${dbConfig.file}`);
         if (!dbFileResponse.ok) {
           console.error(`Failed to fetch ${dbConfig.file}: ${dbFileResponse.statusText}`);
           continue;

@@ -1,7 +1,7 @@
 {
   "name": "duck-ui",
   "private": true,
-  "version": "0.0.42",
+  "version": "0.0.43",
   "release_date": "2026-07-02",
   "type": "module",
   "scripts": {
