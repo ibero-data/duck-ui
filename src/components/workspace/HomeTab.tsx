@@ -155,7 +155,7 @@ const HomeTab = () => {
     };
   }, [currentProfileId, savedQueriesVersion]);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("en-US", {
       day: "numeric",
