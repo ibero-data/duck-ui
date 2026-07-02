@@ -29,7 +29,15 @@ Open your browser and navigate to `http://localhost:5522`.
 You can customize Duck-UI behavior using environment variables:
 
 ```bash
-# For external DuckDB connections
+# For external DuckDB connections (API key auth)
+docker run -p 5522:5522 \
+  -e DUCK_UI_EXTERNAL_CONNECTION_NAME="My DuckDB Server" \
+  -e DUCK_UI_EXTERNAL_HOST="https://duckdb-server/duckdb" \
+  -e DUCK_UI_EXTERNAL_PORT="443" \
+  -e DUCK_UI_EXTERNAL_API_KEY="your-api-key" \
+  ghcr.io/caioricciuti/duck-ui:latest
+
+# For external DuckDB connections (username/password auth)
 docker run -p 5522:5522 \
   -e DUCK_UI_EXTERNAL_CONNECTION_NAME="My DuckDB Server" \
   -e DUCK_UI_EXTERNAL_HOST="http://duckdb-server" \
@@ -44,10 +52,11 @@ docker run -p 5522:5522 \
 | Runtime Variable | Description | Default |
 |----------|-------------|---------|
 | `DUCK_UI_EXTERNAL_CONNECTION_NAME` | Name for the external connection | "" |
-| `DUCK_UI_EXTERNAL_HOST` | Host URL for external DuckDB | "" |
+| `DUCK_UI_EXTERNAL_HOST` | Host URL for external DuckDB (may include path, e.g. `https://host/duckdb`) | "" |
 | `DUCK_UI_EXTERNAL_PORT` | Port for external DuckDB | null |
-| `DUCK_UI_EXTERNAL_USER` | Username for external connection | "" |
-| `DUCK_UI_EXTERNAL_PASS` | Password for external connection | "" |
+| `DUCK_UI_EXTERNAL_API_KEY` | API key sent as `X-API-Key` header (takes priority over user/password) | "" |
+| `DUCK_UI_EXTERNAL_USER` | Username for Basic auth (used when no API key is set) | "" |
+| `DUCK_UI_EXTERNAL_PASS` | Password for Basic auth | "" |
 | `DUCK_UI_EXTERNAL_DATABASE_NAME` | Database name for external connection | "" |
 | `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow unsigned extensions in DuckDB | false |
 | `DUCK_UI_DUCKDB_WASM_USE_CDN` | Load DuckDB WASM from CDN (ignored when build-time `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true`) | false |
@@ -163,6 +172,44 @@ The output will be in the `dist` directory.
 - `Cmd/Ctrl + K`: Open Search Bar
 - `Cmd/Ctrl + Enter`: Run Query
 - `Cmd/Ctrl + Shift + Enter`: Run highlighted query
+
+## Deploying behind a reverse proxy
+
+When serving Duck-UI behind a two-layer nginx proxy (inner proxy + outer TLS/HTTP2 terminator such as [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy)), you **must** suppress `Accept-Encoding` on the upstream connection to the Duck-UI container.
+
+`bun serve` natively compresses responses when it sees `Accept-Encoding: gzip`. That chunked-gzip stream causes `ERR_HTTP2_PROTOCOL_ERROR` when the outer proxy converts it to HTTP/2 DATA frames, making the page appear to hang after loading the first few assets.
+
+**Required inner-nginx config:**
+
+```nginx
+# Assets: no auth, raw bytes — outer proxy handles compression over HTTP/2
+location /ui/assets/ {
+    proxy_set_header Accept-Encoding "";
+    proxy_pass http://duck-ui:5522/assets/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+# Main app: basic auth gates index.html (which carries the pre-configured API key)
+location /ui/ {
+    auth_basic "Duck UI";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    proxy_set_header Accept-Encoding "";
+    proxy_redirect http://duck-ui:5522 /ui/;
+    proxy_pass http://duck-ui:5522/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Key points:
+- Do **not** add `gzip on` or `proxy_buffering on` to the Duck-UI locations in the inner proxy — the outer TLS terminator handles that
+- Split `/ui/assets/` (no auth) from `/ui/` (auth) so Web Workers can load WASM and JS without hitting an auth challenge
+- When building the image for a sub-path, pass `DUCK_UI_BASEPATH=/ui/` as a Docker build argument
 
 ## Contributing
 

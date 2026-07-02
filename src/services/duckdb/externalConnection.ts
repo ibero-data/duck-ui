@@ -19,12 +19,23 @@ const buildConnectionUrl = (host: string, port?: string | number): string => {
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
     url = `https://${url}`;
   }
-  // Only append port when the hostname portion doesn't already contain one.
-  // Strip the scheme first so the ":" in "https://" isn't matched.
+  // Use URL API to detect existing port on the hostname only (not the path).
   if (port) {
-    const hostWithoutScheme = url.replace(/^https?:\/\//, "");
-    if (!hostWithoutScheme.includes(":")) {
-      url = `${url}:${port}`;
+    try {
+      const parsed = new URL(url);
+      if (!parsed.port) {
+        parsed.port = String(port);
+        url = parsed.toString();
+      } else {
+        url = parsed.toString();
+      }
+    } catch {
+      // Fallback: strip scheme, check for colon before any slash
+      const withoutScheme = url.replace(/^https?:\/\//, "");
+      const hostPart = withoutScheme.split("/")[0];
+      if (!hostPart.includes(":")) {
+        url = `${url}:${port}`;
+      }
     }
   }
   if (!url.endsWith("/")) {

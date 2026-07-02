@@ -16,7 +16,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 # Build the app
-RUN bun run build
+RUN DUCK_UI_BASEPATH=${DUCK_UI_BASEPATH} bun run build
 
 # Use a second stage to reduce image size
 FROM oven/bun:1-alpine
@@ -43,6 +43,7 @@ ENV DUCK_UI_EXTERNAL_HOST=""
 ENV DUCK_UI_EXTERNAL_PORT=""
 ENV DUCK_UI_EXTERNAL_USER=""
 ENV DUCK_UI_EXTERNAL_PASS=""
+ENV DUCK_UI_EXTERNAL_API_KEY=""
 ENV DUCK_UI_EXTERNAL_DATABASE_NAME=""
 
 # Create user and change ownership

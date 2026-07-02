@@ -12,6 +12,7 @@ const envVars = {
   DUCK_UI_EXTERNAL_PORT: process.env.DUCK_UI_EXTERNAL_PORT || null,
   DUCK_UI_EXTERNAL_USER: process.env.DUCK_UI_EXTERNAL_USER || "",
   DUCK_UI_EXTERNAL_PASS: process.env.DUCK_UI_EXTERNAL_PASS || "",
+  DUCK_UI_EXTERNAL_API_KEY: process.env.DUCK_UI_EXTERNAL_API_KEY || "",
   DUCK_UI_EXTERNAL_DATABASE_NAME:
     process.env.DUCK_UI_EXTERNAL_DATABASE_NAME || "",
   // Add new configuration for DuckDB settings

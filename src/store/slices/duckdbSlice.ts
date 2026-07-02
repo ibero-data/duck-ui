@@ -33,6 +33,7 @@ export const createDuckdbSlice: StateCreator<
       DUCK_UI_EXTERNAL_PORT: externalPort = "",
       DUCK_UI_EXTERNAL_USER: externalUser = "",
       DUCK_UI_EXTERNAL_PASS: externalPass = "",
+      DUCK_UI_EXTERNAL_API_KEY: externalApiKey = "",
       DUCK_UI_EXTERNAL_DATABASE_NAME: externalDatabaseName = "",
     } = window.env || {};
 
@@ -55,8 +56,9 @@ export const createDuckdbSlice: StateCreator<
         port: Number(externalPort),
         user: externalUser,
         password: externalPass,
+        apiKey: externalApiKey,
         database: externalDatabaseName,
-        authMode: "password",
+        authMode: externalApiKey ? "api_key" : externalUser ? "password" : "none",
       });
     }
 

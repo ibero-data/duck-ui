@@ -13,6 +13,7 @@ declare global {
       DUCK_UI_EXTERNAL_PORT: string;
       DUCK_UI_EXTERNAL_USER: string;
       DUCK_UI_EXTERNAL_PASS: string;
+      DUCK_UI_EXTERNAL_API_KEY: string;
       DUCK_UI_EXTERNAL_DATABASE_NAME: string;
       DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS: boolean;
       DUCK_UI_DUCKDB_WASM_USE_CDN?: boolean;
