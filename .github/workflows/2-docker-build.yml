@@ -41,7 +41,10 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN needs Actions write access granted on the GHCR package
+          # (package settings → Manage Actions access) before it can push; the
+          # existing package was created with a PAT, so keep using it for now.
+          password: ${{ secrets.GHCR_PAT }}
 
       - name: Extract metadata (tags, labels)
         id: meta
