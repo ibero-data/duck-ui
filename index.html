@@ -46,6 +46,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Runtime env (overwritten by the Docker entrypoint; empty default otherwise).
+         An external file instead of an injected inline script so the CSP can
+         stay free of 'unsafe-inline'. -->
+    <script src="/env.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

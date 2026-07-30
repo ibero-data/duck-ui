@@ -98,6 +98,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.65.0",
     "vite": "^7.3.6",
+    "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.10"
   },
   "description": "Fully open-source DuckDB workbench that runs in your browser. SQL editor, notebooks, charts, AI assistant, and shareable analyses powered by DuckDB WASM — no backend, your data never leaves the tab.",
@@ -131,7 +132,6 @@
     "src/**/*.{ts,tsx,css}": "prettier --write"
   },
   "overrides": {
-    "brace-expansion": "^2.0.3",
     "picomatch": "^4.0.4",
     "flatted": "^3.4.2"
   }
