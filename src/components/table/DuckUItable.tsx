@@ -16,6 +16,7 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { formatBytes, formatDuration } from "@/lib/utils";
+import { formatTimestampUTC } from "@/lib/datetime";
 import {
   Download,
   Search,
@@ -90,10 +91,11 @@ const DEFAULT_MAX_AUTO_WIDTH = 250;
 const DEFAULT_MIN_AUTO_WIDTH = 80;
 const DEFAULT_SAMPLE_SIZE = 100;
 
-// Safe JSON stringify that handles BigInt
+// Safe JSON stringify that handles BigInt and Date
 const safeStringify = (value: unknown): string => {
   if (value === null || value === undefined) return "null";
   if (typeof value === "bigint") return value.toString();
+  if (value instanceof Date) return formatTimestampUTC(value);
   if (typeof value === "object") {
     try {
       return JSON.stringify(value, (_, v) => (typeof v === "bigint" ? v.toString() : v));
@@ -336,6 +338,9 @@ const DuckUITable: React.FC<DuckTableProps> = ({
               displayValue = (
                 <span className="text-neutral-400 italic text-xs opacity-50">null</span>
               );
+            } else if (value instanceof Date) {
+              // Timestamps render as UTC "YYYY-MM-DD HH:MM:SS" — what DuckDB stored
+              displayValue = formatTimestampUTC(value);
             } else if (typeof value === "object" || typeof value === "bigint") {
               // Properly stringify objects and BigInt for display
               const stringifiedValue = safeStringify(value);
@@ -347,7 +352,9 @@ const DuckUITable: React.FC<DuckTableProps> = ({
             return (
               <div
                 className={`p-1 px-2 align-middle text-xs overflow-hidden whitespace-nowrap select-text ${
-                  typeof value === "object" ? "font-mono text-blue-500" : ""
+                  typeof value === "object" && !(value instanceof Date)
+                    ? "font-mono text-blue-500"
+                    : ""
                 }`}
                 title={titleAttribute}
               >

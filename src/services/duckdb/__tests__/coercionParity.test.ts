@@ -11,8 +11,9 @@ import { describe, it, expect } from "vitest";
  *
  * SPA `resultToJSON` (src/services/duckdb/resultParser.ts):
  *   - Int64 → BigInt (lossless), preserved for downstream bigint-aware serializers.
- *   - Timestamp → JS Date object; Date32 → localized date string.
- *   - Decimal → number read from the Arrow column vector with scale applied.
+ *   - Timestamp → JS Date object; Date32 → "YYYY-MM-DD" string (UTC).
+ *   - Decimal → number (lossless string past 2^53) from the Arrow column vector,
+ *     scale applied. See resultCoercion.test.ts for the regression suite.
  *
  * core `coerceValue` (@duck_ui/core engine/query.ts):
  *   - BigInt → Number (LOSSY above 2^53).
