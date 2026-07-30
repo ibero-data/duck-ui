@@ -1,5 +1,5 @@
 import { rawResultToJSON } from "./resultParser";
-import { sqlEscapeIdentifier, sqlEscapeString } from "@/lib/sqlSanitize";
+import { sqlEscapeString, qualifyTable } from "@/lib/sqlSanitize";
 import type {
   CurrentConnection,
   ConnectionProvider,
@@ -163,18 +163,21 @@ export const fetchExternalDatabases = async (
       for (const dbRow of dbListResult.data) {
         const dbName = dbRow[dbListResult.columns[0] as string] as string;
         try {
+          // Enumerate (schema, table) pairs — external DuckDB databases can
+          // carry non-"main" schemas too (#3).
           const tablesResult = await executeExternalQuery(
-            `SELECT table_name FROM information_schema.tables WHERE table_catalog = '${sqlEscapeString(dbName)}'`,
+            `SELECT table_schema, table_name FROM information_schema.tables WHERE table_catalog = '${sqlEscapeString(dbName)}' ORDER BY table_schema, table_name`,
             connection
           );
 
           const tables: TableInfo[] = [];
           for (const tableRow of tablesResult.data) {
+            const schemaName = (tableRow.table_schema as string) || "main";
             const tableName = tableRow.table_name as string;
             try {
               // Try to get columns info
               const columnsResult = await executeExternalQuery(
-                `DESCRIBE ${sqlEscapeIdentifier(dbName)}.${sqlEscapeIdentifier(tableName)}`,
+                `DESCRIBE ${qualifyTable(dbName, schemaName, tableName)}`,
                 connection
               );
 
@@ -188,7 +191,7 @@ export const fetchExternalDatabases = async (
 
               tables.push({
                 name: tableName,
-                schema: dbName,
+                schema: schemaName,
                 columns,
                 rowCount: 0, // External connections don't provide row count easily
                 createdAt: new Date().toISOString(),
@@ -197,7 +200,7 @@ export const fetchExternalDatabases = async (
               // If describe fails, add table with basic info
               tables.push({
                 name: tableName,
-                schema: dbName,
+                schema: schemaName,
                 columns: [],
                 rowCount: 0,
                 createdAt: new Date().toISOString(),

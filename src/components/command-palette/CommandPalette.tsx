@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type { EditorTabType } from "@/store";
 import { getUiConfig } from "@/lib/appConfig";
+import { qualifyTable } from "@/lib/sqlSanitize";
 import {
   getSavedQueries,
   type SavedQuery,
@@ -83,10 +84,10 @@ export default function CommandPalette() {
   const openTabs = useMemo(() => tabs.filter((t) => t.id !== activeTabId), [tabs, activeTabId]);
 
   const tableEntries = useMemo(() => {
-    const entries: { database: string; table: string }[] = [];
+    const entries: { database: string; schema: string; table: string }[] = [];
     for (const db of databases) {
       for (const table of db.tables) {
-        entries.push({ database: db.name, table: table.name });
+        entries.push({ database: db.name, schema: table.schema || "main", table: table.name });
       }
     }
     return entries;
@@ -229,17 +230,17 @@ export default function CommandPalette() {
           <>
             <CommandSeparator />
             <CommandGroup heading="Tables">
-              {tableEntries.map(({ database, table }) => (
+              {tableEntries.map(({ database, schema, table }) => (
                 <CommandItem
-                  key={`${database}.${table}`}
+                  key={`${database}.${schema}.${table}`}
                   onSelect={() => {
-                    const query = `SELECT * FROM "${database}"."${table}" LIMIT 100`;
+                    const query = `SELECT * FROM ${qualifyTable(database, schema, table)} LIMIT 100`;
                     createTab("sql", query, table);
                     setOpen(false);
                   }}
                 >
                   <Table className="mr-2 h-4 w-4" />
-                  {database}.{table}
+                  {database}.{schema === "main" ? table : `${schema}.${table}`}
                   <CommandShortcut>SELECT</CommandShortcut>
                 </CommandItem>
               ))}

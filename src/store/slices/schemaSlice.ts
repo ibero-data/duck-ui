@@ -7,7 +7,7 @@ import {
   fetchExternalDatabases,
   fetchWasmDatabases,
 } from "@/services/duckdb";
-import { sqlEscapeIdentifier, sqlEscapeString } from "@/lib/sqlSanitize";
+import { sqlEscapeIdentifier, sqlEscapeString, qualifyTable } from "@/lib/sqlSanitize";
 import type { DuckStoreState, SchemaSlice, DatabaseInfo, ColumnStats, QueryResult } from "../types";
 
 export const createSchemaSlice: StateCreator<
@@ -50,12 +50,11 @@ export const createSchemaSlice: StateCreator<
     }
   },
 
-  fetchTableColumnStats: async (databaseName, tableName) => {
+  fetchTableColumnStats: async (databaseName, tableName, schema) => {
     const { currentConnection, connection } = get();
-    const query =
-      databaseName === "main" || databaseName === "memory" || databaseName === ":memory:"
-        ? `SUMMARIZE ${sqlEscapeIdentifier(tableName)}`
-        : `SUMMARIZE ${sqlEscapeIdentifier(databaseName)}.${sqlEscapeIdentifier(tableName)}`;
+    const useBareName =
+      databaseName === "main" || databaseName === "memory" || databaseName === ":memory:";
+    const query = `SUMMARIZE ${qualifyTable(useBareName ? undefined : databaseName, schema, tableName)}`;
 
     try {
       let result: QueryResult;
@@ -92,7 +91,7 @@ export const createSchemaSlice: StateCreator<
     }
   },
 
-  deleteTable: async (tableName, database = "memory") => {
+  deleteTable: async (tableName, database = "memory", schema) => {
     try {
       const { connection, currentConnection } = get();
       if (currentConnection?.scope === "External") {
@@ -101,7 +100,7 @@ export const createSchemaSlice: StateCreator<
       const wasmConnection = validateConnection(connection);
       set({ isLoading: true });
       await wasmConnection.query(
-        `DROP TABLE IF EXISTS ${sqlEscapeIdentifier(database)}.${sqlEscapeIdentifier(tableName)}`
+        `DROP TABLE IF EXISTS ${qualifyTable(database, schema, tableName)}`
       );
       await get().fetchDatabasesAndTablesInfo();
       set({ isLoading: false });

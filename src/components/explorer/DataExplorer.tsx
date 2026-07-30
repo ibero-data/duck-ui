@@ -81,6 +81,7 @@ export default function DataExplorer() {
       children: db.tables.map((table) => ({
         name: table.name,
         type: "table",
+        schema: table.schema,
       })),
     }));
     return treeData;

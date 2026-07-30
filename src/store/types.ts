@@ -323,8 +323,12 @@ export interface SchemaSlice {
   schemaFetchError: string | null;
 
   fetchDatabasesAndTablesInfo: () => Promise<void>;
-  fetchTableColumnStats: (databaseName: string, tableName: string) => Promise<ColumnStats[]>;
-  deleteTable: (tableName: string, database?: string) => Promise<void>;
+  fetchTableColumnStats: (
+    databaseName: string,
+    tableName: string,
+    schema?: string
+  ) => Promise<ColumnStats[]>;
+  deleteTable: (tableName: string, database?: string, schema?: string) => Promise<void>;
   importFile: (
     fileName: string,
     fileContent: ArrayBuffer,
