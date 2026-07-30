@@ -1,4 +1,5 @@
 import type { StateCreator } from "zustand";
+import { Table, Schema, type RecordBatch } from "apache-arrow";
 import {
   executeExternalQuery,
   resultToJSON,
@@ -11,6 +12,13 @@ import {
   clearHistory as clearHistoryRepo,
 } from "@/services/persistence/repositories/queryHistoryRepository";
 
+/**
+ * Per-tab cancel hooks for in-flight queries. Kept outside the store — these
+ * are closures over live connections/AbortControllers, not serializable state.
+ */
+const activeCancellers = new Map<string, () => void | Promise<unknown>>();
+const cancelledTabs = new Set<string>();
+
 export const createQuerySlice: StateCreator<
   DuckStoreState,
   [["zustand/devtools", never]],
@@ -22,19 +30,40 @@ export const createQuerySlice: StateCreator<
 
   executeQuery: async (query, tabId?) => {
     const { currentConnection, connection } = get();
+    const cancelKey = tabId ?? "__adhoc__";
+    cancelledTabs.delete(cancelKey);
     try {
       set((state) => ({
         executingTabs: tabId ? { ...state.executingTabs, [tabId]: true } : state.executingTabs,
       }));
       let queryResult: QueryResult;
       if (currentConnection?.scope === "External") {
-        queryResult = await executeExternalQuery(query, currentConnection);
+        const controller = new AbortController();
+        activeCancellers.set(cancelKey, () => {
+          cancelledTabs.add(cancelKey);
+          controller.abort();
+        });
+        queryResult = await executeExternalQuery(query, currentConnection, controller.signal);
       } else {
         if (!connection) throw new Error("WASM connection not initialized");
         const wasmConnection = validateConnection(connection);
-        const result = await wasmConnection.query(query);
-        queryResult = resultToJSON(result);
+        // send() instead of query(): a streamed result can be interrupted via
+        // cancelSent(). Note all tabs share one physical connection, so cancel
+        // interrupts whatever statement that connection is currently running.
+        const reader = await wasmConnection.send(query);
+        activeCancellers.set(cancelKey, () => {
+          cancelledTabs.add(cancelKey);
+          return wasmConnection.cancelSent();
+        });
+        const batches: RecordBatch[] = [];
+        for await (const batch of reader) {
+          batches.push(batch);
+        }
+        const table =
+          batches.length > 0 ? new Table(batches) : new Table(reader.schema ?? new Schema([]));
+        queryResult = resultToJSON(table);
       }
+      activeCancellers.delete(cancelKey);
       // Update query history and update tab result if applicable.
       set((state) => {
         const newExecutingTabs = { ...state.executingTabs };
@@ -58,7 +87,13 @@ export const createQuerySlice: StateCreator<
       }
       return tabId ? undefined : queryResult;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      activeCancellers.delete(cancelKey);
+      const wasCancelled = cancelledTabs.delete(cancelKey);
+      const errorMessage = wasCancelled
+        ? "Query cancelled"
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
       const errorResult: QueryResult = {
         columns: [],
         columnTypes: [],
@@ -81,6 +116,17 @@ export const createQuerySlice: StateCreator<
       const { currentProfileId } = get();
       if (currentProfileId) {
         addHistoryEntry(currentProfileId, query, { error: errorMessage }).catch(() => {});
+      }
+    }
+  },
+
+  cancelQuery: async (tabId) => {
+    const cancel = activeCancellers.get(tabId);
+    if (cancel) {
+      try {
+        await cancel();
+      } catch (error) {
+        console.error("Failed to cancel query:", error);
       }
     }
   },

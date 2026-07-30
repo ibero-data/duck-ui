@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import {
   Play,
-  Loader2,
+  Square,
   Lightbulb,
   Command,
   Edit,
@@ -37,6 +37,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const { theme } = useTheme();
   const tabs = useDuckStore((s) => s.tabs);
   const executeQuery = useDuckStore((s) => s.executeQuery);
+  const cancelQuery = useDuckStore((s) => s.cancelQuery);
   const isExecuting = useDuckStore((s) => !!s.executingTabs[tabId]);
   const updateTabTitle = useDuckStore((s) => s.updateTabTitle);
   const toggleBrainPanel = useDuckStore((s) => s.toggleBrainPanel);
@@ -110,6 +111,15 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     } catch (error) {
       console.error("Query execution failed:", error);
       toast.error("Query execution failed");
+    }
+  };
+
+  const handleCancelQuery = async () => {
+    try {
+      await cancelQuery(tabId);
+      toast.info("Query cancelled");
+    } catch (error) {
+      console.error("Failed to cancel query:", error);
     }
   };
 
@@ -318,17 +328,12 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
             </Tooltip>
           </TooltipProvider>
           <Button
-            onClick={handleExecuteQuery}
-            disabled={isExecuting}
+            onClick={isExecuting ? handleCancelQuery : handleExecuteQuery}
             variant="outline"
             className="flex items-center gap-2 min-w-[100px]"
           >
-            {isExecuting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-            {isExecuting ? "Running..." : "Run Query"}
+            {isExecuting ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {isExecuting ? "Stop" : "Run Query"}
           </Button>
         </div>
       </div>
@@ -340,10 +345,9 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
 
       {/* Mobile FAB */}
       <FloatingActionButton
-        onClick={handleExecuteQuery}
-        icon={isExecuting ? Loader2 : Play}
-        label={isExecuting ? "Running..." : "Run"}
-        disabled={isExecuting}
+        onClick={isExecuting ? handleCancelQuery : handleExecuteQuery}
+        icon={isExecuting ? Square : Play}
+        label={isExecuting ? "Stop" : "Run"}
         className={isExecuting ? "animate-pulse" : ""}
       />
 

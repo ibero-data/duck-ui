@@ -313,6 +313,8 @@ export interface QuerySlice {
   executingTabs: Record<string, boolean>;
 
   executeQuery: (query: string, tabId?: string) => Promise<QueryResult | void>;
+  /** Cancels the in-flight query started for this tab, if any. */
+  cancelQuery: (tabId: string) => Promise<void>;
   clearHistory: () => void;
   exportParquet: (query: string) => Promise<Blob>;
 }

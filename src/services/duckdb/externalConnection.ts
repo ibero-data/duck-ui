@@ -45,11 +45,13 @@ const buildConnectionUrl = (host: string, port?: string | number): string => {
 };
 
 /**
- * Executes a query against an external connection.
+ * Executes a query against an external connection. Pass an AbortSignal to make
+ * the request cancellable from the UI.
  */
 export const executeExternalQuery = async (
   query: string,
-  connection: CurrentConnection
+  connection: CurrentConnection,
+  signal?: AbortSignal
 ): Promise<QueryResult> => {
   if (!connection.host) {
     throw new Error("Host must be defined for external connections.");
@@ -75,6 +77,7 @@ export const executeExternalQuery = async (
       method: "POST",
       headers,
       body: query,
+      signal,
     });
 
     if (!response.ok) {
@@ -90,6 +93,9 @@ export const executeExternalQuery = async (
     const rawResult = await response.text();
     return rawResultToJSON(rawResult);
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Query cancelled");
+    }
     if (error instanceof TypeError && error.message.includes("fetch")) {
       throw new Error(
         `Network error: Cannot reach ${url}. Check your connection and CORS settings.`
