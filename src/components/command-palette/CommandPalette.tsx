@@ -24,6 +24,7 @@ import {
   Bookmark,
 } from "lucide-react";
 import type { EditorTabType } from "@/store";
+import { getUiConfig } from "@/lib/appConfig";
 import {
   getSavedQueries,
   type SavedQuery,
@@ -32,6 +33,7 @@ import {
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const ui = getUiConfig();
 
   const tabs = useDuckStore((s) => s.tabs);
   const activeTabId = useDuckStore((s) => s.activeTabId);
@@ -111,27 +113,35 @@ export default function CommandPalette() {
             <Home className="mr-2 h-4 w-4" />
             Home
           </CommandItem>
-          <CommandItem onSelect={() => openOrFocusTab("connections", "Connections")}>
-            <Cable className="mr-2 h-4 w-4" />
-            Connections
-          </CommandItem>
-          <CommandItem onSelect={() => openOrFocusTab("brain", "Duck Brain")}>
-            <Brain className="mr-2 h-4 w-4" />
-            Duck Brain
-          </CommandItem>
-          <CommandItem onSelect={() => openOrFocusTab("settings", "Settings")}>
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </CommandItem>
-          <CommandItem
-            onSelect={() => {
-              toggleBrainPanel();
-              setOpen(false);
-            }}
-          >
-            <Brain className="mr-2 h-4 w-4" />
-            Toggle AI Panel
-          </CommandItem>
+          {!ui.hideConnections && (
+            <CommandItem onSelect={() => openOrFocusTab("connections", "Connections")}>
+              <Cable className="mr-2 h-4 w-4" />
+              Connections
+            </CommandItem>
+          )}
+          {!ui.hideBrain && (
+            <CommandItem onSelect={() => openOrFocusTab("brain", "Duck Brain")}>
+              <Brain className="mr-2 h-4 w-4" />
+              Duck Brain
+            </CommandItem>
+          )}
+          {!ui.hideSettings && (
+            <CommandItem onSelect={() => openOrFocusTab("settings", "Settings")}>
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </CommandItem>
+          )}
+          {!ui.hideBrain && (
+            <CommandItem
+              onSelect={() => {
+                toggleBrainPanel();
+                setOpen(false);
+              }}
+            >
+              <Brain className="mr-2 h-4 w-4" />
+              Toggle AI Panel
+            </CommandItem>
+          )}
           <CommandItem
             onSelect={() => {
               setTheme(theme === "dark" ? "light" : "dark");

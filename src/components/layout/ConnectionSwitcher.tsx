@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useDuckStore } from "@/store";
+import { getUiConfig } from "@/lib/appConfig";
 
 interface ConnectionSwitcherProps {
   className?: string;
@@ -119,18 +120,22 @@ export default function ConnectionSwitcher({ className }: ConnectionSwitcherProp
             </DropdownMenuItem>
           ))}
 
-          <DropdownMenuSeparator />
+          {!getUiConfig().hideConnections && (
+            <>
+              <DropdownMenuSeparator />
 
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={() => {
-              openConnectionsTab();
-              setIsOpen(false);
-            }}
-          >
-            <Cable className="h-4 w-4 mr-2" />
-            <span>Manage Connections</span>
-          </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => {
+                  openConnectionsTab();
+                  setIsOpen(false);
+                }}
+              >
+                <Cable className="h-4 w-4 mr-2" />
+                <span>Manage Connections</span>
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

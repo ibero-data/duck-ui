@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import SortableTab from "@/components/workspace/SortableTab";
 import { useDuckStore } from "@/store";
+import { isGatedTabHidden } from "@/lib/appConfig";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
@@ -106,8 +107,11 @@ export default function WorkspaceTabs() {
   };
 
   const sortedTabs = useMemo(() => {
-    const homeTab = tabs.find((tab) => tab.id === "home");
-    const otherTabs = tabs.filter((tab) => tab.id !== "home");
+    // Backstop: a persisted or URL-restored tab of a gated type must never
+    // render in kiosk mode, even though createTab already refuses new ones.
+    const visibleTabs = tabs.filter((tab) => !isGatedTabHidden(tab.type));
+    const homeTab = visibleTabs.find((tab) => tab.id === "home");
+    const otherTabs = visibleTabs.filter((tab) => tab.id !== "home");
     return homeTab ? [homeTab, ...otherTabs] : otherTabs;
   }, [tabs]);
 

@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useDuckStore, type ColumnStats } from "@/store";
+import { getUiConfig } from "@/lib/appConfig";
 import { ColumnNode } from "./ColumnNode";
 
 export interface TreeNodeData {
@@ -164,15 +165,20 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
                   toast.error("Parent database name is undefined.");
                 },
           },
-          {
-            label: "Delete Table",
-            icon: <Trash className="w-4 h-4 mr-2" />,
-            action: parentDatabaseName
-              ? handleDeleteTable(parentDatabaseName, node.name)
-              : () => {
-                  toast.error("Parent database name is undefined.");
+          // Destructive action is hidden in read-only / kiosk mode.
+          ...(getUiConfig().readOnly
+            ? []
+            : [
+                {
+                  label: "Delete Table",
+                  icon: <Trash className="w-4 h-4 mr-2" />,
+                  action: parentDatabaseName
+                    ? handleDeleteTable(parentDatabaseName, node.name)
+                    : () => {
+                        toast.error("Parent database name is undefined.");
+                      },
                 },
-          },
+              ]),
         ],
       }),
       [parentDatabaseName, node.name, handleQueryData, handleDeleteTable, handleShowSchema]

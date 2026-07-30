@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import { toast } from "sonner";
 import { generateUUID } from "@/lib/utils";
+import { isGatedTabHidden } from "@/lib/appConfig";
 import type { DuckStoreState, TabSlice, EditorTab, NotebookCell } from "../types";
 
 function parseNotebookCells(tab: EditorTab): NotebookCell[] {
@@ -51,6 +52,10 @@ export const createTabSlice: StateCreator<
   activeTabId: "home",
 
   createTab: (type = "sql", content = "", title) => {
+    // Kiosk mode: refuse to open gated surfaces; keep the current tab focused.
+    if (isGatedTabHidden(type)) {
+      return get().activeTabId ?? "";
+    }
     const isNotebook = type === "notebook";
     const defaultContent = isNotebook
       ? typeof content === "string" && content.trim().length > 0

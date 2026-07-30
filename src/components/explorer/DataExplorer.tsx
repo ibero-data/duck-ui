@@ -18,6 +18,7 @@ import {
 import FolderBrowser from "@/components/folders/FolderBrowser";
 import CloudBrowser from "@/components/cloud/CloudBrowser";
 import { type FileEntry, fileSystemService } from "@/lib/fileSystem";
+import { getUiConfig } from "@/lib/appConfig";
 import { type ImportOptions } from "@/components/common/ImportOptionsPopover";
 import { toast } from "sonner";
 
@@ -86,16 +87,19 @@ export default function DataExplorer() {
   };
   const treeData = buildTreeData();
   const isExternal = currentConnection?.scope === "External";
+  // Kiosk mode can hide all data-import affordances (drag-drop, import menu,
+  // folder/cloud browsers), leaving the explorer read-only.
+  const canImport = !isExternal && !getUiConfig().hideImport;
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (e.dataTransfer.types.includes("Files") && !isExternal) {
+      if (e.dataTransfer.types.includes("Files") && canImport) {
         setIsDraggingOver(true);
       }
     },
-    [isExternal]
+    [canImport]
   );
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -112,10 +116,10 @@ export default function DataExplorer() {
       e.preventDefault();
       e.stopPropagation();
       setIsDraggingOver(false);
-      if (isExternal || !e.dataTransfer.files.length) return;
+      if (!canImport || !e.dataTransfer.files.length) return;
       setIsSheetOpen(true);
     },
-    [isExternal]
+    [canImport]
   );
 
   return (
@@ -162,8 +166,8 @@ export default function DataExplorer() {
               <RefreshCw className={`h-4 w-4 ${isLoadingDbTablesFetch ? "animate-spin" : ""}`} />
             </Button>
 
-            {/* Import menu - only show for non-external connections */}
-            {!isExternal && (
+            {/* Import menu - hidden for external connections and in kiosk mode */}
+            {canImport && (
               <DropdownMenu>
                 <DropdownMenuTrigger className="cursor-pointer p-2 border hover:bg-secondary rounded-md focus:outline-none">
                   <EllipsisVertical className="h-5 w-5" />
@@ -263,26 +267,28 @@ export default function DataExplorer() {
                   <RefreshCw className="h-4 w-4" />
                   Refresh Schema
                 </Button>
-              ) : (
+              ) : canImport ? (
                 <Button variant="outline" className="gap-2" onClick={() => setIsSheetOpen(true)}>
                   <Plus className="h-4 w-4" />
                   Import Data
                 </Button>
-              )}
+              ) : null}
             </div>
           )}
 
-          {/* Folder Browser Section - only show if supported and not external */}
-          {isFileSystemSupported && !isExternal && (
+          {/* Folder Browser Section - only when import is allowed */}
+          {isFileSystemSupported && canImport && (
             <div className="border-t pt-3">
               <FolderBrowser onFileImport={handleFolderFileImport} />
             </div>
           )}
 
           {/* Cloud Storage Section */}
-          <div className="border-t pt-3">
-            <CloudBrowser />
-          </div>
+          {canImport && (
+            <div className="border-t pt-3">
+              <CloudBrowser />
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

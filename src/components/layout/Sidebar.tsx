@@ -22,6 +22,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useDuckStore, type EditorTabType } from "@/store";
+import { getUiConfig } from "@/lib/appConfig";
 import { setSetting } from "@/services/persistence/repositories/settingsRepository";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -58,6 +59,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
   const [historyOpen, setHistoryOpen] = useState(false);
   const [savedQueriesOpen, setSavedQueriesOpen] = useState(false);
   const [switchTarget, setSwitchTarget] = useState<(typeof profiles)[0] | null>(null);
+  const ui = getUiConfig();
 
   // Get connection status color
   const getConnectionColor = (scope?: string) => {
@@ -158,11 +160,15 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   ))}
                 </>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openOrFocusTab("settings", "Settings")}>
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </DropdownMenuItem>
+              {!ui.hideSettings && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => openOrFocusTab("settings", "Settings")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -210,40 +216,44 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
           <Separator className="my-2 mx-2" />
 
           {/* Connections */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isTabActive("connections") ? "secondary" : "ghost"}
-                  size="icon"
-                  className="mx-auto h-9 w-9"
-                  onClick={() => openOrFocusTab("connections", "Connections")}
-                  aria-label="Connections"
-                >
-                  <Cable className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Connections</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {!ui.hideConnections && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isTabActive("connections") ? "secondary" : "ghost"}
+                    size="icon"
+                    className="mx-auto h-9 w-9"
+                    onClick={() => openOrFocusTab("connections", "Connections")}
+                    aria-label="Connections"
+                  >
+                    <Cable className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Connections</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
           {/* Brain */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isTabActive("brain") ? "secondary" : "ghost"}
-                  size="icon"
-                  className="mx-auto h-9 w-9"
-                  onClick={() => openOrFocusTab("brain", "Duck Brain")}
-                  aria-label="Duck Brain"
-                >
-                  <Brain className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Duck Brain</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {!ui.hideBrain && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isTabActive("brain") ? "secondary" : "ghost"}
+                    size="icon"
+                    className="mx-auto h-9 w-9"
+                    onClick={() => openOrFocusTab("brain", "Duck Brain")}
+                    aria-label="Duck Brain"
+                  >
+                    <Brain className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Duck Brain</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
           <Separator className="my-2 mx-2" />
 
@@ -318,7 +328,11 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   variant="ghost"
                   size="icon"
                   className="mx-auto h-9 w-9 relative"
-                  onClick={() => openOrFocusTab("connections", "Connections")}
+                  onClick={
+                    ui.hideConnections
+                      ? undefined
+                      : () => openOrFocusTab("connections", "Connections")
+                  }
                   aria-label="Connection status"
                 >
                   <Circle
@@ -331,7 +345,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                 <div className="text-xs">
                   <div className="font-medium">{currentConnection?.name || "No connection"}</div>
                   <div className="text-muted-foreground">
-                    {currentConnection?.scope || "Click to manage"}
+                    {currentConnection?.scope || (ui.hideConnections ? "" : "Click to manage")}
                   </div>
                 </div>
               </TooltipContent>
@@ -339,22 +353,24 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
           </TooltipProvider>
 
           {/* Settings */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isTabActive("settings") ? "secondary" : "ghost"}
-                  size="icon"
-                  className="mx-auto h-9 w-9"
-                  onClick={() => openOrFocusTab("settings", "Settings")}
-                  aria-label="Settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {!ui.hideSettings && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isTabActive("settings") ? "secondary" : "ghost"}
+                    size="icon"
+                    className="mx-auto h-9 w-9"
+                    onClick={() => openOrFocusTab("settings", "Settings")}
+                    aria-label="Settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Settings</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
           {/* Theme Toggle */}
           <TooltipProvider>

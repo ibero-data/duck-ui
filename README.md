@@ -134,22 +134,51 @@ The output will be in the `dist` directory.
 
 ### Embedding databases at build time
 
-Duck-UI can ship with pre-loaded DuckDB databases: drop your `.db` files into
-`public/databases/`, list them in `public/databases/manifest.json`, and they
-are fetched and attached (read-only into the WASM engine) automatically on
-startup — great for demo data and self-contained dashboards.
+Duck-UI can ship with pre-loaded DuckDB databases. List them in
+`public/databases/manifest.json` and they are attached automatically on startup
+— great for demo data, self-contained dashboards, and publishing a public
+dataset. Two kinds of source are supported:
+
+- **Bundled files** — drop a `.db` file into `public/databases/` and reference it
+  by filename. It's fetched and loaded into the WASM engine.
+- **Remote sources** — point at a connection string and DuckDB attaches it in
+  place (nothing is downloaded into the engine). This includes **DuckLake**
+  catalogs, `.db` files over HTTP, S3, and MotherDuck.
 
 ```json
 {
   "databases": [
-    { "name": "My Database", "file": "my-database.db", "autoLoad": true }
+    { "name": "My Database", "file": "my-database.db", "autoLoad": true },
+    { "name": "Anchorage Property", "file": "ducklake:https://pub-xxxx.r2.dev/catalog.ducklake" }
   ]
 }
 ```
 
+### Kiosk mode — publish a locked-down, read-only explorer
+
+Add a `ui` block to the same manifest to hide the panels that let visitors add
+connections, import data, or change settings. This turns Duck-UI into a fixed
+data explorer you can host on GitHub Pages, where people only browse and query
+your embedded databases.
+
+```json
+{
+  "ui": { "kiosk": true },
+  "databases": [
+    { "name": "Anchorage Property", "file": "ducklake:https://pub-xxxx.r2.dev/catalog.ducklake" }
+  ]
+}
+```
+
+`kiosk: true` enables `hideConnections`, `hideSettings`, `hideImport`,
+`hideBrain`, and `readOnly` — each overridable individually (e.g. keep the AI
+assistant with `"hideBrain": false`). Kiosk mode locks down the UI, not the SQL
+engine: the editor stays fully usable for querying, and attaching your catalog
+read-only keeps your source data safe.
+
 Rebuild (or rebuild the Docker image) and the databases appear in the Data
-Explorer on boot. See `public/databases/README.md` for the full manifest
-format.
+Explorer on boot. See `public/databases/README.md` for the full manifest format,
+every field, and GitHub Pages deploy steps.
 
 ## Usage
 

@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand";
 import { initializeWasmConnection } from "@/services/duckdb";
 import type { DuckStoreState, DuckdbSlice, ConnectionProvider } from "../types";
 import { getSetting } from "@/services/persistence/repositories/settingsRepository";
+import { loadAppConfig } from "@/lib/appConfig";
 import { toast } from "sonner";
 
 export const DEFAULT_DUCKDB_MEMORY_LIMIT_MB = 4096;
@@ -25,6 +26,9 @@ export const createDuckdbSlice: StateCreator<
 
   initialize: async () => {
     console.info(`[DuckDB] crossOriginIsolated: ${self.crossOriginIsolated}`);
+    // Load the build-time manifest first so kiosk UI flags are resolved before
+    // the app renders (no flash of management panels on a locked-down deploy).
+    await loadAppConfig();
     const initialConnections: ConnectionProvider[] = [];
 
     const {

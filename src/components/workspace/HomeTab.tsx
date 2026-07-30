@@ -31,6 +31,7 @@ import {
   type SavedQuery,
 } from "@/services/persistence/repositories/savedQueryRepository";
 import { demoDatasets, type DemoDataset } from "@/lib/demoDatasets";
+import { getUiConfig } from "@/lib/appConfig";
 
 const quickStartActions = [
   {
@@ -236,35 +237,37 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {quickStartActions.map((action, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.1 }}
-              className="truncate"
-            >
-              <Button
-                variant="outline"
-                className="h-auto p-6 flex flex-col items-start space-y-3 hover:bg-accent hover:text-accent-foreground group w-full border-2"
-                onClick={() =>
-                  action.action
-                    ? handleNewAction(action.action)
-                    : action.link && window.open(action.link, "_blank")
-                }
+          {quickStartActions
+            .filter((action) => !(action.action === "connect" && getUiConfig().hideConnections))
+            .map((action, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.1 }}
+                className="truncate"
               >
-                <div className="flex items-center space-x-3 text-primary">
-                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                    {action.icon}
+                <Button
+                  variant="outline"
+                  className="h-auto p-6 flex flex-col items-start space-y-3 hover:bg-accent hover:text-accent-foreground group w-full border-2"
+                  onClick={() =>
+                    action.action
+                      ? handleNewAction(action.action)
+                      : action.link && window.open(action.link, "_blank")
+                  }
+                >
+                  <div className="flex items-center space-x-3 text-primary">
+                    <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                      {action.icon}
+                    </div>
+                    <p className="font-bold text-lg truncate">{action.title}</p>
                   </div>
-                  <p className="font-bold text-lg truncate">{action.title}</p>
-                </div>
-                <p className="text-sm text-muted-foreground w-full truncate">
-                  {action.description}
-                </p>
-              </Button>
-            </motion.div>
-          ))}
+                  <p className="text-sm text-muted-foreground w-full truncate">
+                    {action.description}
+                  </p>
+                </Button>
+              </motion.div>
+            ))}
         </motion.div>
 
         <Tabs defaultValue="sample" className="space-y-6">
