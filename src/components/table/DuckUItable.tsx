@@ -134,11 +134,195 @@ const calculateOptimalWidth = (
   return estimatedWidth;
 };
 
+/** Sentinel page size meaning "show everything, virtualized" (the default). */
+const ALL_ROWS = Number.MAX_SAFE_INTEGER;
+
+/**
+ * Column visibility panel. Defined at module level on purpose: defining it
+ * inside DuckUITable recreated the component type on every parent render,
+ * remounting the panel and dropping input focus on each keystroke (the
+ * "filter deselects while typing" bug from the Show HN thread).
+ */
+interface ColumnSelectorPanelProps {
+  columnKeys: string[];
+  enabledColumns: Record<string, boolean>;
+  filter: string;
+  onFilterChange: (value: string) => void;
+  onToggleColumn: (columnId: string) => void;
+  onToggleAll: (value: boolean) => void;
+  onClose: () => void;
+}
+
+const ColumnSelectorPanel: React.FC<ColumnSelectorPanelProps> = React.memo(
+  ({
+    columnKeys,
+    enabledColumns,
+    filter,
+    onFilterChange,
+    onToggleColumn,
+    onToggleAll,
+    onClose,
+  }) => {
+    const filteredColumnKeys = useMemo(() => {
+      if (!filter) return columnKeys;
+      return columnKeys.filter((key) => key.toLowerCase().includes(filter.toLowerCase()));
+    }, [columnKeys, filter]);
+
+    const visibleCount = columnKeys.filter((key) => enabledColumns[key] !== false).length;
+    const totalCount = columnKeys.length;
+
+    return (
+      <Card className="column-selector-panel absolute right-0 top-12 z-20 w-[350px] bg-background shadow-lg rounded-md border p-2">
+        <CardContent className="p-2">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-semibold">
+              Toggle Columns{" "}
+              <span className="text-xs text-muted-foreground">
+                ({visibleCount}/{totalCount})
+              </span>
+            </h3>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-1.5 text-xs"
+                onClick={() => onToggleAll(true)}
+              >
+                All
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-1.5 text-xs"
+                onClick={() => onToggleAll(false)}
+              >
+                None
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="relative mb-3">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <Input
+              value={filter}
+              onChange={(e) => onFilterChange(e.target.value)}
+              placeholder="Filter columns..."
+              className="pl-7 h-7 text-xs w-full"
+            />
+            {filter && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-5 w-5 p-0"
+                onClick={() => onFilterChange("")}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+          <div className="h-[350px] pr-1 overflow-y-auto space-y-1">
+            {filteredColumnKeys.map((columnId) => (
+              <div key={columnId} className="flex items-center space-x-2 pl-1">
+                <Checkbox
+                  id={`column-sel-${columnId}`}
+                  checked={enabledColumns[columnId] !== false}
+                  onCheckedChange={() => onToggleColumn(columnId)}
+                />
+                <label
+                  htmlFor={`column-sel-${columnId}`}
+                  className="text-xs cursor-pointer truncate max-w-[240px]"
+                  title={columnId}
+                >
+                  {columnId}
+                </label>
+              </div>
+            ))}
+            {filteredColumnKeys.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-2">
+                No columns match your filter.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+);
+ColumnSelectorPanel.displayName = "ColumnSelectorPanel";
+
+interface SpreadsheetOptionsPanelProps {
+  showRowNumbers: boolean;
+  zebraStripes: boolean;
+  showGridLines: boolean;
+  onShowRowNumbers: (value: boolean) => void;
+  onZebraStripes: (value: boolean) => void;
+  onShowGridLines: (value: boolean) => void;
+  onClose: () => void;
+}
+
+const SpreadsheetOptionsPanel: React.FC<SpreadsheetOptionsPanelProps> = React.memo(
+  ({
+    showRowNumbers,
+    zebraStripes,
+    showGridLines,
+    onShowRowNumbers,
+    onZebraStripes,
+    onShowGridLines,
+    onClose,
+  }) => (
+    <Card className="spreadsheet-options-panel absolute right-0 top-12 z-20 w-[300px] bg-background shadow-lg rounded-md border p-2">
+      <CardContent className="p-2">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-semibold">Spreadsheet Options</h3>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="show-row-numbers"
+              checked={showRowNumbers}
+              onCheckedChange={(checked) => onShowRowNumbers(checked === true)}
+            />
+            <label htmlFor="show-row-numbers" className="text-xs cursor-pointer">
+              Show row numbers
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="zebra-stripes"
+              checked={zebraStripes}
+              onCheckedChange={(checked) => onZebraStripes(checked === true)}
+            />
+            <label htmlFor="zebra-stripes" className="text-xs cursor-pointer">
+              Zebra stripes
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="show-grid-lines"
+              checked={showGridLines}
+              onCheckedChange={(checked) => onShowGridLines(checked === true)}
+            />
+            <label htmlFor="show-grid-lines" className="text-xs cursor-pointer">
+              Show grid lines
+            </label>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+);
+SpreadsheetOptionsPanel.displayName = "SpreadsheetOptionsPanel";
+
 const DuckUITable: React.FC<DuckTableProps> = ({
   data = [],
   executionTime,
   responseSize,
-  initialPageSize = 25,
+  initialPageSize = ALL_ROWS,
   columnRenderers,
   tableHeight = "100%",
 }) => {
@@ -249,13 +433,23 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
 
-      // Close column selector if clicking outside
-      if (showColumnSelector && !target.closest(".column-selector-panel")) {
+      // Close column selector if clicking outside. The toggle button is
+      // excluded — otherwise mousedown closes the panel and the click reopens
+      // it, so the menu appears to never close.
+      if (
+        showColumnSelector &&
+        !target.closest(".column-selector-panel") &&
+        !target.closest(".column-selector-toggle")
+      ) {
         setShowColumnSelector(false);
       }
 
       // Close spreadsheet options if clicking outside
-      if (showSpreadsheetOptions && !target.closest(".spreadsheet-options-panel")) {
+      if (
+        showSpreadsheetOptions &&
+        !target.closest(".spreadsheet-options-panel") &&
+        !target.closest(".spreadsheet-options-toggle")
+      ) {
         setShowSpreadsheetOptions(false);
       }
 
@@ -921,161 +1115,6 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     );
   };
 
-  const ColumnSelector = () => {
-    const allColumnKeys = data?.[0] ? Object.keys(data[0]) : [];
-
-    // Memoize column keys to prevent re-renders
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const stableColumnKeys = useMemo(() => allColumnKeys, [JSON.stringify(allColumnKeys)]);
-
-    // Simplified filtering for column selector
-    const filteredColumnKeys = useMemo(() => {
-      if (!columnSelectorFilter) return stableColumnKeys;
-      return stableColumnKeys.filter((key) =>
-        key.toLowerCase().includes(columnSelectorFilter.toLowerCase())
-      );
-    }, [stableColumnKeys, columnSelectorFilter]);
-
-    if (!data || !data.length || !data[0]) return null;
-    const visibleCount = Object.values(enabledColumns).filter(Boolean).length;
-    const totalCount = allColumnKeys.length;
-
-    return (
-      <Card className="column-selector-panel absolute right-0 top-12 z-20 w-[350px] bg-background shadow-lg rounded-md border p-2">
-        <CardContent className="p-2">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-semibold">
-              Toggle Columns{" "}
-              <span className="text-xs text-muted-foreground">
-                ({visibleCount}/{totalCount})
-              </span>
-            </h3>
-            <div className="flex gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-1.5 text-xs"
-                onClick={() => toggleAllColumns(true)}
-              >
-                All
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-1.5 text-xs"
-                onClick={() => toggleAllColumns(false)}
-              >
-                None
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => setShowColumnSelector(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="relative mb-3">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-            <Input
-              value={columnSelectorFilter}
-              onChange={(e) => setColumnSelectorFilter(e.target.value)}
-              placeholder="Filter columns..."
-              className="pl-7 h-7 text-xs w-full"
-            />
-            {columnSelectorFilter && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-5 w-5 p-0"
-                onClick={() => setColumnSelectorFilter("")}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
-          <div className="h-[350px] pr-1 overflow-y-auto space-y-1">
-            {filteredColumnKeys.map((columnId) => (
-              <div key={columnId} className="flex items-center space-x-2 pl-1">
-                <Checkbox
-                  id={`column-sel-${columnId}`}
-                  checked={enabledColumns[columnId] !== false}
-                  onCheckedChange={() => toggleColumnVisibility(columnId)}
-                />
-                <label
-                  htmlFor={`column-sel-${columnId}`}
-                  className="text-xs cursor-pointer truncate max-w-[240px]"
-                  title={columnId}
-                >
-                  {columnId}
-                </label>
-              </div>
-            ))}
-            {filteredColumnKeys.length === 0 && (
-              <div className="text-xs text-muted-foreground text-center py-2">
-                No columns match your filter.
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const SpreadsheetOptions = () => {
-    return (
-      <Card className="spreadsheet-options-panel absolute right-0 top-12 z-20 w-[300px] bg-background shadow-lg rounded-md border p-2">
-        <CardContent className="p-2">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm font-semibold">Spreadsheet Options</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => setShowSpreadsheetOptions(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show-row-numbers"
-                checked={showRowNumbers}
-                onCheckedChange={(checked) => setShowRowNumbers(checked === true)}
-              />
-              <label htmlFor="show-row-numbers" className="text-xs cursor-pointer">
-                Show row numbers
-              </label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="zebra-stripes"
-                checked={zebraStripes}
-                onCheckedChange={(checked) => setZebraStripes(checked === true)}
-              />
-              <label htmlFor="zebra-stripes" className="text-xs cursor-pointer">
-                Zebra stripes
-              </label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show-grid-lines"
-                checked={showGridLines}
-                onCheckedChange={(checked) => setShowGridLines(checked === true)}
-              />
-              <label htmlFor="show-grid-lines" className="text-xs cursor-pointer">
-                Show grid lines
-              </label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
   const ContextMenu = () => {
     if (!contextMenu) return null;
 
@@ -1235,27 +1274,47 @@ const DuckUITable: React.FC<DuckTableProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowColumnSelector(!showColumnSelector)}
-                className="h-8 text-xs"
+                onClick={() => setShowColumnSelector((open) => !open)}
+                className="h-8 text-xs column-selector-toggle"
                 title="Configure visible columns"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
                 Columns
               </Button>
-              {showColumnSelector && <ColumnSelector />}
+              {showColumnSelector && data?.[0] && (
+                <ColumnSelectorPanel
+                  columnKeys={Object.keys(data[0])}
+                  enabledColumns={enabledColumns}
+                  filter={columnSelectorFilter}
+                  onFilterChange={setColumnSelectorFilter}
+                  onToggleColumn={toggleColumnVisibility}
+                  onToggleAll={toggleAllColumns}
+                  onClose={() => setShowColumnSelector(false)}
+                />
+              )}
             </div>
             <div className="relative">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowSpreadsheetOptions(!showSpreadsheetOptions)}
-                className="h-8 text-xs"
+                onClick={() => setShowSpreadsheetOptions((open) => !open)}
+                className="h-8 text-xs spreadsheet-options-toggle"
                 title="Spreadsheet display options"
               >
                 <Grid3X3 className="h-3.5 w-3.5 mr-1" />
                 View
               </Button>
-              {showSpreadsheetOptions && <SpreadsheetOptions />}
+              {showSpreadsheetOptions && (
+                <SpreadsheetOptionsPanel
+                  showRowNumbers={showRowNumbers}
+                  zebraStripes={zebraStripes}
+                  showGridLines={showGridLines}
+                  onShowRowNumbers={setShowRowNumbers}
+                  onZebraStripes={setZebraStripes}
+                  onShowGridLines={setShowGridLines}
+                  onClose={() => setShowSpreadsheetOptions(false)}
+                />
+              )}
             </div>
             {Object.keys(userResizedColumns).length > 0 && (
               <Button
@@ -1640,7 +1699,9 @@ const DuckUITable: React.FC<DuckTableProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
-              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
+              {table.getState().pagination.pageSize === ALL_ROWS
+                ? "All rows"
+                : `Page ${table.getState().pagination.pageIndex + 1} of ${table.getPageCount() || 1}`}
             </span>
             <select
               value={table.getState().pagination.pageSize}
@@ -1650,6 +1711,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
               className="text-xs border border-border/40 rounded-md h-7 px-2 bg-background"
               title="Rows per page"
             >
+              <option value={ALL_ROWS}>All (scroll)</option>
               {[10, 25, 50, 100, 200, 500, 1000, 5000, 10000].map((pageSize) => (
                 <option key={pageSize} value={pageSize}>
                   {pageSize} rows
