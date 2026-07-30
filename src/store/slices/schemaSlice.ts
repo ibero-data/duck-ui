@@ -91,6 +91,63 @@ export const createSchemaSlice: StateCreator<
     }
   },
 
+  fetchColumnDistribution: async (databaseName, tableName, columnName, columnType, schema) => {
+    const { currentConnection, connection } = get();
+    const useBareName =
+      databaseName === "main" || databaseName === "memory" || databaseName === ":memory:";
+    const qualified = qualifyTable(useBareName ? undefined : databaseName, schema, tableName);
+    const col = sqlEscapeIdentifier(columnName);
+
+    const upperType = columnType.toUpperCase();
+    const isNumeric = ["INT", "DOUBLE", "FLOAT", "DECIMAL", "REAL", "NUMERIC"].some((t) =>
+      upperType.includes(t)
+    );
+
+    // Numeric columns: 20-bin equi-width histogram. Everything else: top 5
+    // values by count. Both are one aggregate query, run only on expand.
+    const query = isNumeric
+      ? `WITH src AS (SELECT ${col} AS v FROM ${qualified} WHERE ${col} IS NOT NULL),
+              bounds AS (SELECT MIN(v) AS lo, MAX(v) AS hi FROM src)
+         SELECT LEAST(19, GREATEST(0, CAST(FLOOR((v - lo) * 20.0 / NULLIF(hi - lo, 0)) AS INT))) AS bucket,
+                COUNT(*) AS n
+         FROM src, bounds GROUP BY 1 ORDER BY 1`
+      : `SELECT CAST(${col} AS VARCHAR) AS v, COUNT(*) AS n
+         FROM ${qualified} WHERE ${col} IS NOT NULL
+         GROUP BY 1 ORDER BY n DESC, v LIMIT 5`;
+
+    try {
+      let result: QueryResult;
+      if (currentConnection?.scope === "External" && currentConnection) {
+        result = await executeExternalQuery(query, currentConnection);
+      } else {
+        const wasmConnection = validateConnection(connection);
+        const wasmResult = await wasmConnection.query(query);
+        result = resultToJSON(wasmResult);
+      }
+
+      if (isNumeric) {
+        const bins = new Array<number>(20).fill(0);
+        for (const row of result.data) {
+          const count = Number(row.n ?? 0);
+          // A constant column yields a NULL bucket — pile it into one bar.
+          const bucket = row.bucket === null || row.bucket === undefined ? 0 : Number(row.bucket);
+          if (bucket >= 0 && bucket < 20) bins[bucket] += count;
+        }
+        return { kind: "histogram", bins };
+      }
+      return {
+        kind: "topk",
+        values: result.data.map((row) => ({
+          value: String(row.v),
+          count: Number(row.n ?? 0),
+        })),
+      };
+    } catch (error) {
+      console.error("Failed to fetch column distribution:", error);
+      return null;
+    }
+  },
+
   deleteTable: async (tableName, database = "memory", schema) => {
     try {
       const { connection, currentConnection } = get();

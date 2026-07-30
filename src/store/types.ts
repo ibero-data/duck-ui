@@ -85,6 +85,14 @@ export interface ColumnStats {
   null_percentage: string;
 }
 
+/**
+ * Lazily-fetched value distribution for one column: an equi-width histogram
+ * for numeric columns, the top values by count for everything else.
+ */
+export type ColumnDistribution =
+  | { kind: "histogram"; bins: number[] }
+  | { kind: "topk"; values: { value: string; count: number }[] };
+
 export interface TableInfo {
   name: string;
   schema: string;
@@ -330,6 +338,13 @@ export interface SchemaSlice {
     tableName: string,
     schema?: string
   ) => Promise<ColumnStats[]>;
+  fetchColumnDistribution: (
+    databaseName: string,
+    tableName: string,
+    columnName: string,
+    columnType: string,
+    schema?: string
+  ) => Promise<ColumnDistribution | null>;
   deleteTable: (tableName: string, database?: string, schema?: string) => Promise<void>;
   importFile: (
     fileName: string,

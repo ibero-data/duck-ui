@@ -313,7 +313,15 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
                   <span>Loading column statistics...</span>
                 </div>
               ) : columnStats.length > 0 ? (
-                columnStats.map((stats) => <ColumnNode key={stats.column_name} stats={stats} />)
+                columnStats.map((stats) => (
+                  <ColumnNode
+                    key={stats.column_name}
+                    stats={stats}
+                    databaseName={parentDatabaseName}
+                    tableName={node.name}
+                    schema={node.schema}
+                  />
+                ))
               ) : null}
             </div>
           )}
