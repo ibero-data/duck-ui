@@ -3,6 +3,7 @@ import { Send, Square, Loader2, Table2, Columns } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { estimateTokens, formatTokenCount } from "@/lib/duckBrain/tokenEstimate";
 import type { DatabaseInfo } from "@/store";
 import SchemaAutocomplete, {
   buildSchemaSuggestions,
@@ -62,6 +63,8 @@ interface DuckBrainInputProps {
   placeholder?: string;
   databases?: DatabaseInfo[];
   className?: string;
+  /** Estimated tokens of everything sent besides the draft (schema, history, system prompt). */
+  baselineTokens?: number;
 }
 
 const DuckBrainInput: React.FC<DuckBrainInputProps> = ({
@@ -72,6 +75,7 @@ const DuckBrainInput: React.FC<DuckBrainInputProps> = ({
   placeholder = "Ask Duck Brain to write SQL... (@ for tables)",
   databases = [],
   className,
+  baselineTokens,
 }) => {
   const [input, setInput] = useState("");
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
@@ -271,6 +275,16 @@ const DuckBrainInput: React.FC<DuckBrainInputProps> = ({
           </Button>
         )}
       </div>
+
+      {/* Pre-run token estimate: schema + history + prompt + current draft (#23) */}
+      {baselineTokens !== undefined && (
+        <div
+          className="px-1 pt-1 text-[10px] text-muted-foreground select-none"
+          title="Rough estimate of tokens sent with this request (schema context, chat history, system prompt, and your message)"
+        >
+          ~{formatTokenCount(baselineTokens + estimateTokens(input))} tokens will be sent
+        </div>
+      )}
     </form>
   );
 };

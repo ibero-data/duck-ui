@@ -15,7 +15,7 @@ export class AnthropicProvider implements AIProvider {
   readonly name = "anthropic" as const;
 
   private apiKey: string = "";
-  private modelId: string = "claude-sonnet-4-20250514";
+  private modelId: string = "claude-sonnet-5";
   private abortController: AbortController | null = null;
   private ready: boolean = false;
   private initializing: boolean = false;
@@ -31,7 +31,7 @@ export class AnthropicProvider implements AIProvider {
       }
 
       this.apiKey = config.apiKey;
-      this.modelId = config.modelId || "claude-sonnet-4-20250514";
+      this.modelId = config.modelId || "claude-sonnet-5";
 
       // Note: Anthropic doesn't have a simple "list models" endpoint
       // We'll validate on first request instead

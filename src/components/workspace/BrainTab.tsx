@@ -143,7 +143,7 @@ const BrainTab = () => {
     }
 
     const currentConfig = duckBrain.providerConfigs[provider];
-    const defaultModel = provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-4-20250514";
+    const defaultModel = provider === "openai" ? "gpt-5-mini" : "claude-sonnet-5";
 
     updateProviderConfig(provider, {
       apiKey,
@@ -404,7 +404,7 @@ const BrainTab = () => {
               <div className="space-y-2">
                 <Label>Model</Label>
                 <Select
-                  value={providerConfigs.openai?.modelId || "gpt-4o-mini"}
+                  value={providerConfigs.openai?.modelId || "gpt-5-mini"}
                   onValueChange={(value) => handleModelChange("openai", value)}
                 >
                   <SelectTrigger>
@@ -470,7 +470,7 @@ const BrainTab = () => {
               <div className="space-y-2">
                 <Label>Model</Label>
                 <Select
-                  value={providerConfigs.anthropic?.modelId || "claude-sonnet-4-20250514"}
+                  value={providerConfigs.anthropic?.modelId || "claude-sonnet-5"}
                   onValueChange={(value) => handleModelChange("anthropic", value)}
                 >
                   <SelectTrigger>

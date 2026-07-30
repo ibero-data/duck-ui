@@ -161,7 +161,7 @@ export const createProfileSlice: StateCreator<
         if (cfg.provider === "openai") {
           providerConfigs.openai = {
             apiKey: cfg.apiKey ?? "",
-            modelId: config.modelId ?? "gpt-4o-mini",
+            modelId: config.modelId ?? "gpt-5-mini",
           };
           if (cfg.apiKey) aiProvider = "openai";
         } else if (cfg.provider === "anthropic") {

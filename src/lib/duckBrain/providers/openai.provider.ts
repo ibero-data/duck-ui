@@ -15,7 +15,7 @@ export class OpenAIProvider implements AIProvider {
   readonly name = "openai" as const;
 
   private apiKey: string = "";
-  private modelId: string = "gpt-4o-mini";
+  private modelId: string = "gpt-5-mini";
   private baseUrl: string = "https://api.openai.com/v1";
   private abortController: AbortController | null = null;
   private ready: boolean = false;
@@ -35,7 +35,7 @@ export class OpenAIProvider implements AIProvider {
       }
 
       this.apiKey = config.apiKey || "";
-      this.modelId = config.modelId || (isCustomEndpoint ? "llama3.2" : "gpt-4o-mini");
+      this.modelId = config.modelId || (isCustomEndpoint ? "llama3.2" : "gpt-5-mini");
       this.baseUrl = config.baseUrl || "https://api.openai.com/v1";
 
       // Test the connection

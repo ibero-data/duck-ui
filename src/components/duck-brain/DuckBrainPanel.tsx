@@ -14,6 +14,12 @@ import {
 import { useDuckStore, type AIProviderType } from "@/store";
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/lib/duckBrain";
 import { OPENAI_MODELS, ANTHROPIC_MODELS } from "@/lib/duckBrain/providers/types";
+import { formatSchemaForContext } from "@/lib/duckBrain/schemaFormatter";
+import {
+  TEXT_TO_SQL_SYSTEM_PROMPT,
+  DUCKDB_FEW_SHOT_EXAMPLES,
+} from "@/lib/duckBrain/prompts/text-to-sql";
+import { estimateTokens } from "@/lib/duckBrain/tokenEstimate";
 import DuckBrainMessages from "./DuckBrainMessages";
 import DuckBrainInput from "./DuckBrainInput";
 import { toast } from "sonner";
@@ -33,6 +39,7 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
   const executeQueryInChat = useDuckStore((s) => s.executeQueryInChat);
   const updateTabQuery = useDuckStore((s) => s.updateTabQuery);
   const setAIProvider = useDuckStore((s) => s.setAIProvider);
+  const updateProviderConfig = useDuckStore((s) => s.updateProviderConfig);
 
   const {
     modelStatus,
@@ -130,6 +137,39 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
     },
     [generateSQL]
   );
+
+  // Models switchable in-chat for the active provider (promised in #23).
+  const switchableModels = useMemo(() => {
+    if (aiProvider === "openai") return OPENAI_MODELS;
+    if (aiProvider === "anthropic") return ANTHROPIC_MODELS;
+    return null;
+  }, [aiProvider]);
+
+  const activeModelId =
+    aiProvider === "openai" || aiProvider === "anthropic"
+      ? providerConfigs[aiProvider]?.modelId || switchableModels?.[0]?.id
+      : undefined;
+
+  const handleModelChange = useCallback(
+    (modelId: string) => {
+      if (aiProvider !== "openai" && aiProvider !== "anthropic") return;
+      const config = providerConfigs[aiProvider];
+      updateProviderConfig(aiProvider, { ...config, modelId });
+    },
+    [aiProvider, providerConfigs, updateProviderConfig]
+  );
+
+  // Everything sent alongside the user's prompt: system prompt, few-shot
+  // examples, schema context, and the chat history. Recomputed as those grow
+  // so the input can show a pre-run token estimate (#23).
+  const baselineTokens = useMemo(() => {
+    const schema = formatSchemaForContext(databases).formatted;
+    const fewShot = DUCKDB_FEW_SHOT_EXAMPLES.map((m) =>
+      typeof m.content === "string" ? m.content : ""
+    ).join("\n");
+    const history = messages.map((m) => m.content).join("\n");
+    return estimateTokens(`${TEXT_TO_SQL_SYSTEM_PROMPT}\n${schema}\n${fewShot}\n${history}`);
+  }, [databases, messages]);
 
   const handleExecuteSQL = useCallback(
     async (messageId: string, sql: string) => {
@@ -303,6 +343,21 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
               <span>{providerDisplayInfo.name}</span>
             </div>
           )}
+          {/* Model switcher for the active cloud provider (#23) */}
+          {switchableModels && activeModelId && (
+            <Select value={activeModelId} onValueChange={handleModelChange}>
+              <SelectTrigger className="h-6 w-auto gap-1 px-2 text-xs border-0 bg-transparent ml-auto">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {switchableModels.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
@@ -325,6 +380,7 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
           disabled={modelStatus !== "ready" && !hasExternalProvider}
           databases={databases}
           placeholder="Ask Duck Brain... (@ for tables)"
+          baselineTokens={baselineTokens}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown, Hash, Type, Calendar, ToggleLeft } from "lucide-react";
 import { useDuckStore, type ColumnStats } from "@/store";
 import type { ColumnDistribution } from "@/store/types";
@@ -59,14 +59,15 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [distribution, setDistribution] = useState<ColumnDistribution | null>(null);
-  const [distributionLoaded, setDistributionLoaded] = useState(false);
+  // Ref, not state: it only gates the one-shot fetch and never drives rendering.
+  const distributionRequested = useRef(false);
   const fetchColumnDistribution = useDuckStore((s) => s.fetchColumnDistribution);
 
   // Fetch the value distribution once, when the column is first expanded.
   useEffect(() => {
-    if (!isExpanded || distributionLoaded || !databaseName || !tableName) return;
+    if (!isExpanded || distributionRequested.current || !databaseName || !tableName) return;
     let stale = false;
-    setDistributionLoaded(true);
+    distributionRequested.current = true;
     fetchColumnDistribution(
       databaseName,
       tableName,
@@ -81,7 +82,6 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({
     };
   }, [
     isExpanded,
-    distributionLoaded,
     databaseName,
     tableName,
     schema,
