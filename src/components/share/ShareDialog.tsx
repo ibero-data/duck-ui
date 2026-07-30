@@ -20,6 +20,7 @@ import {
   Info,
   Code2,
   SlidersHorizontal,
+  BadgeCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -28,6 +29,8 @@ import {
   type ShareLinks,
   type SharedParam,
 } from "@/lib/share";
+import { buildDeepLink, buildBadgeMarkdown, extractRemoteSources } from "@/lib/deepLink";
+import { Input } from "@/components/ui/input";
 import type { EditorTab } from "@/store/types";
 
 const NUMERIC_TYPE = /int|float|double|decimal|hugeint|numeric|real/i;
@@ -49,12 +52,26 @@ interface ShareDialogProps {
 export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
   const [links, setLinks] = useState<ShareLinks | null>(null);
   const [building, setBuilding] = useState(open && !!tab);
-  const [copied, setCopied] = useState<"link" | "iframe" | "webcomponent" | null>(null);
+  const [copied, setCopied] = useState<
+    "link" | "iframe" | "webcomponent" | "deep" | "badge" | null
+  >(null);
   const [params, setParams] = useState<SharedParam[]>([]);
+  const [badgeDataUrl, setBadgeDataUrl] = useState<string | null>(null);
 
   const hasChart = !!tab?.chartConfig;
   const sql = typeof tab?.content === "string" ? tab.content : "";
   const remoteSource = sql ? queryReproducesForViewers(sql) : true;
+
+  // "Open in Duck-UI" badge: prefill data URLs from the query itself.
+  const detectedSources = useMemo(() => extractRemoteSources(sql), [sql]);
+  const effectiveDataUrls = (badgeDataUrl ?? detectedSources.join(", "))
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const appOrigin = `${window.location.origin}${window.location.pathname === "/" ? "" : window.location.pathname.replace(/\/$/, "")}`;
+  const deepLink =
+    effectiveDataUrls.length > 0 ? buildDeepLink(`${appOrigin}/`, effectiveDataUrls, sql) : null;
+  const badgeMarkdown = deepLink ? buildBadgeMarkdown(deepLink, appOrigin) : null;
 
   // Result columns available to expose as interactive embed filters.
   const columns = useMemo(() => {
@@ -72,6 +89,7 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
     setParams([]);
     setLinks(null);
     setCopied(null);
+    setBadgeDataUrl(null);
     setBuilding(open && !!tab);
   }
 
@@ -110,7 +128,10 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
     setParams((prev) => prev.map((p) => (p.column === column ? { ...p, type } : p)));
   };
 
-  const copy = async (text: string, which: "link" | "iframe" | "webcomponent") => {
+  const copy = async (
+    text: string,
+    which: "link" | "iframe" | "webcomponent" | "deep" | "badge"
+  ) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(which);
@@ -155,6 +176,9 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
               </TabsTrigger>
               <TabsTrigger value="embed" className="flex items-center gap-2">
                 <Code2 className="h-3.5 w-3.5" /> Embed
+              </TabsTrigger>
+              <TabsTrigger value="badge" className="flex items-center gap-2">
+                <BadgeCheck className="h-3.5 w-3.5" /> Badge
               </TabsTrigger>
             </TabsList>
 
@@ -245,6 +269,61 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
                     })}
                   </div>
                 </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="badge" className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                An <strong>Open in Duck-UI</strong> link loads remote data and this query in one
+                click — paste the badge into a dataset README or blog post. Openers see a
+                confirmation before anything runs.
+              </p>
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium">Data URL(s) — comma separated</p>
+                <Input
+                  value={badgeDataUrl ?? detectedSources.join(", ")}
+                  onChange={(e) => setBadgeDataUrl(e.target.value)}
+                  placeholder="https://example.com/data.parquet"
+                  className="font-mono text-xs h-8"
+                />
+                {detectedSources.length === 0 && !badgeDataUrl && (
+                  <p className="text-xs text-muted-foreground">
+                    This query doesn't read from a URL yet. Point it at hosted data (with CORS
+                    enabled) so the link reproduces for anyone.
+                  </p>
+                )}
+              </div>
+              {deepLink && badgeMarkdown && (
+                <>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium">Deep link</p>
+                    <CopyField
+                      value={deepLink}
+                      disabled={false}
+                      copied={copied === "deep"}
+                      onCopy={() => copy(deepLink, "deep")}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium">Markdown badge</p>
+                    <CopyField
+                      value={badgeMarkdown}
+                      disabled={false}
+                      copied={copied === "badge"}
+                      onCopy={() => copy(badgeMarkdown, "badge")}
+                      rows={2}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Renders as{" "}
+                      <img
+                        src={`${import.meta.env.BASE_URL}badge.svg`}
+                        alt="Open in Duck-UI"
+                        className="inline h-4 align-text-bottom"
+                      />
+                    </p>
+                  </div>
+                </>
               )}
             </TabsContent>
           </Tabs>

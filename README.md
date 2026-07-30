@@ -49,6 +49,20 @@ Both are good tools. The differences that matter:
 
 If you just want a quick local UI and don't care about any of that, the official one is fine. Duck-UI is for when the answers to "can I host it, embed it, extend it, run it offline, and read the code" need to be yes.
 
+## "Open in Duck-UI" links
+
+Any hosted dataset can become a one-click, runnable analysis. Add `?load=` (and optionally `&sql=`) to the app URL:
+
+```
+https://demo.duckui.com/?load=https://example.com/nyc-taxi.parquet&sql=SELECT count(*) FROM nyc_taxi
+```
+
+Openers see exactly what will load and what will run, confirm once, and get a live editor over your data — nothing touches a server. Parquet, CSV, JSON, `.duckdb` files, and `ducklake:` catalogs are supported. The Share dialog generates the link and a README badge for you:
+
+[![Open in Duck-UI](./public/badge.svg)](https://demo.duckui.com/)
+
+The data host needs CORS enabled — see [hosting your data](docs/hosting-data.md) for a free R2/GitHub Pages setup.
+
 ## Publish a dataset with kiosk mode
 
 Duck-UI doubles as a zero-backend data-publishing appliance. Drop a manifest next to the build, deploy to GitHub Pages, and visitors get a read-only SQL explorer for your data:
