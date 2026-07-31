@@ -1,0 +1,4 @@
+id,price,note
+1,1.5e3,ok
+2,NULL,
+3,NaN,missing

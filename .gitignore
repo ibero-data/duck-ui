@@ -31,3 +31,6 @@ pnpm-lock.yaml
 
 post.md
 CLAUDE.md
+# Playwright
+test-results/
+playwright-report/

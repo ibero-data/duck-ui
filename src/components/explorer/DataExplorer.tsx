@@ -170,7 +170,10 @@ export default function DataExplorer() {
             {/* Import menu - hidden for external connections and in kiosk mode */}
             {canImport && (
               <DropdownMenu>
-                <DropdownMenuTrigger className="cursor-pointer p-2 border hover:bg-secondary rounded-md focus:outline-none">
+                <DropdownMenuTrigger
+                  aria-label="Data menu"
+                  className="cursor-pointer p-2 border hover:bg-secondary rounded-md focus:outline-none"
+                >
                   <EllipsisVertical className="h-5 w-5" />
                 </DropdownMenuTrigger>
                 <DropdownMenuPortal>
