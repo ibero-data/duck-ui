@@ -51,10 +51,11 @@ If you just want a quick local UI and don't care about any of that, the official
 
 ## "Open in Duck-UI" links
 
-Any hosted dataset can become a one-click, runnable analysis. Add `?load=` (and optionally `&sql=`) to the app URL:
+Any hosted dataset can become a one-click, runnable analysis. Add `?load=` (and optionally `&sql=`) to the app URL — [try this one](https://demo.duckui.com/?load=https://blobs.duckdb.org/stations.parquet&sql=SELECT%20country%2C%20count(*)%20AS%20stations%20FROM%20stations%20GROUP%20BY%20country%20ORDER%20BY%20stations%20DESC):
 
 ```
-https://demo.duckui.com/?load=https://example.com/nyc-taxi.parquet&sql=SELECT count(*) FROM nyc_taxi
+https://demo.duckui.com/?load=https://blobs.duckdb.org/stations.parquet
+  &sql=SELECT country, count(*) AS stations FROM stations GROUP BY country ORDER BY stations DESC
 ```
 
 Openers see exactly what will load and what will run, confirm once, and get a live editor over your data — nothing touches a server. Parquet, CSV, JSON, `.duckdb` files, and `ducklake:` catalogs are supported. The Share dialog generates the link and a README badge for you:

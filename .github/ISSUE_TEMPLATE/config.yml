@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or idea?
+    url: https://github.com/caioricciuti/duck-ui/discussions
+    about: Ask questions and share ideas in Discussions — issues are for bugs and concrete feature requests.
+  - name: Try the live demo
+    url: https://demo.duckui.com
+    about: Reproduce your problem on the latest version before filing, if you can.

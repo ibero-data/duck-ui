@@ -63,15 +63,33 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          // Precache the app shell (JS/CSS/HTML). The multi-MB DuckDB WASM
-          // binaries and AI models are cached at runtime on first use instead
-          // of forcing every visitor through a huge install — after one query
-          // (and one Brain load, if used) the app works fully offline.
-          globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+          // Precache ONLY the app shell — precaching every chunk pushed ~29MB
+          // to first-time visitors (Monaco language chunks, exceljs, both
+          // DuckDB workers). Hashed /assets/* chunks, the WASM binaries, and
+          // AI models are all cached at runtime on first use instead — after
+          // one session the app works fully offline.
+          globPatterns: [
+            'index.html',
+            'registerSW.js',
+            'manifest.webmanifest',
+            '*.{svg,png,ico}',
+            'assets/index-*.{js,css}',
+          ],
           globIgnores: ['**/env.js'],
           maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
           navigateFallback: 'index.html',
           runtimeCaching: [
+            {
+              // Hashed build chunks (immutable filenames) — cached as the
+              // app lazily loads them, replacing the old eager precache.
+              urlPattern: /\/assets\/.+\.(js|css)$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'duckui-chunks',
+                expiration: { maxEntries: 300 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
             {
               // Same-origin WASM (DuckDB engine bundles)
               urlPattern: /\.wasm$/,
