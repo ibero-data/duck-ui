@@ -32,6 +32,7 @@ import {
 } from "@/services/persistence/repositories/savedQueryRepository";
 import { demoDatasets, type DemoDataset } from "@/lib/demoDatasets";
 import { getUiConfig } from "@/lib/appConfig";
+import { toast } from "sonner";
 
 const quickStartActions = [
   {
@@ -122,6 +123,7 @@ const caioRicciutiProducts = [
 const HomeTab = () => {
   const createTab = useDuckStore((s) => s.createTab);
   const executeQuery = useDuckStore((s) => s.executeQuery);
+  const db = useDuckStore((s) => s.db);
   const updateTabChartConfig = useDuckStore((s) => s.updateTabChartConfig);
   const queryHistory = useDuckStore((s) => s.queryHistory);
   const error = useDuckStore((s) => s.error);
@@ -196,16 +198,33 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
     }
   };
 
-  const handleOpenDemo = (dataset: DemoDataset) => {
+  const handleOpenDemo = async (dataset: DemoDataset) => {
     const tabId = createTab("sql", dataset.query, dataset.name);
     if (!tabId) return;
     if (dataset.chartConfig) {
       updateTabChartConfig(tabId, dataset.chartConfig);
     }
+    // CSV demos are downloaded in JS and registered into the virtual FS —
+    // remote-CSV sniffing over httpfs is unreliable (see demoDatasets.ts).
+    if (dataset.stage && db) {
+      try {
+        const response = await fetch(dataset.stage.url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        try {
+          await db.dropFile(dataset.stage.file);
+        } catch {
+          // not registered yet — fine
+        }
+        await db.registerFileText(dataset.stage.file, text);
+      } catch (error) {
+        console.error("Failed to stage demo dataset:", error);
+        toast.error("Couldn't download the demo dataset. Check your connection and try again.");
+        return;
+      }
+    }
     // Auto-run so the user lands on populated results immediately.
-    setTimeout(() => {
-      executeQuery(dataset.query, tabId).catch(console.error);
-    }, 100);
+    executeQuery(dataset.query, tabId).catch(console.error);
   };
 
   const truncateQuery = (query: string, length: number = 50) => {
