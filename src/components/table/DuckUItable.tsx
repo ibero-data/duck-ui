@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -453,8 +453,10 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         setShowSpreadsheetOptions(false);
       }
 
-      // Close context menu on any click
-      if (contextMenu) {
+      // Close the context menu — but not when the mousedown is ON the menu,
+      // otherwise the menu unmounts before its buttons' click events fire and
+      // every item appears to do nothing.
+      if (contextMenu && !target.closest(".context-menu")) {
         setContextMenu(null);
       }
     };
@@ -631,79 +633,90 @@ const DuckUITable: React.FC<DuckTableProps> = ({
     return selection;
   };
 
+  // Shared by the Ctrl/Cmd+C shortcut and the context menu's Copy item.
+  const copySelectedCells = useCallback(() => {
+    if (selectedCells.size === 0) return;
+
+    // Get selected cells data organized by row and column
+    const cellsByPosition = new Map<string, unknown>();
+    const rowIndices = new Set<number>();
+    const columnIds = new Set<string>();
+
+    selectedCells.forEach((cellKey) => {
+      const [rowStr, colId] = cellKey.split("::");
+      const rowIndex = parseInt(rowStr);
+      rowIndices.add(rowIndex);
+      columnIds.add(colId);
+
+      const row = rows[rowIndex];
+      if (row) {
+        const cell = row.getAllCells().find((c) => c.column.id === colId);
+        if (cell) {
+          cellsByPosition.set(cellKey, cell.getValue());
+        }
+      }
+    });
+
+    // Sort rows and columns
+    const sortedRows = Array.from(rowIndices).sort((a, b) => a - b);
+    const sortedCols = Array.from(columnIds);
+
+    // Build TSV string for Excel/Sheets compatibility
+    const tsvRows: string[] = [];
+    sortedRows.forEach((rowIndex) => {
+      const rowValues: string[] = [];
+      sortedCols.forEach((colId) => {
+        const cellKey = `${rowIndex}::${colId}`;
+        const value = cellsByPosition.get(cellKey);
+        if (value !== undefined) {
+          const strValue = value === null ? "" : safeStringify(value);
+          rowValues.push(strValue);
+        } else if (selectedCells.has(cellKey)) {
+          rowValues.push("");
+        }
+      });
+      if (rowValues.length > 0) {
+        tsvRows.push(rowValues.join("\t"));
+      }
+    });
+
+    const tsvContent = tsvRows.join("\n");
+    navigator.clipboard.writeText(tsvContent).then(() => {
+      toast.success(`Copied ${selectedCells.size} cells to clipboard`);
+
+      // Visual feedback - flash selected cells
+      const tempCells = new Set(selectedCells);
+      setSelectedCells(new Set());
+      setTimeout(() => setSelectedCells(tempCells), 100);
+    });
+  }, [selectedCells, rows]);
+
+  // Shared by the Ctrl/Cmd+A shortcut and the context menu's Select All item.
+  const selectAllCells = useCallback(() => {
+    const allCells = new Set<string>();
+    rows.forEach((row, rowIndex) => {
+      row.getVisibleCells().forEach((cell) => {
+        if (cell.column.id !== "__row_number__") {
+          allCells.add(`${rowIndex}::${cell.column.id}`);
+        }
+      });
+    });
+    setSelectedCells(allCells);
+  }, [rows]);
+
   // Keyboard handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl/Cmd + C to copy selected cells
       if ((e.ctrlKey || e.metaKey) && e.key === "c" && selectedCells.size > 0) {
         e.preventDefault();
-
-        // Get selected cells data organized by row and column
-        const cellsByPosition = new Map<string, unknown>();
-        const rowIndices = new Set<number>();
-        const columnIds = new Set<string>();
-
-        selectedCells.forEach((cellKey) => {
-          const [rowStr, colId] = cellKey.split("::");
-          const rowIndex = parseInt(rowStr);
-          rowIndices.add(rowIndex);
-          columnIds.add(colId);
-
-          const row = rows[rowIndex];
-          if (row) {
-            const cell = row.getAllCells().find((c) => c.column.id === colId);
-            if (cell) {
-              cellsByPosition.set(cellKey, cell.getValue());
-            }
-          }
-        });
-
-        // Sort rows and columns
-        const sortedRows = Array.from(rowIndices).sort((a, b) => a - b);
-        const sortedCols = Array.from(columnIds);
-
-        // Build TSV string for Excel/Sheets compatibility
-        const tsvRows: string[] = [];
-        sortedRows.forEach((rowIndex) => {
-          const rowValues: string[] = [];
-          sortedCols.forEach((colId) => {
-            const cellKey = `${rowIndex}::${colId}`;
-            const value = cellsByPosition.get(cellKey);
-            if (value !== undefined) {
-              const strValue = value === null ? "" : safeStringify(value);
-              rowValues.push(strValue);
-            } else if (selectedCells.has(cellKey)) {
-              rowValues.push("");
-            }
-          });
-          if (rowValues.length > 0) {
-            tsvRows.push(rowValues.join("\t"));
-          }
-        });
-
-        const tsvContent = tsvRows.join("\n");
-        navigator.clipboard.writeText(tsvContent).then(() => {
-          toast.success(`Copied ${selectedCells.size} cells to clipboard`);
-
-          // Visual feedback - flash selected cells
-          const tempCells = new Set(selectedCells);
-          setSelectedCells(new Set());
-          setTimeout(() => setSelectedCells(tempCells), 100);
-        });
+        copySelectedCells();
       }
 
       // Ctrl/Cmd + A to select all
       if ((e.ctrlKey || e.metaKey) && e.key === "a") {
         e.preventDefault();
-        const allCells = new Set<string>();
-        rows.forEach((row, rowIndex) => {
-          row.getVisibleCells().forEach((cell) => {
-            if (cell.column.id !== "__row_number__") {
-              allCells.add(`${rowIndex}::${cell.column.id}`);
-            }
-          });
-        });
-        setSelectedCells(allCells);
+        selectAllCells();
       }
 
       // Escape to clear selection
@@ -715,7 +728,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedCells, rows]);
+  }, [selectedCells, copySelectedCells, selectAllCells]);
 
   // Handle mouse up globally for drag selection
   useEffect(() => {
@@ -1126,9 +1139,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         <button
           className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
           onClick={() => {
-            // Trigger copy
-            const e = new KeyboardEvent("keydown", { key: "c", ctrlKey: true });
-            window.dispatchEvent(e);
+            copySelectedCells();
             setContextMenu(null);
           }}
         >
@@ -1138,9 +1149,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         <button
           className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
           onClick={() => {
-            // Select all
-            const e = new KeyboardEvent("keydown", { key: "a", ctrlKey: true });
-            window.dispatchEvent(e);
+            selectAllCells();
             setContextMenu(null);
           }}
         >

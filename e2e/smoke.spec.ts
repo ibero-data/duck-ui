@@ -123,6 +123,23 @@ test("exports query results to CSV", async ({ page }) => {
   expect(download.suggestedFilename()).toMatch(/\.csv$/);
 });
 
+test("cell context menu items actually work", async ({ page }) => {
+  const sql = "SELECT range AS id, 'name_' || range AS name FROM range(25)";
+  await page.goto(`/?query=${b64(sql)}&execute=true`);
+  await ensureProfile(page);
+  const cell = page.getByText("name_3", { exact: true }).first();
+  await expect(cell).toBeVisible({ timeout: 60_000 });
+
+  // Select a cell, open the menu, pick Select Column — the selection must
+  // grow to the whole column (regression: menu items used to unmount before
+  // their click handlers could fire, so every item silently did nothing).
+  await cell.click();
+  await expect(page.getByText("1 cell selected")).toBeVisible();
+  await cell.click({ button: "right" });
+  await page.getByRole("button", { name: "Select Column" }).click();
+  await expect(page.getByText("25 cells selected")).toBeVisible();
+});
+
 test("Open-in-Duck-UI deep link confirms, loads remote parquet, and runs", async ({
   page,
 }) => {
