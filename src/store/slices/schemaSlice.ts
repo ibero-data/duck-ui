@@ -99,9 +99,11 @@ export const createSchemaSlice: StateCreator<
     const col = sqlEscapeIdentifier(columnName);
 
     const upperType = columnType.toUpperCase();
-    const isNumeric = ["INT", "DOUBLE", "FLOAT", "DECIMAL", "REAL", "NUMERIC"].some((t) =>
-      upperType.includes(t)
-    );
+    // INTERVAL contains "INT" but can't do the histogram arithmetic — send it
+    // down the top-k branch instead.
+    const isNumeric =
+      !upperType.includes("INTERVAL") &&
+      ["INT", "DOUBLE", "FLOAT", "DECIMAL", "REAL", "NUMERIC"].some((t) => upperType.includes(t));
 
     // Numeric columns: 20-bin equi-width histogram. Everything else: top 5
     // values by count. Both are one aggregate query, run only on expand.
@@ -243,13 +245,16 @@ export const createSchemaSlice: StateCreator<
           SELECT * FROM read_${fileType.toLowerCase()}('${sqlEscapeString(fileName)}')
         `);
       }
+      // `database` ("memory") is the CATALOG, not the schema — the old query
+      // filtered table_schema by it and always counted 0, which the previous
+      // undefined === 0 row access silently masked.
       const verification = await connection.query(`
         SELECT COUNT(*) AS count
         FROM information_schema.tables
         WHERE table_name = '${sqlEscapeString(tableName)}'
-          AND table_schema = '${sqlEscapeString(database)}'
+          AND table_catalog = '${sqlEscapeString(database)}'
       `);
-      if (verification.toArray()[0][0] === 0) {
+      if (Number(verification.toArray()[0]?.count ?? 0) === 0) {
         throw new Error(`${createType} creation verification failed`);
       }
       await get().fetchDatabasesAndTablesInfo();

@@ -919,6 +919,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
             if (val === null || val === undefined) return "NULL";
             if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
             if (typeof val === "bigint") return val.toString();
+            if (val instanceof Date) return `TIMESTAMP '${formatTimestampUTC(val)}'`;
             if (typeof val === "object") return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
             return String(val);
           });
@@ -1081,6 +1082,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
             if (val === null || val === undefined) return "NULL";
             if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
             if (typeof val === "bigint") return val.toString();
+            if (val instanceof Date) return `TIMESTAMP '${formatTimestampUTC(val)}'`;
             if (typeof val === "object") return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
             return String(val);
           });

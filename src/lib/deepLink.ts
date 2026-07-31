@@ -71,6 +71,7 @@ export function parseDeepLink(params: URLSearchParams): DeepLinkRequest | null {
     value === "ducklake";
 
   const sources: DeepLinkSource[] = [];
+  const usedNames = new Set<string>();
   loads.forEach((url, index) => {
     const trimmed = url.trim();
     const isHttp = /^https?:\/\//i.test(trimmed);
@@ -82,7 +83,14 @@ export function parseDeepLink(params: URLSearchParams): DeepLinkRequest | null {
         ? formatOverride
         : inferFormat(trimmed);
     if (!format) return;
-    sources.push({ url: trimmed, format, name: deriveSourceName(trimmed, index) });
+    // De-duplicate derived names so one source can't silently shadow another.
+    let name = deriveSourceName(trimmed, index);
+    let suffix = 2;
+    while (usedNames.has(name)) {
+      name = `${deriveSourceName(trimmed, index)}_${suffix++}`;
+    }
+    usedNames.add(name);
+    sources.push({ url: trimmed, format, name });
   });
 
   if (sources.length === 0) return null;
@@ -126,13 +134,14 @@ export function buildDeepLink(
   baseUrl: string,
   sourceUrls: string[],
   sql?: string,
-  options: { run?: boolean } = {}
+  options: { run?: boolean; format?: SourceFormat } = {}
 ): string {
   const url = new URL(baseUrl);
   for (const source of sourceUrls) {
     if (source.trim()) url.searchParams.append("load", source.trim());
   }
   if (sql?.trim()) url.searchParams.set("sql", sql.trim());
+  if (options.format) url.searchParams.set("format", options.format);
   if (options.run === false) url.searchParams.set("run", "0");
   return url.toString();
 }

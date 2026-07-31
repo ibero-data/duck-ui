@@ -124,6 +124,7 @@ const HomeTab = () => {
   const createTab = useDuckStore((s) => s.createTab);
   const executeQuery = useDuckStore((s) => s.executeQuery);
   const db = useDuckStore((s) => s.db);
+  const currentConnection = useDuckStore((s) => s.currentConnection);
   const updateTabChartConfig = useDuckStore((s) => s.updateTabChartConfig);
   const queryHistory = useDuckStore((s) => s.queryHistory);
   const error = useDuckStore((s) => s.error);
@@ -204,19 +205,22 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
     if (dataset.chartConfig) {
       updateTabChartConfig(tabId, dataset.chartConfig);
     }
-    // CSV demos are downloaded in JS and registered into the virtual FS —
-    // remote-CSV sniffing over httpfs is unreliable (see demoDatasets.ts).
-    if (dataset.stage && db) {
+    // CSV demos are downloaded in JS and registered into the virtual FS under
+    // their own URL (registered names shadow httpfs) — remote-CSV sniffing
+    // over httpfs is unreliable (see demoDatasets.ts). External servers read
+    // the URL server-side, so no staging there.
+    const isExternal = currentConnection?.scope === "External";
+    if (dataset.stage && db && !isExternal) {
       try {
         const response = await fetch(dataset.stage.url);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const text = await response.text();
         try {
-          await db.dropFile(dataset.stage.file);
+          await db.dropFile(dataset.stage.url);
         } catch {
           // not registered yet — fine
         }
-        await db.registerFileText(dataset.stage.file, text);
+        await db.registerFileText(dataset.stage.url, text);
       } catch (error) {
         console.error("Failed to stage demo dataset:", error);
         toast.error("Couldn't download the demo dataset. Check your connection and try again.");

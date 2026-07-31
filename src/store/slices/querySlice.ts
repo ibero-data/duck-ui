@@ -83,8 +83,15 @@ export const createQuerySlice: StateCreator<
         // send() streams the result so cancelSent() can interrupt it; the
         // queue guarantees only one statement is active on that connection.
         const run = async (): Promise<QueryResult> => {
+          // Stop pressed while this query sat in the queue — never start it.
+          if (cancelledTabs.has(cancelKey)) throw new Error("Query cancelled");
           const editorConnection = await getEditorConnection(db);
           const reader = await editorConnection.send(query);
+          // Stop pressed in the window before send() resolved.
+          if (cancelledTabs.has(cancelKey)) {
+            await editorConnection.cancelSent().catch(() => {});
+            throw new Error("Query cancelled");
+          }
           activeCancellers.set(cancelKey, () => {
             cancelledTabs.add(cancelKey);
             return editorConnection.cancelSent();
@@ -161,12 +168,16 @@ export const createQuerySlice: StateCreator<
 
   cancelQuery: async (tabId) => {
     const cancel = activeCancellers.get(tabId);
-    if (cancel) {
-      try {
-        await cancel();
-      } catch (error) {
-        console.error("Failed to cancel query:", error);
-      }
+    if (!cancel) {
+      // The query hasn't started yet (queued behind another tab, or send()
+      // still in flight) — flag it so run() bails before executing.
+      cancelledTabs.add(tabId);
+      return;
+    }
+    try {
+      await cancel();
+    } catch (error) {
+      console.error("Failed to cancel query:", error);
     }
   },
 

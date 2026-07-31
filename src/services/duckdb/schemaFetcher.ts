@@ -42,7 +42,9 @@ export const fetchWasmDatabases = async (
             const countResult = await connection.query(
               `SELECT COUNT(*) as count FROM ${qualified}`
             );
-            const countValue = Number(countResult.toArray()[0][0]);
+            // Named access — Arrow StructRows have no numeric index, and the
+            // count arrives as a BigInt.
+            const countValue = Number(countResult.toArray()[0]?.count ?? 0);
             return {
               name: tableName,
               schema: schemaName,

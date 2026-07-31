@@ -313,6 +313,25 @@ const App = () => {
   );
 };
 
+// After a deploy, the auto-updating service worker purges the previous
+// build's precache; a mid-session lazy chunk load would then 404. Reload once
+// when a NEW worker replaces an existing one — the 2s-debounced workspace
+// auto-save makes this nearly lossless. The first-ever install also fires
+// controllerchange (clientsClaim), and reloading there would loop.
+if ("serviceWorker" in navigator) {
+  let hadController = !!navigator.serviceWorker.controller;
+  let reloadingForNewVersion = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) {
+      hadController = true;
+      return;
+    }
+    if (reloadingForNewVersion) return;
+    reloadingForNewVersion = true;
+    window.location.reload();
+  });
+}
+
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Failed to find root element");
 

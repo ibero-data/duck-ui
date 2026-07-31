@@ -31,7 +31,7 @@ Open `http://localhost:5522`. That's the whole setup.
 - **Duck Brain (AI)** — text-to-SQL and one-click error fixing with your choice of provider: WebLLM fully in-browser (no API key, works offline), OpenAI, Anthropic, Chrome built-in AI, or any OpenAI-compatible endpoint (Ollama, DeepSeek, ...). Only your schema is ever sent, never your data — and with WebLLM, not even that.
 - **Share and embed** — encode a whole analysis (query, notebook, chart config) into a URL. No server involved. Embed live, runnable queries in any page with an iframe or the `<duck-embed>` web component.
 - **Persistence** — OPFS-backed local databases that survive reloads, profiles, encrypted credential storage (AES-256-GCM in your browser).
-- **Connections** — in-memory WASM, persistent OPFS, external [DuckDB httpserver](https://github.com/quackscience/duckdb-extension-httpserver) instances, DuckLake remote catalogs.
+- **Connections** — in-memory WASM, persistent OPFS, external [DuckDB httpserver](https://github.com/quackscience/duckdb-extension-httpserver) instances. DuckLake catalogs attach via the embedded-database manifest, `?load=ducklake:` links, or plain ATTACH SQL.
 - **Deploy anywhere** — Docker image, static hosting, GitHub Pages subpaths, air-gapped/offline setups, kiosk mode for publishing read-only datasets.
 
 ## Why Duck-UI and not the official `duckdb -ui`?
@@ -86,13 +86,13 @@ Runtime environment variables (Docker):
 |----------|-------------|---------|
 | `DUCK_UI_EXTERNAL_CONNECTION_NAME` | Name for a pre-configured external connection | "" |
 | `DUCK_UI_EXTERNAL_HOST` | Host URL for external DuckDB (may include a path) | "" |
-| `DUCK_UI_EXTERNAL_PORT` | Port for external DuckDB | null |
+| `DUCK_UI_EXTERNAL_PORT` | Port for external DuckDB (NAME, HOST and PORT must all be set or the connection is skipped) | null |
 | `DUCK_UI_EXTERNAL_API_KEY` | API key sent as `X-API-Key` (takes priority over user/pass) | "" |
 | `DUCK_UI_EXTERNAL_USER` / `DUCK_UI_EXTERNAL_PASS` | Basic auth credentials | "" |
 | `DUCK_UI_EXTERNAL_DATABASE_NAME` | Database name for the external connection | "" |
 | `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow unsigned DuckDB extensions | false |
 | `DUCK_UI_DUCKDB_WASM_USE_CDN` | Load DuckDB WASM from CDN | false |
-| `DUCK_UI_DUCKDB_WASM_BASE_URL` | Custom CDN base URL | auto jsDelivr |
+| `DUCK_UI_DUCKDB_WASM_BASE_URL` | Custom CDN base URL (the origin is added to the CSP automatically at container start) | auto jsDelivr |
 
 Build-time: `DUCK_UI_BASEPATH=/subpath/` for subpath deploys, `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true` for CDN-only artifacts.
 

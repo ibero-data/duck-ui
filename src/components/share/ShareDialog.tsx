@@ -29,7 +29,13 @@ import {
   type ShareLinks,
   type SharedParam,
 } from "@/lib/share";
-import { buildDeepLink, buildBadgeMarkdown, extractRemoteSources } from "@/lib/deepLink";
+import {
+  buildDeepLink,
+  buildBadgeMarkdown,
+  extractRemoteSources,
+  inferFormat,
+  type SourceFormat,
+} from "@/lib/deepLink";
 import { Input } from "@/components/ui/input";
 import type { EditorTab } from "@/store/types";
 
@@ -57,6 +63,7 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
   >(null);
   const [params, setParams] = useState<SharedParam[]>([]);
   const [badgeDataUrl, setBadgeDataUrl] = useState<string | null>(null);
+  const [badgeFormat, setBadgeFormat] = useState<SourceFormat>("parquet");
 
   const hasChart = !!tab?.chartConfig;
   const sql = typeof tab?.content === "string" ? tab.content : "";
@@ -68,9 +75,18 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-  const appOrigin = `${window.location.origin}${window.location.pathname === "/" ? "" : window.location.pathname.replace(/\/$/, "")}`;
+  // Derive from the build base, not the current route — /a share links would
+  // otherwise produce /a/badge.svg and /a/?load=... URLs.
+  const appOrigin = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}`;
+  // Extension-less URLs (common on R2) need an explicit format or openers
+  // get a link that silently does nothing.
+  const needsFormat = effectiveDataUrls.some((url) => !inferFormat(url));
   const deepLink =
-    effectiveDataUrls.length > 0 ? buildDeepLink(`${appOrigin}/`, effectiveDataUrls, sql) : null;
+    effectiveDataUrls.length > 0
+      ? buildDeepLink(`${appOrigin}/`, effectiveDataUrls, sql, {
+          format: needsFormat ? badgeFormat : undefined,
+        })
+      : null;
   const badgeMarkdown = deepLink ? buildBadgeMarkdown(deepLink, appOrigin) : null;
 
   // Result columns available to expose as interactive embed filters.
@@ -291,6 +307,23 @@ export function ShareDialog({ open, onOpenChange, tab }: ShareDialogProps) {
                     This query doesn't read from a URL yet. Point it at hosted data (with CORS
                     enabled) so the link reproduces for anyone.
                   </p>
+                )}
+                {needsFormat && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">
+                      A URL has no file extension — pick its format so the link works:
+                    </span>
+                    <select
+                      value={badgeFormat}
+                      onChange={(e) => setBadgeFormat(e.target.value as SourceFormat)}
+                      className="text-xs border rounded px-1.5 py-0.5 bg-background"
+                    >
+                      <option value="parquet">Parquet</option>
+                      <option value="csv">CSV</option>
+                      <option value="json">JSON</option>
+                      <option value="duckdb">DuckDB</option>
+                    </select>
+                  </div>
                 )}
               </div>
               {deepLink && badgeMarkdown && (

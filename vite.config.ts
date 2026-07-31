@@ -92,11 +92,25 @@ export default defineConfig(({ mode }) => {
               },
             },
             {
+              // StaleWhileRevalidate (not CacheFirst): this route caches
+              // opaque no-cors responses, so a poisoned/failed entry must be
+              // able to self-heal from the network.
               urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
-              handler: 'CacheFirst',
+              handler: 'StaleWhileRevalidate',
               options: {
                 cacheName: 'jsdelivr-cdn',
-                expiration: { maxEntries: 40 },
+                expiration: { maxEntries: 40, maxAgeSeconds: 7 * 24 * 60 * 60 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              // Runtime config: fresh from the server when online, last-seen
+              // value when offline (env.js is excluded from the precache).
+              urlPattern: /\/env\.js$/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'duckui-env',
+                expiration: { maxEntries: 1 },
                 cacheableResponse: { statuses: [0, 200] },
               },
             },

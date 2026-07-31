@@ -25,12 +25,15 @@ export interface DemoDataset {
   chartConfig?: ChartConfig;
   /**
    * CSV sources are downloaded in JS and registered into DuckDB's virtual FS
-   * under `file` before the query runs. Remote-CSV dialect sniffing over
-   * httpfs is unreliable in duckdb-wasm (partial range reads confuse the
-   * sniffer), while parsing locally-registered bytes is rock solid — parquet
-   * sources don't need this and stream directly.
+   * under the URL itself before the query runs (registered names shadow
+   * httpfs). Remote-CSV dialect sniffing over httpfs is unreliable in
+   * duckdb-wasm (partial range reads confuse the sniffer), while parsing
+   * locally-registered bytes is rock solid. The query keeps the real URL, so
+   * share links reproduce and external DuckDB servers (which read the URL
+   * server-side, no staging) run the same SQL. Parquet sources don't need
+   * this and stream directly.
    */
-  stage?: { url: string; file: string };
+  stage?: { url: string };
 }
 
 export const demoDatasets: DemoDataset[] = [
@@ -42,13 +45,12 @@ export const demoDatasets: DemoDataset[] = [
     source: "vega-datasets · CSV",
     stage: {
       url: "https://raw.githubusercontent.com/vega/vega-datasets/main/data/seattle-weather.csv",
-      file: "seattle_weather.csv",
     },
     query: `-- Average high temperature by month
 SELECT
   month("date") AS month,
   ROUND(AVG(temp_max), 1) AS avg_high_c
-FROM read_csv('seattle_weather.csv')
+FROM read_csv('https://raw.githubusercontent.com/vega/vega-datasets/main/data/seattle-weather.csv')
 GROUP BY month
 ORDER BY month;`,
     chartConfig: { type: "line", xAxis: "month", yAxis: "avg_high_c" },
@@ -92,13 +94,12 @@ ORDER BY stations DESC;`,
     source: "blobs.duckdb.org · CSV",
     stage: {
       url: "https://blobs.duckdb.org/data/Star_Trek-Season_1.csv",
-      file: "star_trek_s1.csv",
     },
     query: `-- Downed redshirts per episode
 SELECT
   episode_num,
   cnt_downed_redshirts AS redshirts_lost
-FROM read_csv('star_trek_s1.csv')
+FROM read_csv('https://blobs.duckdb.org/data/Star_Trek-Season_1.csv')
 ORDER BY episode_num;`,
     chartConfig: { type: "bar", xAxis: "episode_num", yAxis: "redshirts_lost" },
   },

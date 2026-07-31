@@ -69,6 +69,13 @@ describe("parseDeepLink", () => {
   it("drops sources whose format cannot be determined", () => {
     expect(parseDeepLink(params("load=https://x.com/thing"))).toBeNull();
   });
+
+  it("de-duplicates derived names so sources can't shadow each other", () => {
+    const req = parseDeepLink(
+      params("load=https://a.com/data.parquet&load=https://b.com/data.parquet")
+    );
+    expect(req!.sources.map((s) => s.name)).toEqual(["data", "data_2"]);
+  });
 });
 
 describe("buildSourceSQL", () => {

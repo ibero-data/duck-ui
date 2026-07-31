@@ -46,6 +46,10 @@ export function DeepLinkLoader() {
   // Kiosk publishers pin their own data; links can't add more there.
   const request: DeepLinkRequest | null = useMemo(() => {
     if (!isInitialized || dismissed || getUiConfig().hideImport) return null;
+    // No deep links inside iframes: an embedding page could overlay bait on
+    // top of the confirm dialog (clickjacking), and embeds have their own
+    // share-payload mechanism anyway.
+    if (window.top !== window.self) return null;
     return parseDeepLink(searchParams);
   }, [isInitialized, dismissed, searchParams]);
 
@@ -57,8 +61,17 @@ export function DeepLinkLoader() {
   const handleLoad = useCallback(
     async (run: boolean) => {
       if (!request) return;
+      const { connection, currentConnection } = useDuckStore.getState();
+      // Deep links attach into the in-browser engine; on an external server
+      // connection the loaded sources would be invisible. Keep the dialog
+      // open so the link isn't consumed.
+      if (!connection || currentConnection?.scope === "External") {
+        toast.error("Shared data loads into the in-browser DuckDB engine", {
+          description: "Switch to a WASM or OPFS connection, then open this link again.",
+        });
+        return;
+      }
       setIsLoading(true);
-      const { connection } = useDuckStore.getState();
 
       try {
         for (const source of request.sources) {
@@ -138,14 +151,21 @@ export function DeepLinkLoader() {
                 {request.sources.map((source) => (
                   <li key={source.url} className="flex items-start gap-2 font-mono text-xs">
                     <ExternalLink className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                    <span className="break-all">{source.url}</span>
+                    <span className="break-all">
+                      {source.url}{" "}
+                      <span className="text-muted-foreground">→ attaches as {source.name}</span>
+                    </span>
                   </li>
                 ))}
               </ul>
               {request.sql && (
                 <>
-                  <p>and run this SQL:</p>
-                  <pre className="max-h-40 overflow-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
+                  <p>
+                    and run this SQL ({request.sql.split("\n").length}{" "}
+                    {request.sql.split("\n").length === 1 ? "line" : "lines"} — scroll to read all
+                    of it):
+                  </p>
+                  <pre className="max-h-60 overflow-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
                     {request.sql}
                   </pre>
                 </>
@@ -154,8 +174,8 @@ export function DeepLinkLoader() {
                 <ShieldAlert className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                 <span>
                   Everything runs in your browser only — no data leaves this tab. Sources from{" "}
-                  {hosts.join(", ")} are attached read-only, but only load links from people you
-                  trust.
+                  {hosts.join(", ")} are attached read-only, but the SQL runs with full access to
+                  your local session, so only open links from people you trust.
                 </span>
               </p>
             </div>
