@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import { Table, Schema, type RecordBatch } from "apache-arrow";
+import type * as duckdb from "@duckdb/duckdb-wasm";
 import {
   executeExternalQuery,
   resultToJSON,
@@ -19,6 +20,37 @@ import {
 const activeCancellers = new Map<string, () => void | Promise<unknown>>();
 const cancelledTabs = new Set<string>();
 
+/**
+ * Editor queries run on their OWN connection, one at a time.
+ *
+ * A streamed (send) result is silently truncated when any other statement runs
+ * on the same connection before the stream is drained — and the app's shared
+ * connection is busy with introspection at boot, which shipped as auto-run
+ * share links returning 0 rows. A dedicated connection removes the interleave;
+ * the queue serializes concurrent tab runs on it; session state (SET, temp
+ * tables) survives across runs because the connection is long-lived.
+ */
+let editorConn: duckdb.AsyncDuckDBConnection | null = null;
+let editorConnDb: duckdb.AsyncDuckDB | null = null;
+let executionQueue: Promise<unknown> = Promise.resolve();
+
+const getEditorConnection = async (
+  db: duckdb.AsyncDuckDB
+): Promise<duckdb.AsyncDuckDBConnection> => {
+  if (!editorConn || editorConnDb !== db) {
+    if (editorConn) {
+      try {
+        await editorConn.close();
+      } catch {
+        // stale connection from a previous engine — nothing to do
+      }
+    }
+    editorConn = await db.connect();
+    editorConnDb = db;
+  }
+  return editorConn;
+};
+
 export const createQuerySlice: StateCreator<
   DuckStoreState,
   [["zustand/devtools", never]],
@@ -29,7 +61,7 @@ export const createQuerySlice: StateCreator<
   executingTabs: {},
 
   executeQuery: async (query, tabId?) => {
-    const { currentConnection, connection } = get();
+    const { currentConnection, connection, db } = get();
     const cancelKey = tabId ?? "__adhoc__";
     cancelledTabs.delete(cancelKey);
     try {
@@ -45,25 +77,32 @@ export const createQuerySlice: StateCreator<
         });
         queryResult = await executeExternalQuery(query, currentConnection, controller.signal);
       } else {
-        if (!connection) throw new Error("WASM connection not initialized");
-        const wasmConnection = validateConnection(connection);
-        // send() instead of query(): a streamed result can be interrupted via
-        // cancelSent(). Note all tabs share one physical connection, so cancel
-        // interrupts whatever statement that connection is currently running.
-        const reader = await wasmConnection.send(query);
-        activeCancellers.set(cancelKey, () => {
-          cancelledTabs.add(cancelKey);
-          return wasmConnection.cancelSent();
-        });
-        const batches: RecordBatch[] = [];
-        for await (const batch of reader) {
-          batches.push(batch);
-        }
-        const table =
-          batches.length > 0 ? new Table(batches) : new Table(reader.schema ?? new Schema([]));
-        queryResult = resultToJSON(table);
+        if (!connection || !db) throw new Error("WASM connection not initialized");
+        validateConnection(connection);
+        // Runs on the dedicated editor connection (see getEditorConnection).
+        // send() streams the result so cancelSent() can interrupt it; the
+        // queue guarantees only one statement is active on that connection.
+        const run = async (): Promise<QueryResult> => {
+          const editorConnection = await getEditorConnection(db);
+          const reader = await editorConnection.send(query);
+          activeCancellers.set(cancelKey, () => {
+            cancelledTabs.add(cancelKey);
+            return editorConnection.cancelSent();
+          });
+          const batches: RecordBatch[] = [];
+          for await (const batch of reader) {
+            batches.push(batch);
+          }
+          const table =
+            batches.length > 0 ? new Table(batches) : new Table(reader.schema ?? new Schema([]));
+          return resultToJSON(table);
+        };
+        const resultPromise = executionQueue.then(run, run);
+        executionQueue = resultPromise.catch(() => undefined);
+        queryResult = await resultPromise;
       }
       activeCancellers.delete(cancelKey);
+      console.debug("[query] completed", { tabId, rows: queryResult.rowCount });
       // Update query history and update tab result if applicable.
       set((state) => {
         const newExecutingTabs = { ...state.executingTabs };

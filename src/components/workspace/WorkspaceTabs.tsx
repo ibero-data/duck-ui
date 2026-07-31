@@ -35,7 +35,6 @@ import {
 import SortableTab from "@/components/workspace/SortableTab";
 import { useDuckStore } from "@/store";
 import { isGatedTabHidden } from "@/lib/appConfig";
-import { DeepLinkLoader } from "@/components/share/DeepLinkLoader";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
@@ -126,8 +125,6 @@ export default function WorkspaceTabs() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* "Open in Duck-UI" deep links (?load=...) — confirm-before-run */}
-      <DeepLinkLoader />
       <Tabs
         value={activeTabId || undefined}
         onValueChange={setActiveTab}

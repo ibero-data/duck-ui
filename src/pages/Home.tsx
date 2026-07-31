@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import WorkspaceTabs from "@/components/workspace/WorkspaceTabs";
 import CommandPalette from "@/components/command-palette/CommandPalette";
+import { DeepLinkLoader } from "@/components/share/DeepLinkLoader";
 
 export default function Home() {
   const [dataExplorerOpen, setDataExplorerOpen] = useState(false);
@@ -15,6 +16,9 @@ export default function Home() {
   return (
     <div className="h-screen w-full flex overflow-hidden">
       <CommandPalette />
+      {/* Mounted ONCE here — WorkspaceTabs renders twice (desktop + mobile
+          branches), which would stack duplicate dialogs. */}
+      <DeepLinkLoader />
       {/* Sidebar - Desktop only */}
       <aside className="hidden md:flex">
         <Sidebar

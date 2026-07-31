@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { useDuckStore } from "@/store";
 import { toast } from "sonner";
@@ -12,20 +12,25 @@ import { decodeShare, readShareParam, clearShareHash, serializeShareCells } from
  *    rich format produced by the Share button. See `src/lib/share`.
  *  - `?query=<base64>&execute=true` — legacy query-only links.
  */
+// Module-level, not a ref: the workspace remounts when the profile gate
+// resolves, and a per-mount ref would process the URL once per mount —
+// duplicating the shared tab.
+let hasProcessedQueryFromURL = false;
+
 export function useQueryFromURL() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { createTab, executeQuery, updateTabChartConfig, isInitialized } = useDuckStore();
-  const hasProcessedRef = useRef(false);
 
   useEffect(() => {
     // Only process once and after DuckDB is initialized.
-    if (hasProcessedRef.current || !isInitialized) return;
+    if (hasProcessedQueryFromURL || !isInitialized) return;
 
     const shareParam = readShareParam();
     const queryParam = searchParams.get("query");
     if (!shareParam && !queryParam) return;
 
-    hasProcessedRef.current = true;
+    hasProcessedQueryFromURL = true;
+    console.debug("[share] processing analysis from URL");
 
     // Rich full-tab share takes precedence.
     if (shareParam) {
@@ -79,7 +84,9 @@ export function useQueryFromURL() {
       toast.success("Query loaded from URL");
 
       if (searchParams.get("execute") === "true" && tabId) {
+        console.debug("[share] scheduling auto-run for tab", tabId);
         setTimeout(() => {
+          console.debug("[share] auto-running query for tab", tabId);
           executeQuery(decodedQuery, tabId);
         }, 100);
       }
