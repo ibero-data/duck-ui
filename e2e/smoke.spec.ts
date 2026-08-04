@@ -196,3 +196,32 @@ test("Open-in-Duck-UI deep link confirms, loads remote parquet, and runs", async
   // Default query previews the data; rows from the parquet must render.
   await expect(page.getByText("row_1", { exact: true }).first()).toBeVisible();
 });
+
+test.describe("short viewport", () => {
+  // Deliberately short so a right-click low in the grid would push the menu
+  // past the bottom edge if it weren't clamped.
+  test.use({ viewport: { width: 1280, height: 520 } });
+
+  test("cell context menu stays fully inside the viewport", async ({ page }) => {
+    const sql = "SELECT range AS id, 'name_' || range AS name FROM range(25)";
+    await page.goto(`/?query=${b64(sql)}&execute=true`);
+    await ensureProfile(page);
+
+    const cell = page.getByText("name_3", { exact: true }).first();
+    await expect(cell).toBeVisible({ timeout: 60_000 });
+    await cell.click();
+    await cell.click({ button: "right" });
+
+    // Items rendered past the edge are unreachable — Playwright reports them
+    // as "outside of the viewport" and a real user simply cannot click them.
+    const menu = page.locator(".context-menu");
+    await expect(menu).toBeVisible();
+    const box = (await menu.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+
+    await page.getByRole("button", { name: "Select Column" }).click();
+    await expect(page.getByText("25 cells selected")).toBeVisible();
+  });
+});

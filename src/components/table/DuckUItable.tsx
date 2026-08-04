@@ -1135,7 +1135,22 @@ const DuckUITable: React.FC<DuckTableProps> = ({
 
     return (
       <div
-        className="context-menu fixed z-20 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px]"
+        // Right-clicking near an edge would otherwise push items off-screen
+        // where they can't be clicked. Flip the menu back over the cursor once
+        // its real size is known, the way a native context menu does.
+        ref={(node) => {
+          if (!node) return;
+          node.style.left = `${contextMenu.x}px`;
+          node.style.top = `${contextMenu.y}px`;
+          const rect = node.getBoundingClientRect();
+          if (rect.right > window.innerWidth) {
+            node.style.left = `${Math.max(4, contextMenu.x - rect.width)}px`;
+          }
+          if (rect.bottom > window.innerHeight) {
+            node.style.top = `${Math.max(4, contextMenu.y - rect.height)}px`;
+          }
+        }}
+        className="context-menu fixed z-20 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px] max-h-[calc(100vh-8px)] overflow-y-auto"
         style={{ left: contextMenu.x, top: contextMenu.y }}
       >
         <button
