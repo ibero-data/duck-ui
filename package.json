@@ -1,8 +1,8 @@
 {
   "name": "duck-ui",
   "private": true,
-  "version": "1.0.0",
-  "release_date": "2026-07-31",
+  "version": "1.0.1",
+  "release_date": "2026-08-04",
   "type": "module",
   "scripts": {
     "dev": "vite",
