@@ -6,6 +6,7 @@ import {
   resultToJSON,
   validateConnection,
   updateHistory,
+  explainEngineError,
 } from "@/services/duckdb";
 import type { DuckStoreState, QuerySlice, QueryResult } from "../types";
 import {
@@ -138,7 +139,7 @@ export const createQuerySlice: StateCreator<
       const errorMessage = wasCancelled
         ? "Query cancelled"
         : error instanceof Error
-          ? error.message
+          ? explainEngineError(error.message)
           : "Unknown error";
       const errorResult: QueryResult = {
         columns: [],

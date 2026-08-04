@@ -1,5 +1,6 @@
 import { DataType, TimeUnit } from "apache-arrow";
 import type { QueryResult, ExternalQueryResponse } from "@/store/types";
+import { wkbToWkt, blobToString, varintToString, intervalToString } from "./cellDecoders";
 
 /**
  * Converts a raw result (from an external HTTP endpoint) into a QueryResult.
@@ -237,6 +238,72 @@ export const timeCellToString = (value: unknown, unit: TimeUnit): string | null 
   return `${hh}:${mm}:${ss}.${fracDigits.replace(/0+$/, "")}`;
 };
 
+const EXTENSION_NAME_KEY = "ARROW:extension:name";
+const EXTENSION_METADATA_KEY = "ARROW:extension:metadata";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+const getExtensionName = (field: any): string | null =>
+  field?.metadata?.get?.(EXTENSION_NAME_KEY) ?? null;
+
+/** DuckDB tags VARINT as `arrow.opaque` carrying a "bignum" type name. */
+const isVarintField = (field: any): boolean => {
+  if (getExtensionName(field) !== "arrow.opaque") return false;
+  try {
+    return JSON.parse(field.metadata.get(EXTENSION_METADATA_KEY) ?? "{}").type_name === "bignum";
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Reports the DuckDB type where Arrow's own name would mislead — a GEOMETRY
+ * column should not read as "Binary" in the grid header.
+ */
+const columnTypeLabel = (field: any): string => {
+  if (getExtensionName(field) === "geoarrow.wkb") return "GEOMETRY";
+  if (isVarintField(field)) return "VARINT";
+  return field.type.toString();
+};
+
+/**
+ * Arrow JS reads only the first two words of a MONTH_DAY_NANO interval, which
+ * silently drops the whole time component (INTERVAL '90' MINUTE arrives as
+ * zero). These are read straight out of the chunk buffers instead: each value
+ * is a 16-byte stride of int32 months, int32 days, int64 nanoseconds.
+ */
+const buildIntervalReader = (vector: any): ((rowIndex: number) => string | null) => {
+  const bounds: { start: number; chunk: any }[] = [];
+  let cursor = 0;
+  for (const chunk of vector?.data ?? []) {
+    bounds.push({ start: cursor, chunk });
+    cursor += chunk.length;
+  }
+
+  return (rowIndex: number): string | null => {
+    for (let i = bounds.length - 1; i >= 0; i--) {
+      const { start, chunk } = bounds[i];
+      if (rowIndex < start) continue;
+      const local = chunk.offset + (rowIndex - start);
+
+      const nullBitmap = chunk.nullBitmap;
+      if (nullBitmap?.length && (nullBitmap[local >> 3] & (1 << (local % 8))) === 0) return null;
+
+      const values = chunk.values;
+      if (!values?.buffer) return null;
+      const view = new DataView(values.buffer, values.byteOffset, values.byteLength);
+      const offset = local * 16;
+      if (offset + 16 > view.byteLength) return null;
+      return intervalToString(
+        view.getInt32(offset, true),
+        view.getInt32(offset + 4, true),
+        view.getBigInt64(offset + 8, true)
+      );
+    }
+    return null;
+  };
+};
+
 /**
  * Converts a WASM query result (an Arrow table) into a QueryResult.
  *
@@ -246,9 +313,10 @@ export const timeCellToString = (value: unknown, unit: TimeUnit): string | null 
  * - Date32/Date64 → "YYYY-MM-DD" via UTC (#15)
  * - Timestamp (all units, with or without timezone) → Date object
  * - Time → "HH:MM:SS[.ffffff]" string
+ * - Interval → "1 year 2 months 3 days 04:05:06"
+ * - GEOMETRY → WKT, VARINT → decimal string, BLOB → `\xHH` (see cellDecoders)
  * Int64/UInt64 stay BigInt (lossless), everything else passes through.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const resultToJSON = (result: any): QueryResult => {
   try {
     const schema = result.schema;
@@ -257,11 +325,20 @@ export const resultToJSON = (result: any): QueryResult => {
     // Decimal values must be read from the column vectors — row.toJSON() drops them.
     const columnVectors = fields.map((_: unknown, colIdx: number) => result.getChildAt(colIdx));
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Resolved once per column rather than once per cell.
+    const binaryDecoders = fields.map((field: any) => {
+      if (!DataType.isBinary(field.type)) return null;
+      if (getExtensionName(field) === "geoarrow.wkb") return wkbToWkt;
+      if (isVarintField(field)) return varintToString;
+      return blobToString;
+    });
+    const intervalReaders = fields.map((field: any, colIdx: number) =>
+      DataType.isInterval(field.type) ? buildIntervalReader(columnVectors[colIdx]) : null
+    );
+
     const data = result.toArray().map((row: any, rowIndex: number) => {
       const jsonRow = row.toJSON();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       fields.forEach((field: any, columnIndex: number) => {
         const col = field.name;
         const type = field.type;
@@ -276,6 +353,11 @@ export const resultToJSON = (result: any): QueryResult => {
           jsonRow[col] = value === null || value === undefined ? null : new Date(Number(value));
         } else if (DataType.isTime(type)) {
           jsonRow[col] = timeCellToString(jsonRow[col], type.unit);
+        } else if (intervalReaders[columnIndex]) {
+          jsonRow[col] = intervalReaders[columnIndex](rowIndex);
+        } else if (binaryDecoders[columnIndex]) {
+          const value = jsonRow[col];
+          if (value instanceof Uint8Array) jsonRow[col] = binaryDecoders[columnIndex](value);
         }
       });
 
@@ -283,10 +365,8 @@ export const resultToJSON = (result: any): QueryResult => {
     });
 
     return {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       columns: fields.map((field: any) => field.name),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      columnTypes: fields.map((field: any) => field.type.toString()),
+      columnTypes: fields.map(columnTypeLabel),
       data,
       rowCount: result.numRows,
     };

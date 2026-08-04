@@ -32,6 +32,7 @@ import {
 } from "@/services/persistence/repositories/savedQueryRepository";
 import { demoDatasets, type DemoDataset } from "@/lib/demoDatasets";
 import { getUiConfig } from "@/lib/appConfig";
+import { stageRemoteTextFile } from "@/services/duckdb";
 import { toast } from "sonner";
 
 const quickStartActions = [
@@ -200,35 +201,30 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
   };
 
   const handleOpenDemo = async (dataset: DemoDataset) => {
-    const tabId = createTab("sql", dataset.query, dataset.name);
-    if (!tabId) return;
-    if (dataset.chartConfig) {
-      updateTabChartConfig(tabId, dataset.chartConfig);
-    }
-    // CSV demos are downloaded in JS and registered into the virtual FS under
-    // their own URL (registered names shadow httpfs) — remote-CSV sniffing
-    // over httpfs is unreliable (see demoDatasets.ts). External servers read
-    // the URL server-side, so no staging there.
+    // CSV demos are downloaded in JS and registered in the virtual filesystem,
+    // then the query is pointed at that local name: reading a remote CSV over
+    // httpfs mis-detects the dialect (see stageRemoteTextFile). External
+    // servers fetch the URL themselves, so they keep the URL.
+    let query = dataset.query;
     const isExternal = currentConnection?.scope === "External";
     if (dataset.stage && db && !isExternal) {
       try {
-        const response = await fetch(dataset.stage.url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const text = await response.text();
-        try {
-          await db.dropFile(dataset.stage.url);
-        } catch {
-          // not registered yet — fine
-        }
-        await db.registerFileText(dataset.stage.url, text);
+        const localName = await stageRemoteTextFile(db, dataset.stage.url);
+        if (localName) query = query.split(dataset.stage.url).join(localName);
       } catch (error) {
         console.error("Failed to stage demo dataset:", error);
         toast.error("Couldn't download the demo dataset. Check your connection and try again.");
         return;
       }
     }
+
+    const tabId = createTab("sql", query, dataset.name);
+    if (!tabId) return;
+    if (dataset.chartConfig) {
+      updateTabChartConfig(tabId, dataset.chartConfig);
+    }
     // Auto-run so the user lands on populated results immediately.
-    executeQuery(dataset.query, tabId).catch(console.error);
+    executeQuery(query, tabId).catch(console.error);
   };
 
   const truncateQuery = (query: string, length: number = 50) => {
