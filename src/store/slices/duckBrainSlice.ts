@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import { toast } from "sonner";
 import { generateUUID } from "@/lib/utils";
-import { executeExternalQuery, resultToJSON, validateConnection } from "@/services/duckdb";
+import { runQuery } from "@/services/engine";
 import type { DuckStoreState, DuckBrainSlice, DuckBrainMessage, QueryResult } from "../types";
 
 // Track the duckBrainService subscription to prevent leaks
@@ -24,8 +24,13 @@ export const createDuckBrainSlice: StateCreator<
     isGenerating: false,
     streamingContent: "",
     isPanelOpen: false,
-    aiProvider: "webllm",
-    providerConfigs: {},
+    // Default: a local OpenAI-compatible server, preset for Ollama. Real
+    // models at native speed, fully private — the honest "local AI" story.
+    // In-browser WebLLM stays available as the explicit experimental choice.
+    aiProvider: "openai-compatible",
+    providerConfigs: {
+      "openai-compatible": { baseUrl: "http://localhost:11434/v1", modelId: "" },
+    },
   },
 
   initializeDuckBrain: async (modelId) => {
@@ -77,20 +82,17 @@ export const createDuckBrainSlice: StateCreator<
       return null;
     }
 
-    // Chrome Built-in AI runs on-device and needs no configuration.
-    const needsConfig = isExternalProvider && aiProvider !== "chrome-ai";
-
-    if (needsConfig) {
+    if (isExternalProvider) {
       if (aiProvider === "openai-compatible") {
         const config = providerConfigs["openai-compatible"];
         if (!config?.baseUrl || !config?.modelId) {
-          toast.error("Please configure the Base URL and Model ID in Brain settings.");
+          toast.error("Pick a model in Settings → AI. With Ollama running it is one click.");
           return null;
         }
       } else {
         const config = providerConfigs[aiProvider as "openai" | "anthropic"];
         if (!config?.apiKey) {
-          toast.error(`Please configure your ${aiProvider} API key in Brain settings.`);
+          toast.error(`Add your ${aiProvider} API key in Settings → AI.`);
           return null;
         }
       }
@@ -126,19 +128,12 @@ export const createDuckBrainSlice: StateCreator<
       if (isExternalProvider) {
         const { createProvider } = await import("@/lib/duckBrain/providers");
         const provider = createProvider(aiProvider);
-
-        if (aiProvider === "chrome-ai") {
-          // On-device, no credentials.
-          await provider.initialize({});
-        } else {
-          const config =
-            providerConfigs[aiProvider as "openai" | "anthropic" | "openai-compatible"]!;
-          await provider.initialize({
-            apiKey: "apiKey" in config ? config.apiKey : undefined,
-            modelId: config.modelId,
-            baseUrl: "baseUrl" in config ? config.baseUrl : undefined,
-          });
-        }
+        const config = providerConfigs[aiProvider as "openai" | "anthropic" | "openai-compatible"]!;
+        await provider.initialize({
+          apiKey: "apiKey" in config ? config.apiKey : undefined,
+          modelId: config.modelId,
+          baseUrl: "baseUrl" in config ? config.baseUrl : undefined,
+        });
 
         await provider.generateStreaming(
           messages,
@@ -317,23 +312,17 @@ export const createDuckBrainSlice: StateCreator<
   },
 
   executeQueryInChat: async (messageId, sql) => {
-    const { currentConnection, connection, updateMessageQueryResult } = get();
+    const { currentSession, updateMessageQueryResult } = get();
 
     updateMessageQueryResult(messageId, { status: "running" });
 
     try {
-      let queryResult: QueryResult;
-
-      if (currentConnection?.scope === "External") {
-        queryResult = await executeExternalQuery(sql, currentConnection);
-      } else {
-        if (!connection) {
-          throw new Error("WASM connection not initialized");
-        }
-        const wasmConnection = validateConnection(connection);
-        const result = await wasmConnection.query(sql);
-        queryResult = resultToJSON(result);
+      if (!currentSession) {
+        throw new Error("No active connection");
       }
+      const queryResult: QueryResult = await runQuery(currentSession, sql, "duck-brain", {
+        maxRows: get().maxResultRows,
+      });
 
       if (queryResult.error) {
         updateMessageQueryResult(messageId, {
@@ -397,9 +386,9 @@ export const createDuckBrainSlice: StateCreator<
       duckBrain: {
         ...state.duckBrain,
         aiProvider: provider,
-        // webllm and chrome-ai must be initialized before use; cloud providers are
-        // ready once their API key is set.
-        modelStatus: provider === "webllm" || provider === "chrome-ai" ? "idle" : "ready",
+        // webllm must be initialized before use; server-backed providers are
+        // ready once configured.
+        modelStatus: provider === "webllm" ? "idle" : "ready",
         error: null,
       },
     }));
@@ -427,34 +416,6 @@ export const createDuckBrainSlice: StateCreator<
     const { aiProvider, providerConfigs } = duckBrain;
 
     if (aiProvider === "webllm") {
-      return;
-    }
-
-    // Chrome Built-in AI: on-device, no config — just verify availability.
-    if (aiProvider === "chrome-ai") {
-      set((state) => ({
-        duckBrain: { ...state.duckBrain, modelStatus: "loading", error: null },
-      }));
-      try {
-        const { createProvider } = await import("@/lib/duckBrain/providers");
-        const provider = createProvider("chrome-ai");
-        await provider.initialize({});
-        await provider.cleanup();
-        set((state) => ({
-          duckBrain: {
-            ...state.duckBrain,
-            modelStatus: "ready",
-            currentModel: "Gemini Nano (on-device)",
-          },
-        }));
-        toast.success("Chrome Built-in AI is ready");
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Chrome AI unavailable";
-        set((state) => ({
-          duckBrain: { ...state.duckBrain, modelStatus: "error", error: errorMessage },
-        }));
-        toast.error(errorMessage);
-      }
       return;
     }
 

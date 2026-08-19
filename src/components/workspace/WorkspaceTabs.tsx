@@ -60,7 +60,7 @@ const TabErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => (
 const HomeTab = lazy(() => import("@/components/workspace/HomeTab"));
 const SqlTab = lazy(() => import("@/components/workspace/SqlTab"));
 const NotebookTab = lazy(() => import("@/components/notebook/NotebookTab"));
-const BrainTab = lazy(() => import("@/components/workspace/BrainTab"));
+const DashboardTab = lazy(() => import("@/components/dashboard/DashboardTab"));
 const ConnectionsTab = lazy(() => import("@/components/workspace/ConnectionsTab"));
 const SettingsTab = lazy(() => import("@/components/workspace/SettingsTab"));
 
@@ -208,8 +208,8 @@ export default function WorkspaceTabs() {
                     <SqlTab tabId={tab.id} />
                   ) : tab.type === "notebook" ? (
                     <NotebookTab tabId={tab.id} />
-                  ) : tab.type === "brain" ? (
-                    <BrainTab />
+                  ) : tab.type === "dashboard" ? (
+                    <DashboardTab tabId={tab.id} />
                   ) : tab.type === "connections" ? (
                     <ConnectionsTab />
                   ) : tab.type === "settings" ? (

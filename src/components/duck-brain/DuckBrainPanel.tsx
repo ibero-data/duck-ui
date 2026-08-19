@@ -38,6 +38,9 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
   const clearBrainMessages = useDuckStore((s) => s.clearBrainMessages);
   const executeQueryInChat = useDuckStore((s) => s.executeQueryInChat);
   const updateTabQuery = useDuckStore((s) => s.updateTabQuery);
+  const tabs = useDuckStore((s) => s.tabs);
+  const createTab = useDuckStore((s) => s.createTab);
+  const setActiveTab = useDuckStore((s) => s.setActiveTab);
   const setAIProvider = useDuckStore((s) => s.setAIProvider);
   const updateProviderConfig = useDuckStore((s) => s.updateProviderConfig);
 
@@ -73,12 +76,10 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
       if (config?.baseUrl && config?.modelId) {
         return { name: config.modelId, isCloud: true };
       }
-    } else if (aiProvider === "chrome-ai") {
-      return { name: "Gemini Nano", isCloud: false };
     }
-    // Default to local model
+    // In-browser model, or nothing configured yet.
     const localModel = AVAILABLE_MODELS.find((m) => m.id === duckBrain.currentModel);
-    return { name: localModel?.displayName || "Local Model", isCloud: false };
+    return { name: localModel?.displayName || "Not configured", isCloud: false };
   }, [aiProvider, providerConfigs, duckBrain.currentModel]);
 
   // Build list of available providers for selector
@@ -92,11 +93,6 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
         value: "webllm",
         label: localModel?.displayName || "Local Model",
       });
-    }
-
-    // Add Chrome Built-in AI when it's the active, ready provider
-    if (aiProvider === "chrome-ai" && modelStatus === "ready") {
-      providers.push({ value: "chrome-ai", label: "Gemini Nano (Chrome)" });
     }
 
     // Add OpenAI if configured
@@ -187,6 +183,11 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
 
   const handleInsertSQL = useCallback(
     (sql: string) => {
+      // The sheet is global now: there may be no SQL tab under it.
+      if (!tabId) {
+        toast.info("Open a SQL tab first, then insert.");
+        return;
+      }
       updateTabQuery(tabId, sql);
       toast.success("SQL inserted into editor");
     },
@@ -197,8 +198,15 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
     await initializeDuckBrain(DEFAULT_MODEL.id);
   }, [initializeDuckBrain]);
 
-  // Render WebGPU not supported state
-  if (isWebGPUSupported === false) {
+  const openAISettings = useCallback(() => {
+    const existing = tabs.find((tab) => tab.type === "settings");
+    if (existing) setActiveTab(existing.id);
+    else createTab("settings", "", "Settings");
+  }, [tabs, createTab, setActiveTab]);
+
+  // WebGPU only matters for the in-browser provider; every server-backed
+  // provider works fine without it.
+  if (isWebGPUSupported === false && aiProvider === "webllm") {
     return (
       <div className="flex flex-col h-full border-l bg-background">
         <Header onClose={toggleBrainPanel} />
@@ -226,31 +234,54 @@ const DuckBrainPanel: React.FC<DuckBrainPanelProps> = React.memo(({ tabId }) => 
       providerConfigs["openai-compatible"]?.baseUrl &&
       providerConfigs["openai-compatible"]?.modelId);
 
-  // Render idle state (not initialized) - only for WebLLM without external provider
+  // Nothing usable yet. What that means depends on the provider: the
+  // in-browser one needs a model download; everything else needs Settings.
   if ((modelStatus === "idle" || modelStatus === "checking") && !hasExternalProvider) {
+    if (aiProvider === "webllm") {
+      return (
+        <div className="flex flex-col h-full border-l bg-background">
+          <Header onClose={toggleBrainPanel} />
+          <div className="flex-1 flex items-center justify-center p-4">
+            <div className="text-center max-w-sm">
+              <Brain className="h-12 w-12 mx-auto mb-4 text-primary" />
+              <h3 className="font-semibold mb-2">Initialize Duck Brain</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Download an AI model to enable natural language to SQL conversion. This runs 100%
+                locally in your browser.
+              </p>
+              <div className="space-y-2 text-xs text-muted-foreground mb-4">
+                <p>
+                  <strong>Model:</strong> {DEFAULT_MODEL.displayName}
+                </p>
+                <p>
+                  <strong>Size:</strong> {DEFAULT_MODEL.size}
+                </p>
+                <p>First load downloads the model. Future loads use cache.</p>
+              </div>
+              <Button onClick={handleInitialize} className="gap-2">
+                <Download className="h-4 w-4" />
+                Load AI Model
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col h-full border-l bg-background">
         <Header onClose={toggleBrainPanel} />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center max-w-sm">
             <Brain className="h-12 w-12 mx-auto mb-4 text-primary" />
-            <h3 className="font-semibold mb-2">Initialize Duck Brain</h3>
+            <h3 className="font-semibold mb-2">No AI configured yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Download an AI model to enable natural language to SQL conversion. This runs 100%
-              locally in your browser.
+              Duck Brain turns questions into SQL. Point it at a local Ollama (private, one click if
+              it's running), or add an OpenAI or Anthropic key.
             </p>
-            <div className="space-y-2 text-xs text-muted-foreground mb-4">
-              <p>
-                <strong>Model:</strong> {DEFAULT_MODEL.displayName}
-              </p>
-              <p>
-                <strong>Size:</strong> {DEFAULT_MODEL.size}
-              </p>
-              <p>First load downloads the model. Future loads use cache.</p>
-            </div>
-            <Button onClick={handleInitialize} className="gap-2">
-              <Download className="h-4 w-4" />
-              Load AI Model
+            <Button onClick={openAISettings} className="gap-2">
+              <Cloud className="h-4 w-4" />
+              Open AI settings
             </Button>
           </div>
         </div>

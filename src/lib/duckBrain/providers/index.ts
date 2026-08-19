@@ -1,12 +1,10 @@
 export * from "./types";
-export { OpenAIProvider } from "./openai.provider";
+export { OpenAIProvider, listCompatibleModels } from "./openai.provider";
 export { AnthropicProvider } from "./anthropic.provider";
-export { ChromeAIProvider, isChromeAISupported } from "./chrome.provider";
 
 import type { AIProvider, AIProviderType, ProviderConfig } from "./types";
 import { OpenAIProvider } from "./openai.provider";
 import { AnthropicProvider } from "./anthropic.provider";
-import { ChromeAIProvider } from "./chrome.provider";
 
 /**
  * Factory function to create AI provider instances
@@ -18,13 +16,9 @@ export function createProvider(type: AIProviderType): AIProvider {
       return new OpenAIProvider();
     case "anthropic":
       return new AnthropicProvider();
-    case "chrome-ai":
-      return new ChromeAIProvider();
     case "webllm":
       // WebLLM uses the existing service, not this factory
       throw new Error("WebLLM should use the existing duckBrainService");
-    case "gemini":
-      throw new Error("Gemini provider not yet implemented");
     default:
       throw new Error(`Unknown provider type: ${type}`);
   }

@@ -14,6 +14,7 @@ export const MobileNavDrawer = () => {
   const tabs = useDuckStore((s) => s.tabs);
   const setActiveTab = useDuckStore((s) => s.setActiveTab);
   const createTab = useDuckStore((s) => s.createTab);
+  const toggleBrainPanel = useDuckStore((s) => s.toggleBrainPanel);
   const ui = getUiConfig();
 
   const toggleTheme = () => {
@@ -83,10 +84,13 @@ export const MobileNavDrawer = () => {
               <Button
                 variant="ghost"
                 className="w-full justify-start"
-                onClick={() => openOrFocusTab("brain", "Duck Brain")}
+                onClick={() => {
+                  toggleBrainPanel();
+                  setOpen(false);
+                }}
               >
                 <Brain className="mr-2 h-4 w-4" />
-                Duck Brain Settings
+                Duck Brain
               </Button>
             )}
           </div>

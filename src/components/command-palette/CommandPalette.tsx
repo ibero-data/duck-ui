@@ -120,12 +120,6 @@ export default function CommandPalette() {
               Connections
             </CommandItem>
           )}
-          {!ui.hideBrain && (
-            <CommandItem onSelect={() => openOrFocusTab("brain", "Duck Brain")}>
-              <Brain className="mr-2 h-4 w-4" />
-              Duck Brain
-            </CommandItem>
-          )}
           {!ui.hideSettings && (
             <CommandItem onSelect={() => openOrFocusTab("settings", "Settings")}>
               <Settings className="mr-2 h-4 w-4" />

@@ -108,5 +108,4 @@ export const getUiConfig = (): UiConfig => cachedUi;
  */
 export const isGatedTabHidden = (type: string): boolean =>
   (type === "connections" && cachedUi.hideConnections) ||
-  (type === "settings" && cachedUi.hideSettings) ||
-  (type === "brain" && cachedUi.hideBrain);
+  (type === "settings" && cachedUi.hideSettings);

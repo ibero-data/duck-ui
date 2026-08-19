@@ -235,3 +235,35 @@ export class OpenAIProvider implements AIProvider {
     return this.ready;
   }
 }
+
+/**
+ * Lists the models an OpenAI-compatible server offers.
+ *
+ * For a local Ollama or LM Studio this is what turns "type a model id from
+ * memory" into "pick from what's actually installed". Failures return an
+ * empty list plus the error text, so the caller can fall back to manual
+ * entry with a reason instead of a mystery.
+ */
+export const listCompatibleModels = async (
+  baseUrl: string,
+  apiKey?: string
+): Promise<{ models: string[]; error?: string }> => {
+  try {
+    const headers: Record<string, string> = {};
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, { headers });
+    if (!response.ok) {
+      return { models: [], error: `Server answered ${response.status}` };
+    }
+    const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
+    const models = (body.data ?? [])
+      .map((entry) => (typeof entry.id === "string" ? entry.id : ""))
+      .filter(Boolean);
+    return { models };
+  } catch (error) {
+    return {
+      models: [],
+      error: error instanceof Error ? error.message : "Could not reach the server",
+    };
+  }
+};

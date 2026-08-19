@@ -8,6 +8,8 @@ import { createTabSlice } from "./slices/tabSlice";
 import { createDuckBrainSlice } from "./slices/duckBrainSlice";
 import { createFileSystemSlice } from "./slices/fileSystemSlice";
 import { createProfileSlice } from "./slices/profileSlice";
+import { createSessionSlice } from "./slices/sessionSlice";
+import { createDashboardSlice } from "./slices/dashboardSlice";
 import { saveWorkspace } from "@/services/persistence/repositories/workspaceRepository";
 import {
   saveProviderConfig,
@@ -19,9 +21,6 @@ import type { DuckStoreState } from "./types";
 // Re-export all types from the centralized types file
 export * from "./types";
 
-// Re-export cloud storage types for use in components
-export type { CloudConnection, CloudSupportStatus } from "@/lib/cloudStorage";
-
 const storeCreator: StateCreator<DuckStoreState, [["zustand/devtools", never]]> = (...a) => ({
   ...createDuckdbSlice(...a),
   ...createConnectionSlice(...a),
@@ -31,6 +30,8 @@ const storeCreator: StateCreator<DuckStoreState, [["zustand/devtools", never]]> 
   ...createDuckBrainSlice(...a),
   ...createFileSystemSlice(...a),
   ...createProfileSlice(...a),
+  ...createSessionSlice(...a),
+  ...createDashboardSlice(...a),
 });
 
 export const useDuckStore = create<DuckStoreState>()(
