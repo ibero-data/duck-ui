@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import { Navigate } from "react-router";
 import { initializeSystemDb } from "@/services/persistence/systemDb";
+import { cleanupOrphanedStorage } from "@/services/persistence/cleanup";
 import { listProfiles } from "@/services/persistence/repositories/profileRepository";
 import ProfilePicker from "@/components/profile/ProfilePicker";
 import type { Profile } from "@/store/types";
@@ -22,11 +23,6 @@ const EmbedView = lazy(() => import("@/pages/EmbedView"));
 /** True when the current path is the chrome-free embed viewer. */
 function isEmbedPath(): boolean {
   return /\/embed\/?$/.test(window.location.pathname);
-}
-
-// Import httpfs test utility for console access (window.testHttpfs) — dev only
-if (import.meta.env.DEV) {
-  import("@/lib/cloudStorage/testHttpfs");
 }
 
 interface LoadingScreenProps {
@@ -87,6 +83,9 @@ const ProfileBootstrap = ({ children }: { children: React.ReactNode }) => {
     async function boot() {
       try {
         await initializeSystemDb();
+        // Clears storage left by removed features (see cleanup.ts). Never
+        // blocks boot.
+        cleanupOrphanedStorage().catch(() => {});
         const profiles = await listProfiles();
 
         if (profiles.length === 1 && !profiles[0].has_password) {

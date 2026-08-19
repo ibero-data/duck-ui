@@ -1,14 +1,19 @@
 import type { StateCreator } from "zustand";
 import { toast } from "sonner";
 import {
-  executeExternalQuery,
-  resultToJSON,
-  validateConnection,
-  fetchExternalDatabases,
-  fetchWasmDatabases,
-} from "@/services/duckdb";
+  catalogToDatabaseInfo,
+  requireLocalDuckSession,
+  runQuery,
+  type DataSession,
+} from "@/services/engine";
 import { sqlEscapeIdentifier, sqlEscapeString, qualifyTable } from "@/lib/sqlSanitize";
-import type { DuckStoreState, SchemaSlice, DatabaseInfo, ColumnStats, QueryResult } from "../types";
+import type { DuckStoreState, SchemaSlice, ColumnStats, QueryResult } from "../types";
+
+/** The active session, or a clear error when nothing is connected. */
+const requireSession = (session: DataSession | null): DataSession => {
+  if (!session) throw new Error("No active connection");
+  return session;
+};
 
 export const createSchemaSlice: StateCreator<
   DuckStoreState,
@@ -21,23 +26,17 @@ export const createSchemaSlice: StateCreator<
   schemaFetchError: null,
 
   fetchDatabasesAndTablesInfo: async () => {
-    const { currentConnection, connection } = get();
+    const session = get().currentSession;
     try {
       set({ isLoadingDbTablesFetch: true, schemaFetchError: null });
-      let databases: DatabaseInfo[] = [];
 
-      if (currentConnection?.scope === "External") {
-        databases = await fetchExternalDatabases(currentConnection);
-      } else if (currentConnection?.scope === "OPFS" || currentConnection?.scope === "WASM") {
-        if (!connection) {
-          set({ databases: [], error: null });
-          return;
-        }
-        const wasmConnection = validateConnection(connection);
-        databases = await fetchWasmDatabases(wasmConnection);
+      if (!session?.capabilities.supportsCatalog) {
+        set({ databases: [], schemaFetchError: null });
+        return;
       }
 
-      set({ databases, schemaFetchError: null });
+      const snapshot = await session.introspect();
+      set({ databases: catalogToDatabaseInfo(snapshot), schemaFetchError: null });
     } catch (error) {
       const errorMessage = `Failed to load schema: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -51,21 +50,13 @@ export const createSchemaSlice: StateCreator<
   },
 
   fetchTableColumnStats: async (databaseName, tableName, schema) => {
-    const { currentConnection, connection } = get();
     const useBareName =
       databaseName === "main" || databaseName === "memory" || databaseName === ":memory:";
     const query = `SUMMARIZE ${qualifyTable(useBareName ? undefined : databaseName, schema, tableName)}`;
 
     try {
-      let result: QueryResult;
-
-      if (currentConnection?.scope === "External" && currentConnection) {
-        result = await executeExternalQuery(query, currentConnection);
-      } else {
-        const wasmConnection = validateConnection(connection);
-        const wasmResult = await wasmConnection.query(query);
-        result = resultToJSON(wasmResult);
-      }
+      const result = await runQuery(requireSession(get().currentSession), query, "column-stats");
+      if (result.error) throw new Error(result.error);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const columnStats: ColumnStats[] = result.data.map((row: any) => ({
@@ -92,7 +83,6 @@ export const createSchemaSlice: StateCreator<
   },
 
   fetchColumnDistribution: async (databaseName, tableName, columnName, columnType, schema) => {
-    const { currentConnection, connection } = get();
     const useBareName =
       databaseName === "main" || databaseName === "memory" || databaseName === ":memory:";
     const qualified = qualifyTable(useBareName ? undefined : databaseName, schema, tableName);
@@ -118,14 +108,12 @@ export const createSchemaSlice: StateCreator<
          GROUP BY 1 ORDER BY n DESC, v LIMIT 5`;
 
     try {
-      let result: QueryResult;
-      if (currentConnection?.scope === "External" && currentConnection) {
-        result = await executeExternalQuery(query, currentConnection);
-      } else {
-        const wasmConnection = validateConnection(connection);
-        const wasmResult = await wasmConnection.query(query);
-        result = resultToJSON(wasmResult);
-      }
+      const result: QueryResult = await runQuery(
+        requireSession(get().currentSession),
+        query,
+        "column-distribution"
+      );
+      if (result.error) throw new Error(result.error);
 
       if (isNumeric) {
         const bins = new Array<number>(20).fill(0);
@@ -152,15 +140,17 @@ export const createSchemaSlice: StateCreator<
 
   deleteTable: async (tableName, database = "memory", schema) => {
     try {
-      const { connection, currentConnection } = get();
-      if (currentConnection?.scope === "External") {
-        throw new Error("Table deletion is not supported for external connections.");
+      const session = requireSession(get().currentSession);
+      if (!session.capabilities.writable) {
+        throw new Error("This connection is read-only.");
       }
-      const wasmConnection = validateConnection(connection);
       set({ isLoading: true });
-      await wasmConnection.query(
-        `DROP TABLE IF EXISTS ${qualifyTable(database, schema, tableName)}`
+      const result = await runQuery(
+        session,
+        `DROP TABLE IF EXISTS ${qualifyTable(database, schema, tableName)}`,
+        "delete-table"
       );
+      if (result.error) throw new Error(result.error);
       await get().fetchDatabasesAndTablesInfo();
       set({ isLoading: false });
     } catch (error) {
@@ -183,13 +173,16 @@ export const createSchemaSlice: StateCreator<
     options = {}
   ) => {
     try {
-      const { db, connection, currentConnection } = get();
-
-      if (currentConnection?.scope === "External") {
-        throw new Error("File import is not supported for external connections.");
+      const session = requireSession(get().currentSession);
+      if (!session.capabilities.supportsFileImport) {
+        throw new Error(
+          "This connection can't import local files. Switch to an in-browser (memory or OPFS) connection."
+        );
       }
+      // Registering a file buffer has no SQL expression — it needs the engine
+      // handle directly.
+      const { db, connection } = requireLocalDuckSession(session).local;
 
-      if (!db || !connection) throw new Error("Database not initialized");
       const buffer = new Uint8Array(fileContent);
       try {
         await db.dropFile(fileName);

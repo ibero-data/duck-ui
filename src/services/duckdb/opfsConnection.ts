@@ -49,7 +49,7 @@ export const cleanupOPFSConnection = async (
  * Tests an OPFS connection by executing a basic query.
  */
 export const testOPFSConnection = async (
-  conn: ConnectionProvider
+  target: string | ConnectionProvider
 ): Promise<{
   db: duckdb.AsyncDuckDB;
   connection: duckdb.AsyncDuckDBConnection;
@@ -65,7 +65,7 @@ export const testOPFSConnection = async (
     );
   }
 
-  const { path } = conn;
+  const path = typeof target === "string" ? target : target.path;
   if (!path) {
     throw new Error("Path must be defined for OPFS connections.");
   }

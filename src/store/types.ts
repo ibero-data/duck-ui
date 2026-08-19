@@ -1,5 +1,13 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
-import type { CloudConnection, CloudSupportStatus } from "@/lib/cloudStorage";
+import type { DataSession, SessionCapabilities } from "@/services/engine/types";
+import type {
+  Participant,
+  SessionStatus,
+  ShareSelection,
+} from "@/services/collaboration/liveSession";
+import type { SharedCapability } from "@/services/collaboration/capabilities/capability";
+import type { ForkTableProgress } from "@/services/collaboration/fork";
+import type { Dashboard } from "@/services/dashboard/types";
 
 //
 // Global Window type augmentation
@@ -26,11 +34,20 @@ declare global {
 // Connection Types
 //
 
+/** Where a connection came from. "SESSION" ones are granted by a live peer. */
+export type ConnectionEnvironment = "APP" | "ENV" | "BUILT_IN" | "SESSION";
+
+/**
+ * Legacy connection kind. "Peer" only ever appears on a session-granted
+ * connection, which is never persisted — it exists for as long as the grant.
+ */
+export type ConnectionScope = "WASM" | "External" | "OPFS" | "Peer";
+
 export interface CurrentConnection {
-  environment: "APP" | "ENV" | "BUILT_IN";
+  environment: ConnectionEnvironment;
   id: string;
   name: string;
-  scope: "WASM" | "External" | "OPFS";
+  scope: ConnectionScope;
   host?: string;
   port?: number;
   user?: string;
@@ -42,10 +59,10 @@ export interface CurrentConnection {
 }
 
 export interface ConnectionProvider {
-  environment: "APP" | "ENV" | "BUILT_IN";
+  environment: ConnectionEnvironment;
   id: string;
   name: string;
-  scope: "WASM" | "External" | "OPFS";
+  scope: ConnectionScope;
   host?: string;
   port?: number;
   user?: string;
@@ -59,6 +76,12 @@ export interface ConnectionProvider {
 export interface ConnectionList {
   connections: ConnectionProvider[];
 }
+
+/**
+ * Capabilities of the active session, or every flag off when nothing is
+ * connected. UI code should branch on these rather than on a connection kind.
+ */
+export type ActiveCapabilities = SessionCapabilities;
 
 //
 // Database & Table Types
@@ -117,6 +140,14 @@ export interface QueryResult {
   data: Record<string, unknown>[];
   rowCount: number;
   error?: string;
+  /**
+   * The engine stopped early at a row cap — `data` is a prefix of the real
+   * result, not the whole thing. Consumers that export or aggregate MUST say
+   * so rather than presenting a partial answer as complete.
+   */
+  truncated?: boolean;
+  /** Engine execution time. Absent for results restored from persistence. */
+  durationMs?: number;
 }
 
 export interface QueryHistoryItem {
@@ -143,7 +174,7 @@ export interface ExternalQueryResponse {
 // AI Provider Types
 //
 
-export type AIProviderType = "webllm" | "openai" | "anthropic" | "chrome-ai" | "openai-compatible";
+export type AIProviderType = "webllm" | "openai" | "anthropic" | "openai-compatible";
 
 export interface ProviderConfigs {
   openai?: { apiKey: string; modelId: string };
@@ -175,7 +206,7 @@ export interface MountedFolderInfo {
 // Editor & Chart Types
 //
 
-export type EditorTabType = "sql" | "notebook" | "home" | "brain" | "connections" | "settings";
+export type EditorTabType = "sql" | "notebook" | "dashboard" | "home" | "connections" | "settings";
 
 export interface NotebookCell {
   id: string;
@@ -289,12 +320,16 @@ export interface EditorTab {
 //
 
 export interface DuckdbSlice {
+  /**
+   * DuckDB-WASM handles for the active session, when it runs in this tab.
+   * Compatibility projection only — SQL execution and introspection go through
+   * `currentSession`. Null on connections that execute elsewhere.
+   *
+   * Per-connection engine lifecycle is owned by `services/engine/registry`,
+   * which is why there are no longer separate wasm/opfs handle pairs here.
+   */
   db: duckdb.AsyncDuckDB | null;
   connection: duckdb.AsyncDuckDBConnection | null;
-  wasmDb: duckdb.AsyncDuckDB | null;
-  wasmConnection: duckdb.AsyncDuckDBConnection | null;
-  opfsDb: duckdb.AsyncDuckDB | null;
-  opfsConnection: duckdb.AsyncDuckDBConnection | null;
   isInitialized: boolean;
   isLoading: boolean;
   error: string | null;
@@ -306,6 +341,13 @@ export interface DuckdbSlice {
 
 export interface ConnectionSlice {
   currentConnection: CurrentConnection | null;
+  /**
+   * Live engine session for `currentConnection`. Everything that executes SQL
+   * or reads the catalog goes through this — never through `db`/`connection`,
+   * which remain only as a compatibility projection for the DuckDB-WASM
+   * specific code paths (file import, parquet export).
+   */
+  currentSession: DataSession | null;
   connectionList: ConnectionList;
   isLoadingExternalConnection: boolean;
 
@@ -316,9 +358,27 @@ export interface ConnectionSlice {
   getConnection: (connectionId: string) => ConnectionProvider | undefined;
 }
 
+/** Live view of a query that is still running. */
+export interface QueryProgress {
+  rows: number;
+  batches: number;
+  elapsedMs: number;
+  /** Column headers, known from the engine before the first row arrives. */
+  columns: string[];
+}
+
 export interface QuerySlice {
   queryHistory: QueryHistoryItem[];
   executingTabs: Record<string, boolean>;
+  /** Per-tab progress for in-flight queries. Cleared when one settles. */
+  queryProgress: Record<string, QueryProgress>;
+  /**
+   * Rows an editor query may return before the engine stops and marks the
+   * result truncated. Guards the tab against a `SELECT *` on a huge table
+   * materializing into JS objects and freezing it.
+   */
+  maxResultRows: number;
+  setMaxResultRows: (rows: number) => void;
 
   executeQuery: (query: string, tabId?: string) => Promise<QueryResult | void>;
   /** Cancels the in-flight query started for this tab, if any. */
@@ -423,22 +483,11 @@ export interface DuckBrainSlice {
 export interface FileSystemSlice {
   mountedFolders: MountedFolderInfo[];
   isFileSystemSupported: boolean;
-  cloudConnections: CloudConnection[];
-  cloudSupportStatus: CloudSupportStatus | null;
-  isCloudStorageInitialized: boolean;
 
   initFileSystem: () => Promise<void>;
   mountFolder: () => Promise<MountedFolderInfo | null>;
   unmountFolder: (id: string) => Promise<void>;
   refreshFolderPermissions: () => Promise<void>;
-  initCloudStorage: () => Promise<void>;
-  addCloudConnection: (
-    config: Omit<CloudConnection, "id" | "addedAt" | "isConnected">
-  ) => Promise<CloudConnection | null>;
-  removeCloudConnection: (id: string) => Promise<void>;
-  connectCloudStorage: (id: string) => Promise<boolean>;
-  disconnectCloudStorage: (id: string) => Promise<void>;
-  testCloudConnection: (id: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 //
@@ -472,6 +521,101 @@ export interface ProfileSlice {
 }
 
 //
+// Dashboards
+//
+
+export interface DashboardSlice {
+  dashboards: Dashboard[];
+  isDashboardEditing: boolean;
+
+  loadDashboards: (profileId?: string) => Promise<void>;
+  createDashboard: (name: string) => Promise<Dashboard | null>;
+  updateDashboard: (dashboard: Dashboard) => Promise<void>;
+  deleteDashboard: (id: string) => Promise<void>;
+  duplicateDashboard: (id: string) => Promise<Dashboard | null>;
+  setDashboardEditing: (editing: boolean) => void;
+
+  /** Appends a named SQL fence plus a component tag to a dashboard document. */
+  appendQueryToDashboard: (options: {
+    dashboardId: string;
+    kind: "chart" | "table" | "metric";
+    title: string;
+    sql: string;
+    chartConfig?: ChartConfig;
+    /** Result columns, for picking sensible x/y in the generated tag. */
+    columns?: { name: string; numeric: boolean }[];
+  }) => Promise<void>;
+
+  /** Focuses a dashboard's tab, opening one if needed. Returns its tab id. */
+  openDashboardTab: (dashboardId: string, name: string) => string | undefined;
+  /** The dashboards list slide-over. Store-driven so Home and the rail share it. */
+  isDashboardsPanelOpen: boolean;
+  setDashboardsPanelOpen: (open: boolean) => void;
+  runDashboard: (dashboardId: string, force?: boolean) => Promise<void>;
+}
+
+//
+// Live session
+//
+
+export type SessionRole = "host" | "guest";
+
+/** What the UI renders about a live session. Never the session itself. */
+export interface SessionProjection {
+  role: SessionRole | null;
+  status: SessionStatus;
+  sessionName: string;
+  hostName: string;
+  /** Host only: the link to send. */
+  inviteUrl: string | null;
+  inviteCode: string | null;
+  /** Guest only: the code to send back. */
+  answerCode: string | null;
+  participants: Participant[];
+  sharedCapabilities: SharedCapability[];
+  isWebRtcSupported: boolean;
+  error: string | null;
+}
+
+export interface SessionSlice {
+  session: SessionProjection;
+
+  listShareableTables: () => Promise<ShareSelection[]>;
+  startLiveSession: (options: {
+    sessionName: string;
+    shared: ShareSelection[];
+    /** Share everything on the connection, including tables added later. */
+    shareAll?: boolean;
+    maxResultRows?: number;
+  }) => Promise<void>;
+  acceptGuestCode: (code: string) => Promise<void>;
+  /** Host: mints a fresh single-use invite for one more person. */
+  inviteAnotherGuest: () => Promise<void>;
+  /** Host: disconnects one participant. */
+  removeParticipant: (peerId: string) => Promise<void>;
+  joinLiveSession: (inviteCode: string) => Promise<void>;
+  syncSessionConnections: (capabilities: SharedCapability[]) => void;
+  /** Adopts co-edited dashboards from the shared document into local state. */
+  adoptSharedDashboards: () => void;
+  /** Adopts shared notebook state (whole-document, last-writer-wins). */
+  adoptSharedNotebooks: () => void;
+  /** Reconciles local tabs with the shared workspace document. */
+  projectSharedTabs: () => void;
+  /** Subscribes the tab list to shared-document changes. */
+  watchSharedWorkspace: () => void;
+  revokeCapability: (capabilityId: string) => Promise<void>;
+  /** Copies shared tables into this browser's own engine. Guest side of Fork. */
+  forkCapability: (
+    capabilityId: string,
+    tables: string[],
+    onProgress?: (progress: ForkTableProgress) => void,
+    /** Where the copies land. Defaults to the in-memory engine; an OPFS connection makes them survive the browser closing. */
+    targetConnectionId?: string
+  ) => Promise<ForkTableProgress[]>;
+  endLiveSession: () => Promise<void>;
+}
+
+//
 // Composed Store Type
 //
 
@@ -482,4 +626,6 @@ export type DuckStoreState = DuckdbSlice &
   TabSlice &
   DuckBrainSlice &
   FileSystemSlice &
-  ProfileSlice;
+  ProfileSlice &
+  SessionSlice &
+  DashboardSlice;

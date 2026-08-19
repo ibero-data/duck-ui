@@ -1,13 +1,21 @@
 import { rawResultToJSON } from "./resultParser";
 import { sqlEscapeString, qualifyTable } from "@/lib/sqlSanitize";
-import type {
-  CurrentConnection,
-  ConnectionProvider,
-  QueryResult,
-  ColumnInfo,
-  TableInfo,
-  DatabaseInfo,
-} from "@/store/types";
+import type { QueryResult, ColumnInfo, TableInfo, DatabaseInfo } from "@/store/types";
+
+/**
+ * Everything needed to reach a DuckDB `httpserver` endpoint. Structural, so
+ * both the legacy `CurrentConnection`/`ConnectionProvider` shapes and the
+ * engine layer's `duck-http` config satisfy it without conversion.
+ */
+export interface ExternalEndpoint {
+  host?: string;
+  port?: number | string;
+  user?: string;
+  password?: string;
+  apiKey?: string;
+  authMode?: "none" | "password" | "api_key";
+  database?: string;
+}
 
 /**
  * Builds a properly formatted URL from a connection's host and port.
@@ -50,7 +58,7 @@ const buildConnectionUrl = (host: string, port?: string | number): string => {
  */
 export const executeExternalQuery = async (
   query: string,
-  connection: CurrentConnection,
+  connection: ExternalEndpoint,
   signal?: AbortSignal
 ): Promise<QueryResult> => {
   if (!connection.host) {
@@ -108,7 +116,7 @@ export const executeExternalQuery = async (
 /**
  * Tests an external connection by executing a basic query.
  */
-export const testExternalConnection = async (connection: ConnectionProvider): Promise<void> => {
+export const testExternalConnection = async (connection: ExternalEndpoint): Promise<void> => {
   if (!connection.host) {
     throw new Error("Host must be defined for external connections.");
   }
@@ -157,7 +165,7 @@ export const testExternalConnection = async (connection: ConnectionProvider): Pr
  * Fetches databases and tables for an external connection.
  */
 export const fetchExternalDatabases = async (
-  connection: CurrentConnection
+  connection: ExternalEndpoint
 ): Promise<DatabaseInfo[]> => {
   try {
     // Try to get database list

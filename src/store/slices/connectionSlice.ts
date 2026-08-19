@@ -1,15 +1,84 @@
 import type { StateCreator } from "zustand";
 import { toast } from "sonner";
 import {
-  testExternalConnection,
-  testOPFSConnection,
-  cleanupOPFSConnection,
-} from "@/services/duckdb";
-import type { DuckStoreState, ConnectionSlice } from "../types";
+  asLocalDuckSession,
+  closeSession,
+  getSession,
+  listSessions,
+  openSession,
+  testConnection,
+  toConnectionDefinition,
+  toCredentialMaterial,
+  type DataSession,
+} from "@/services/engine";
+import type {
+  ConnectionProvider,
+  CurrentConnection,
+  DuckStoreState,
+  ConnectionSlice,
+} from "../types";
 import {
   saveConnection,
   deleteConnection as deleteConnectionRepo,
 } from "@/services/persistence/repositories/connectionRepository";
+
+/** Trims a provider record down to the fields the active-connection view keeps. */
+export const toCurrentConnection = (provider: ConnectionProvider): CurrentConnection => ({
+  environment: provider.environment,
+  id: provider.id,
+  name: provider.name,
+  scope: provider.scope,
+  host: provider.host,
+  port: provider.port,
+  user: provider.user,
+  password: provider.password,
+  database: provider.database,
+  authMode: provider.authMode,
+  apiKey: provider.apiKey,
+  path: provider.path,
+});
+
+/** The catalog name shown in the UI for a connection. */
+export const currentDatabaseLabel = (provider: ConnectionProvider): string => {
+  switch (provider.scope) {
+    case "OPFS":
+      return provider.path?.replace(/\.db$/, "") || "opfs";
+    case "External":
+      return provider.database || "external";
+    case "Peer":
+      // Named for what it is, so the UI never implies the data is local.
+      return "shared";
+    default:
+      return "memory";
+  }
+};
+
+/**
+ * DuckDB-WASM handles the store still projects for the code paths that
+ * genuinely need an in-tab engine (file import, parquet export, deep links).
+ * Null for any session that does not run here.
+ */
+export const localHandles = (
+  session: DataSession | null
+): { db: DuckStoreState["db"]; connection: DuckStoreState["connection"] } => {
+  const local = asLocalDuckSession(session);
+  return { db: local?.local.db ?? null, connection: local?.local.connection ?? null };
+};
+
+/**
+ * Only one OPFS engine at a time.
+ *
+ * Each OPFS session is its own DuckDB-WASM instance holding an exclusive lock
+ * on its file. Leaving the previous one open would pin ~34MB of WASM plus a
+ * worker per database the user has ever visited, so switching away closes it.
+ */
+const closeOtherOpfsSessions = async (keepConnectionId: string): Promise<void> => {
+  await Promise.all(
+    listSessions()
+      .filter((session) => session.kind === "opfs" && session.connectionId !== keepConnectionId)
+      .map((session) => closeSession(session.connectionId))
+  );
+};
 
 export const createConnectionSlice: StateCreator<
   DuckStoreState,
@@ -18,6 +87,7 @@ export const createConnectionSlice: StateCreator<
   ConnectionSlice
 > = (set, get) => ({
   currentConnection: null,
+  currentSession: null,
   connectionList: {
     connections: [],
   },
@@ -31,29 +101,23 @@ export const createConnectionSlice: StateCreator<
         throw new Error(`A connection with the name "${connection.name}" already exists.`);
       }
 
-      if (connection.scope === "External") {
-        await testExternalConnection(connection);
-      } else if (connection.scope === "OPFS") {
-        const { opfsDb, opfsConnection, currentConnection } = get();
-        if (opfsDb && opfsConnection) {
-          await cleanupOPFSConnection(opfsDb, opfsConnection, currentConnection?.path);
-        }
-        const opfsInstance = await testOPFSConnection(connection);
-        // Store the connection to avoid leaking handles and path locks
+      const definition = toConnectionDefinition(connection);
+      const credentials = toCredentialMaterial(connection);
+
+      if (definition.config.kind === "opfs") {
+        // Opening IS the test for OPFS — a separate probe would pay the file
+        // lock release wait twice. On success the new database becomes active,
+        // which is what the user just asked for by adding it.
+        await closeOtherOpfsSessions(definition.id);
+        const session = await openSession(definition, credentials);
         set({
-          db: opfsInstance.db,
-          connection: opfsInstance.connection,
-          opfsDb: opfsInstance.db,
-          opfsConnection: opfsInstance.connection,
-          currentConnection: {
-            environment: connection.environment,
-            id: connection.id,
-            name: connection.name,
-            scope: connection.scope,
-            path: connection.path,
-          },
-          currentDatabase: connection.path?.replace(/\.db$/, "") || "opfs",
+          ...localHandles(session),
+          currentSession: session,
+          currentConnection: toCurrentConnection(connection),
+          currentDatabase: currentDatabaseLabel(connection),
         });
+      } else if (definition.config.kind !== "wasm") {
+        await testConnection(definition, credentials);
       }
 
       set((state) => ({
@@ -72,9 +136,9 @@ export const createConnectionSlice: StateCreator<
           path: connection.path,
           authMode: connection.authMode,
         };
-        const credentials: Record<string, unknown> = {};
-        if (connection.password) credentials.password = connection.password;
-        if (connection.apiKey) credentials.apiKey = connection.apiKey;
+        const credentialRecord: Record<string, unknown> = {};
+        if (connection.password) credentialRecord.password = connection.password;
+        if (connection.apiKey) credentialRecord.apiKey = connection.apiKey;
 
         saveConnection(
           currentProfileId,
@@ -82,7 +146,7 @@ export const createConnectionSlice: StateCreator<
             name: connection.name,
             scope: connection.scope ?? "External",
             config,
-            credentials: Object.keys(credentials).length > 0 ? credentials : undefined,
+            credentials: Object.keys(credentialRecord).length > 0 ? credentialRecord : undefined,
             environment: connection.environment ?? "APP",
           },
           encryptionKey
@@ -116,6 +180,11 @@ export const createConnectionSlice: StateCreator<
         connections: state.connectionList.connections.filter((c) => c.id !== id),
       },
     }));
+    // Release the engine too — an OPFS file would otherwise stay locked by a
+    // connection the user can no longer see.
+    closeSession(id).catch((err) =>
+      console.warn("[Connection] Failed to close session on delete:", err)
+    );
     deleteConnectionRepo(id).catch((err) =>
       console.warn("[Connection] Failed to delete from DB:", err)
     );
@@ -124,98 +193,35 @@ export const createConnectionSlice: StateCreator<
   setCurrentConnection: async (connectionId) => {
     try {
       set({ isLoading: true });
-      const connectionProvider = get().connectionList.connections.find(
-        (c) => c.id === connectionId
-      );
-      if (!connectionProvider) {
+      const provider = get().connectionList.connections.find((c) => c.id === connectionId);
+      if (!provider) {
         throw new Error(`Connection with ID ${connectionId} not found.`);
       }
 
-      const { wasmDb, wasmConnection, opfsDb, opfsConnection } = get();
+      const definition = toConnectionDefinition(provider);
 
-      if (connectionProvider.scope === "WASM") {
-        if (!wasmDb || !wasmConnection) {
-          throw new Error("WASM connection not initialized");
-        }
-        set({
-          db: wasmDb,
-          connection: wasmConnection,
-          currentConnection: {
-            environment: connectionProvider.environment,
-            id: connectionProvider.id,
-            name: connectionProvider.name,
-            scope: connectionProvider.scope,
-          },
-          currentDatabase: "memory",
-        });
-      } else if (connectionProvider.scope === "OPFS") {
-        const needsNewConnection =
-          !opfsDb || !opfsConnection || connectionProvider.path !== get().currentConnection?.path;
-
-        if (needsNewConnection) {
+      if (definition.config.kind === "opfs") {
+        if (!getSession(definition.id)) {
           toast.info("Initializing OPFS connection...");
-
-          if (opfsDb && opfsConnection) {
-            await cleanupOPFSConnection(opfsDb, opfsConnection, get().currentConnection?.path);
-          }
-
-          const opfsInstance = await testOPFSConnection(connectionProvider);
-
-          set({
-            db: opfsInstance.db,
-            connection: opfsInstance.connection,
-            opfsDb: opfsInstance.db,
-            opfsConnection: opfsInstance.connection,
-            currentConnection: {
-              environment: connectionProvider.environment,
-              id: connectionProvider.id,
-              name: connectionProvider.name,
-              scope: connectionProvider.scope,
-              path: connectionProvider.path,
-            },
-            currentDatabase: connectionProvider.path?.replace(/\.db$/, "") || "opfs",
-          });
-        } else {
-          set({
-            db: opfsDb,
-            connection: opfsConnection,
-            currentConnection: {
-              environment: connectionProvider.environment,
-              id: connectionProvider.id,
-              name: connectionProvider.name,
-              scope: connectionProvider.scope,
-              path: connectionProvider.path,
-            },
-            currentDatabase: connectionProvider.path?.replace(/\.db$/, "") || "opfs",
-          });
         }
-      } else if (connectionProvider.scope === "External") {
-        set({
-          db: null,
-          connection: null,
-          currentConnection: {
-            environment: connectionProvider.environment,
-            id: connectionProvider.id,
-            name: connectionProvider.name,
-            scope: connectionProvider.scope,
-            host: connectionProvider.host,
-            port: connectionProvider.port,
-            user: connectionProvider.user,
-            password: connectionProvider.password,
-            database: connectionProvider.database,
-            authMode: connectionProvider.authMode,
-            apiKey: connectionProvider.apiKey,
-          },
-          currentDatabase: connectionProvider.database || "external",
-        });
+        await closeOtherOpfsSessions(definition.id);
       }
+
+      const session = await openSession(definition, toCredentialMaterial(provider));
+
+      set({
+        ...localHandles(session),
+        currentSession: session,
+        currentConnection: toCurrentConnection(provider),
+        currentDatabase: currentDatabaseLabel(provider),
+      });
 
       try {
         await get().fetchDatabasesAndTablesInfo();
       } catch {
         // Schema fetch failure shouldn't prevent connection from completing
       }
-      toast.success(`Connected to ${connectionProvider.name}`);
+      toast.success(`Connected to ${provider.name}`);
     } catch (error) {
       set({
         error: `Failed to set current connection: ${

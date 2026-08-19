@@ -259,8 +259,11 @@ const isVarintField = (field: any): boolean => {
 /**
  * Reports the DuckDB type where Arrow's own name would mislead — a GEOMETRY
  * column should not read as "Binary" in the grid header.
+ *
+ * Exported so the engine layer can describe a result's schema (before any row
+ * arrives) with exactly the labels the grid will later show.
  */
-const columnTypeLabel = (field: any): string => {
+export const columnTypeLabel = (field: any): string => {
   if (getExtensionName(field) === "geoarrow.wkb") return "GEOMETRY";
   if (isVarintField(field)) return "VARINT";
   return field.type.toString();

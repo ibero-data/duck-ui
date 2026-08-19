@@ -34,3 +34,6 @@ CLAUDE.md
 # Playwright
 test-results/
 playwright-report/
+
+# Local session notes
+WORK_LOG.md
