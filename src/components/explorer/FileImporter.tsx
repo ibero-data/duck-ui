@@ -596,7 +596,9 @@ const FileDetails: React.FC<FileDetailsProps> = ({
 
 const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen }) => {
   const db = useDuckStore((s) => s.db);
-  const currentConnection = useDuckStore((s) => s.currentConnection);
+  const supportsFileImport = useDuckStore(
+    (s) => s.currentSession?.capabilities.supportsFileImport ?? false
+  );
   const importFile = useDuckStore((s) => s.importFile);
   const executeQuery = useDuckStore((s) => s.executeQuery);
   const [activeTab, setActiveTab] = useState("upload");
@@ -938,7 +940,7 @@ const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen
    */
   const resolveUrlSource = async (url: string, extension?: string): Promise<string> => {
     if (extension !== "csv" && extension !== "json") return url;
-    if (!db || currentConnection?.scope === "External") return url;
+    if (!db || !supportsFileImport) return url;
     try {
       return (await stageRemoteTextFile(db, url)) ?? url;
     } catch (error) {

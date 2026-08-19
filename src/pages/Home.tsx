@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import WorkspaceTabs from "@/components/workspace/WorkspaceTabs";
 import CommandPalette from "@/components/command-palette/CommandPalette";
 import { DeepLinkLoader } from "@/components/share/DeepLinkLoader";
+import JoinSessionDialog from "@/components/collaboration/JoinSessionDialog";
+import DashboardShareLoader from "@/components/dashboard/DashboardShareLoader";
+import DuckBrainSheet from "@/components/duck-brain/DuckBrainSheet";
 
 export default function Home() {
   const [dataExplorerOpen, setDataExplorerOpen] = useState(false);
@@ -19,6 +22,11 @@ export default function Home() {
       {/* Mounted ONCE here — WorkspaceTabs renders twice (desktop + mobile
           branches), which would stack duplicate dialogs. */}
       <DeepLinkLoader />
+      {/* Also mounted once: an invite link must not open two dialogs. */}
+      <JoinSessionDialog />
+      <DashboardShareLoader />
+      {/* Duck Brain slide-over: one global mount, store-driven. */}
+      <DuckBrainSheet />
       {/* Sidebar - Desktop only */}
       <aside className="hidden md:flex">
         <Sidebar
@@ -69,7 +77,7 @@ export default function Home() {
                 <span className="text-xs">Tables</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] sm:w-[350px] p-0">
+            <SheetContent side="left" className="w-[300px] gap-0 p-0 sm:w-[350px]">
               <SheetHeader className="px-4 py-3 border-b">
                 <SheetTitle>Data Explorer</SheetTitle>
               </SheetHeader>

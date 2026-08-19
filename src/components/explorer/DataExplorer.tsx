@@ -16,7 +16,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import FolderBrowser from "@/components/folders/FolderBrowser";
-import CloudBrowser from "@/components/cloud/CloudBrowser";
 import { type FileEntry, fileSystemService } from "@/lib/fileSystem";
 import { getUiConfig } from "@/lib/appConfig";
 import { type ImportOptions } from "@/components/common/ImportOptionsPopover";
@@ -27,7 +26,12 @@ export default function DataExplorer() {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const databases = useDuckStore((s) => s.databases);
   const isLoading = useDuckStore((s) => s.isLoading);
-  const currentConnection = useDuckStore((s) => s.currentConnection);
+  // Capability reads, not connection-kind checks: a future peer-hosted session
+  // gets the right affordances without touching this component.
+  const isRemote = useDuckStore((s) => s.currentSession?.capabilities.remote ?? false);
+  const supportsFileImport = useDuckStore(
+    (s) => s.currentSession?.capabilities.supportsFileImport ?? false
+  );
   const importFile = useDuckStore((s) => s.importFile);
   const fetchDatabasesAndTablesInfo = useDuckStore((s) => s.fetchDatabasesAndTablesInfo);
   const isFileSystemSupported = useDuckStore((s) => s.isFileSystemSupported);
@@ -87,10 +91,9 @@ export default function DataExplorer() {
     return treeData;
   };
   const treeData = buildTreeData();
-  const isExternal = currentConnection?.scope === "External";
   // Kiosk mode can hide all data-import affordances (drag-drop, import menu,
   // folder/cloud browsers), leaving the explorer read-only.
-  const canImport = !isExternal && !getUiConfig().hideImport;
+  const canImport = supportsFileImport && !getUiConfig().hideImport;
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -147,7 +150,7 @@ export default function DataExplorer() {
       <CardHeader className="p-2 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {isExternal ? (
+            {isRemote ? (
               <Server className="h-4 w-4 text-primary" />
             ) : (
               <Database className="h-4 w-4 text-primary" />
@@ -232,7 +235,7 @@ export default function DataExplorer() {
           ) : (
             <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
               <div className="flex flex-col items-center gap-2">
-                {isExternal ? (
+                {isRemote ? (
                   <>
                     <Server className="h-8 w-8 text-muted-foreground" />
                     {schemaFetchError ? (
@@ -262,7 +265,7 @@ export default function DataExplorer() {
                   </>
                 )}
               </div>
-              {isExternal ? (
+              {isRemote ? (
                 <Button
                   variant="outline"
                   className="gap-2"
@@ -284,13 +287,6 @@ export default function DataExplorer() {
           {isFileSystemSupported && canImport && (
             <div className="border-t pt-3">
               <FolderBrowser onFileImport={handleFolderFileImport} />
-            </div>
-          )}
-
-          {/* Cloud Storage Section */}
-          {canImport && (
-            <div className="border-t pt-3">
-              <CloudBrowser />
             </div>
           )}
         </div>

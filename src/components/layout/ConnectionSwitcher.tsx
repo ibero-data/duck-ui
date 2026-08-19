@@ -27,6 +27,7 @@ export default function ConnectionSwitcher({ className }: ConnectionSwitcherProp
   const tabs = useDuckStore((s) => s.tabs);
   const createTab = useDuckStore((s) => s.createTab);
   const setActiveTab = useDuckStore((s) => s.setActiveTab);
+  const hostName = useDuckStore((s) => s.session.hostName);
   const [isOpen, setIsOpen] = React.useState(false);
 
   // Helper to open or focus Connections tab
@@ -51,6 +52,10 @@ export default function ConnectionSwitcher({ className }: ConnectionSwitcherProp
     }
   };
 
+  const sessionConnections = connectionList.connections.filter(
+    (connection) => connection.environment === "SESSION"
+  );
+
   const getStatusColor = (scope: string) => {
     switch (scope) {
       case "WASM":
@@ -59,6 +64,9 @@ export default function ConnectionSwitcher({ className }: ConnectionSwitcherProp
         return "bg-blue-500";
       case "OPFS":
         return "bg-purple-500";
+      // Hosted by another participant — amber matches the live-session accent.
+      case "Peer":
+        return "bg-amber-500";
       default:
         return "bg-gray-500";
     }
@@ -100,25 +108,60 @@ export default function ConnectionSwitcher({ className }: ConnectionSwitcherProp
             Switch Connection
           </DropdownMenuLabel>
 
-          {connectionList.connections.map((connection) => (
-            <DropdownMenuItem
-              key={connection.id}
-              onClick={() => handleConnectionChange(connection.id)}
-              className={cn(
-                "flex items-center gap-2 cursor-pointer",
-                activeConnection?.id === connection.id && "bg-accent"
-              )}
-            >
-              <Circle
-                className={cn("h-2 w-2", getStatusColor(connection.scope))}
-                fill="currentColor"
-              />
-              <span className="flex-1 font-medium">{connection.name}</span>
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {connection.scope}
-              </Badge>
-            </DropdownMenuItem>
-          ))}
+          {connectionList.connections
+            .filter((connection) => connection.environment !== "SESSION")
+            .map((connection) => (
+              <DropdownMenuItem
+                key={connection.id}
+                onClick={() => handleConnectionChange(connection.id)}
+                className={cn(
+                  "flex items-center gap-2 cursor-pointer",
+                  activeConnection?.id === connection.id && "bg-accent"
+                )}
+              >
+                <Circle
+                  className={cn("h-2 w-2", getStatusColor(connection.scope))}
+                  fill="currentColor"
+                />
+                <span className="flex-1 font-medium">{connection.name}</span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {connection.scope}
+                </Badge>
+              </DropdownMenuItem>
+            ))}
+
+          {/* Session grants are listed apart, and say whose browser runs them
+              — a connection that executes somewhere else should never be
+              indistinguishable from a local one (§43). */}
+          {sessionConnections.length > 0 && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                Session
+              </DropdownMenuLabel>
+              {sessionConnections.map((connection) => (
+                <DropdownMenuItem
+                  key={connection.id}
+                  onClick={() => handleConnectionChange(connection.id)}
+                  className={cn(
+                    "flex items-center gap-2 cursor-pointer",
+                    activeConnection?.id === connection.id && "bg-accent"
+                  )}
+                >
+                  <Circle
+                    className={cn("h-2 w-2", getStatusColor(connection.scope))}
+                    fill="currentColor"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate font-medium">{connection.name}</p>
+                    <p className="truncate text-[10px] text-muted-foreground">
+                      {hostName ? `Hosted by ${hostName}` : "Hosted by a participant"} · Read-only
+                    </p>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
 
           {!getUiConfig().hideConnections && (
             <>

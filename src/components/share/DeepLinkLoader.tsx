@@ -61,11 +61,11 @@ export function DeepLinkLoader() {
   const handleLoad = useCallback(
     async (run: boolean) => {
       if (!request) return;
-      const { connection, currentConnection } = useDuckStore.getState();
-      // Deep links attach into the in-browser engine; on an external server
-      // connection the loaded sources would be invisible. Keep the dialog
-      // open so the link isn't consumed.
-      if (!connection || currentConnection?.scope === "External") {
+      const { connection, currentSession } = useDuckStore.getState();
+      // Deep links attach into the in-browser engine; on a connection that
+      // executes elsewhere the loaded sources would be invisible. Keep the
+      // dialog open so the link isn't consumed.
+      if (!connection || !currentSession?.capabilities.supportsFileImport) {
         toast.error("Shared data loads into the in-browser DuckDB engine", {
           description: "Switch to a WASM or OPFS connection, then open this link again.",
         });

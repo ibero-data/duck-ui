@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDuckStore } from "@/store";
-import { resultToJSON, validateConnection } from "@/services/duckdb";
+import { runQuery } from "@/services/engine";
 import { decodeShare, readShareParam, queryReadsRemoteSource } from "@/lib/share";
 import type { ChartConfig, QueryResult } from "@/store/types";
 import DuckUiTable from "@/components/table/DuckUItable";
@@ -24,7 +24,8 @@ type EmbedState =
  * no sidebar, no profile — just the result, with a fork link back to Duck-UI.
  */
 export default function EmbedView() {
-  const connection = useDuckStore((s) => s.connection);
+  const currentSession = useDuckStore((s) => s.currentSession);
+  const maxResultRows = useDuckStore((s) => s.maxResultRows);
   const isInitialized = useDuckStore((s) => s.isInitialized);
   const [state, setState] = useState<EmbedState>({ status: "loading" });
   const [liveChartConfig, setLiveChartConfig] = useState<ChartConfig | undefined>();
@@ -62,9 +63,8 @@ export default function EmbedView() {
       }
 
       try {
-        const conn = validateConnection(connection);
-        const raw = await conn.query(sql);
-        const result = resultToJSON(raw);
+        if (!currentSession) throw new Error("No active connection");
+        const result = await runQuery(currentSession, sql, "embed", { maxRows: maxResultRows });
         if (cancelled) return;
 
         if (result.error) {
@@ -91,7 +91,7 @@ export default function EmbedView() {
     return () => {
       cancelled = true;
     };
-  }, [isInitialized, connection]);
+  }, [isInitialized, currentSession, maxResultRows]);
 
   return (
     <div className="flex flex-col h-screen w-full bg-background text-foreground">

@@ -1680,7 +1680,7 @@ const DuckUITable: React.FC<DuckTableProps> = ({
         </div>
 
         {/* Pagination controls */}
-        <div className="flex items-center justify-between mt-4 flex-shrink-0 mb-2 px-4">
+        <div className="flex items-center justify-between mt-2 flex-shrink-0 mb-1 px-4">
           <div className="flex items-center gap-2">
             <Button
               variant="outline"

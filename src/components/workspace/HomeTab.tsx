@@ -5,6 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Github,
   Terminal,
+  LayoutDashboard,
+  Radio,
+  Brain,
   BookOpen,
   Database,
   ExternalLink,
@@ -21,6 +24,7 @@ import {
 } from "lucide-react";
 import { useDuckStore } from "@/store";
 import { motion } from "framer-motion";
+import ShareLiveDialog from "@/components/collaboration/ShareLiveDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import Logo from "/logo.png";
 import LogoLight from "/logo-light.png";
@@ -43,6 +47,24 @@ const quickStartActions = [
     action: "sql",
   },
   {
+    title: "NEW! Dashboards",
+    icon: <LayoutDashboard className="w-5 h-5" />,
+    description: "Reports as markdown with live SQL, charts and inputs.",
+    action: "dashboards",
+  },
+  {
+    title: "NEW! Share Live",
+    icon: <Radio className="w-5 h-5" />,
+    description: "Invite another browser into your workspace. No server.",
+    action: "share-live",
+  },
+  {
+    title: "Duck Brain AI",
+    icon: <Brain className="w-5 h-5" />,
+    description: "Ask questions in plain language, get SQL back.",
+    action: "brain",
+  },
+  {
     title: "Explore with Examples",
     icon: <TestTubeDiagonal className="w-5 h-5" />,
     description: "Explore example query set to feel the power of DuckDB.",
@@ -55,10 +77,10 @@ const quickStartActions = [
     action: "connect",
   },
   {
-    title: "NEW! DuckUI Embed",
+    title: "Embed Duck-UI",
     icon: <PackageCheck className="w-5 h-5" />,
-    description: "Embed DuckUI in your own applications.",
-    link: "https://duckui.com/play/",
+    description: "Put charts and queries inside your own app.",
+    link: "https://docs.duckui.com/embed/docs",
   },
 ];
 
@@ -81,7 +103,7 @@ const resourceCards = [
     title: "Duck-UI Documentation",
     Icon: ExternalLink,
     description: "Learn how to make the most of Duck-UI.",
-    link: "https://duckui.com/",
+    link: "https://docs.duckui.com/",
     action: "Learn More",
   },
 ];
@@ -125,7 +147,9 @@ const HomeTab = () => {
   const createTab = useDuckStore((s) => s.createTab);
   const executeQuery = useDuckStore((s) => s.executeQuery);
   const db = useDuckStore((s) => s.db);
-  const currentConnection = useDuckStore((s) => s.currentConnection);
+  const supportsFileImport = useDuckStore(
+    (s) => s.currentSession?.capabilities.supportsFileImport ?? false
+  );
   const updateTabChartConfig = useDuckStore((s) => s.updateTabChartConfig);
   const queryHistory = useDuckStore((s) => s.queryHistory);
   const error = useDuckStore((s) => s.error);
@@ -134,6 +158,9 @@ const HomeTab = () => {
   const currentProfile = useDuckStore((s) => s.currentProfile);
   const currentProfileId = useDuckStore((s) => s.currentProfileId);
   const savedQueriesVersion = useDuckStore((s) => s.savedQueriesVersion);
+  const setDashboardsPanelOpen = useDuckStore((s) => s.setDashboardsPanelOpen);
+  const toggleBrainPanel = useDuckStore((s) => s.toggleBrainPanel);
+  const [shareOpen, setShareOpen] = useState(false);
   // null = not loaded yet (shows skeleton); refreshes keep the stale list visible
   const [savedQueries, setSavedQueries] = useState<SavedQuery[] | null>(null);
 
@@ -172,7 +199,7 @@ const HomeTab = () => {
   };
 
   // Helper to open or focus a singleton tab (same pattern as Sidebar)
-  const openOrFocusTab = (type: "connections" | "brain", title: string) => {
+  const openOrFocusTab = (type: "connections", title: string) => {
     const existing = tabs.find((t) => t.type === type);
     if (existing) {
       setActiveTab(existing.id);
@@ -198,6 +225,15 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
       // Open Connections tab instead of modal
       openOrFocusTab("connections", "Connections");
     }
+    if (type === "dashboards") {
+      setDashboardsPanelOpen(true);
+    }
+    if (type === "share-live") {
+      setShareOpen(true);
+    }
+    if (type === "brain") {
+      toggleBrainPanel();
+    }
   };
 
   const handleOpenDemo = async (dataset: DemoDataset) => {
@@ -206,8 +242,10 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
     // httpfs mis-detects the dialect (see stageRemoteTextFile). External
     // servers fetch the URL themselves, so they keep the URL.
     let query = dataset.query;
-    const isExternal = currentConnection?.scope === "External";
-    if (dataset.stage && db && !isExternal) {
+    // Staging registers the file in this tab's virtual filesystem, so it only
+    // applies to an engine that runs here. A remote server fetches the URL
+    // itself and keeps the original query.
+    if (dataset.stage && db && supportsFileImport) {
       try {
         const localName = await stageRemoteTextFile(db, dataset.stage.url);
         if (localName) query = query.split(dataset.stage.url).join(localName);
@@ -258,6 +296,7 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
         >
           {quickStartActions
             .filter((action) => !(action.action === "connect" && getUiConfig().hideConnections))
+            .filter((action) => !(action.action === "brain" && getUiConfig().hideBrain))
             .map((action, index) => (
               <motion.div
                 key={index}
@@ -314,7 +353,7 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
             <TabsTrigger value="resources" className="data-[state=active]:text-primary px-6">
               Resources
             </TabsTrigger>
-            <TabsTrigger value="iberodata" className="data-[state=active]:text-primary px-6">
+            <TabsTrigger value="caioricciuti" className="data-[state=active]:text-primary px-6">
               Caio Ricciuti
             </TabsTrigger>
           </TabsList>
@@ -489,7 +528,7 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
             </div>
           </TabsContent>
 
-          <TabsContent value="iberodata" className="space-y-6">
+          <TabsContent value="caioricciuti" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {caioRicciutiProducts.map((product, index) => (
                 <motion.div
@@ -528,6 +567,8 @@ SELECT * FROM 'https://blobs.duckdb.org/stations.parquet' LIMIT 1000;
           Duck-UI Version: {duck_ui_version} - Released on: {duck_ui_release_date}
         </p>
       </div>
+
+      <ShareLiveDialog open={shareOpen} onOpenChange={setShareOpen} />
     </div>
   );
 };

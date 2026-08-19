@@ -44,7 +44,13 @@ import type { QueryResult, ChartConfig, ChartType, DataTransform } from "@/store
 interface ChartVisualizationProProps {
   result: QueryResult;
   chartConfig?: ChartConfig;
-  onConfigChange: (config: ChartConfig | undefined) => void;
+  onConfigChange?: (config: ChartConfig | undefined) => void;
+  /**
+   * Presentation mode: render only the chart, no configuration toolbar.
+   * Used inside dashboard documents, where the config lives in the markdown
+   * and a toolbar per chart would turn a report into a cockpit.
+   */
+  readOnly?: boolean;
 }
 
 // Enhanced color palette
@@ -296,6 +302,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   result,
   chartConfig,
   onConfigChange,
+  readOnly = false,
 }) => {
   const { theme } = useTheme();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -310,9 +317,19 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
 
   // Auto-chart: detect best config when no config exists
   const autoDetect = useCallback((): ChartConfig => {
+    // Prefer a categorical column for the x-axis; fall back to the first
+    // column when everything is numeric.
     const xAxis =
       result.columns.find((col) => !isNumericColumn(result.data, col)) || result.columns[0] || "";
-    const yCol = numericColumns[0] || result.columns[1] || "";
+
+    // The x-axis column must NOT also be plotted as a series. With an
+    // all-numeric result (`SELECT 1, 2, 3`) the old default picked column one
+    // for both, so the chart drew a value against itself and the legend
+    // listed the axis as data.
+    const yCol =
+      numericColumns.find((col) => col !== xAxis) ||
+      result.columns.find((col) => col !== xAxis) ||
+      "";
     const suggested = suggestChartTypes(result, xAxis, yCol);
     const type = (suggested[0] || "bar") as ChartType;
     return {
@@ -330,7 +347,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   // On mount: auto-generate config if none provided
   useEffect(() => {
     if (!chartConfig && result.data.length > 0) {
-      onConfigChange(autoDetect());
+      onConfigChange?.(autoDetect());
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -338,7 +355,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   const updateConfig = useCallback(
     (updates: Partial<ChartConfig>) => {
       const base = chartConfig || autoDetect();
-      onConfigChange({ ...base, ...updates });
+      onConfigChange?.({ ...base, ...updates });
     },
     [chartConfig, autoDetect, onConfigChange]
   );
@@ -346,7 +363,7 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   const updateTransform = useCallback(
     (updates: Partial<DataTransform>) => {
       const base = chartConfig || autoDetect();
-      onConfigChange({ ...base, transform: { ...base.transform, ...updates } });
+      onConfigChange?.({ ...base, transform: { ...base.transform, ...updates } });
     },
     [chartConfig, autoDetect, onConfigChange]
   );
@@ -555,7 +572,21 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
     }
 
     const opts: Omit<uPlot.Options, "width" | "height"> = {
-      scales: { x: { time: false } },
+      scales: {
+        x: {
+          time: false,
+          /**
+           * A result with one row collapses the x range to a single value, and
+           * uPlot then draws the whole series pinned to the left edge with the
+           * rest of the canvas empty — which reads as a broken chart rather
+           * than as one data point. Pad the range so a lone bar sits centred.
+           */
+          range:
+            chartData.length === 1
+              ? (_u: uPlot, min: number, max: number): [number, number] => [min - 1, max + 1]
+              : undefined,
+        },
+      },
       series: uSeries,
       axes: uAxes,
       cursor: {
@@ -660,6 +691,10 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
   }
 
   const isLineOrArea = ["line", "area", "stacked_area"].includes(config.type);
+
+  if (readOnly) {
+    return <div className="h-full min-h-0">{renderChart()}</div>;
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -855,9 +890,9 @@ export const ChartVisualizationPro: React.FC<ChartVisualizationProProps> = ({
           size="icon"
           className="h-8 w-8"
           onClick={() => {
-            onConfigChange(undefined);
+            onConfigChange?.(undefined);
             // Will auto-detect on next render
-            setTimeout(() => onConfigChange(autoDetect()), 0);
+            setTimeout(() => onConfigChange?.(autoDetect()), 0);
           }}
           title="Reset chart"
         >
