@@ -5,7 +5,11 @@
  */
 
 const FALLBACK_DB_NAME = "duck-ui-persistence";
-const FALLBACK_DB_VERSION = 1;
+/**
+ * Bumped to 2 for the `dashboards` store. `onupgradeneeded` creates any store
+ * that is missing, so an existing profile gains it without losing anything.
+ */
+const FALLBACK_DB_VERSION = 2;
 
 const STORES = [
   "profiles",
@@ -16,19 +20,55 @@ const STORES = [
   "ai_provider_configs",
   "ai_conversations",
   "saved_queries",
+  "dashboards",
 ] as const;
 
 let fallbackDb: IDBDatabase | null = null;
+
+/**
+ * A blocked upgrade must fail loudly, not hang forever.
+ *
+ * When the schema version is bumped, `indexedDB.open` waits for every OTHER
+ * tab holding the old version to release it. Without a `versionchange` handler
+ * those tabs never do, so in the new tab every write silently never resolves —
+ * which shipped as "I made a dashboard, reloaded, and it was gone": it was
+ * never written. The handler below closes our connection when someone else
+ * upgrades; this timeout covers tabs from builds that predate the handler.
+ */
+const OPEN_TIMEOUT_MS = 10_000;
 
 function openFallbackDb(): Promise<IDBDatabase> {
   if (fallbackDb) return Promise.resolve(fallbackDb);
 
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(FALLBACK_DB_NAME, FALLBACK_DB_VERSION);
-    request.onerror = () => reject(request.error);
+
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          "Storage is locked by another Duck-UI tab. Close or reload your other Duck-UI tabs and try again."
+        )
+      );
+    }, OPEN_TIMEOUT_MS);
+
+    request.onerror = () => {
+      clearTimeout(timer);
+      reject(request.error);
+    };
+    request.onblocked = () => {
+      console.warn("[persistence] upgrade blocked by another tab holding the old schema");
+    };
     request.onsuccess = () => {
+      clearTimeout(timer);
       fallbackDb = request.result;
-      resolve(fallbackDb);
+      // Release our handle the moment any other tab needs to upgrade, so a
+      // deploy that bumps the schema never deadlocks across open tabs. The
+      // next operation in this tab reopens at the new version.
+      fallbackDb.onversionchange = () => {
+        fallbackDb?.close();
+        fallbackDb = null;
+      };
+      resolve(request.result);
     };
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;

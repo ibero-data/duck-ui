@@ -22,7 +22,7 @@ interface EditorConfig {
   minimap: { enabled: boolean };
   padding: { top: number };
   suggestOnTriggerCharacters: boolean;
-  quickSuggestions: boolean;
+  quickSuggestions: boolean | { other: boolean; comments: boolean; strings: boolean };
   wordBasedSuggestions: boolean;
   fontSize: number;
   lineNumbers: "on" | "off" | "relative";
@@ -66,6 +66,9 @@ export const createEditor = (
       showVariables: true,
       showWords: true,
       showColors: true,
+      // Keep suggesting while tabbing through a snippet's placeholders —
+      // a scaffold's data={} slot should offer query names immediately.
+      snippetsPreventQuickSuggestions: false,
     },
   });
 
