@@ -24,6 +24,8 @@ import {
   Bookmark,
 } from "lucide-react";
 import type { EditorTabType } from "@/store";
+import { getUiConfig } from "@/lib/appConfig";
+import { qualifyTable } from "@/lib/sqlSanitize";
 import {
   getSavedQueries,
   type SavedQuery,
@@ -32,6 +34,7 @@ import {
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const ui = getUiConfig();
 
   const tabs = useDuckStore((s) => s.tabs);
   const activeTabId = useDuckStore((s) => s.activeTabId);
@@ -81,10 +84,10 @@ export default function CommandPalette() {
   const openTabs = useMemo(() => tabs.filter((t) => t.id !== activeTabId), [tabs, activeTabId]);
 
   const tableEntries = useMemo(() => {
-    const entries: { database: string; table: string }[] = [];
+    const entries: { database: string; schema: string; table: string }[] = [];
     for (const db of databases) {
       for (const table of db.tables) {
-        entries.push({ database: db.name, table: table.name });
+        entries.push({ database: db.name, schema: table.schema || "main", table: table.name });
       }
     }
     return entries;
@@ -111,27 +114,29 @@ export default function CommandPalette() {
             <Home className="mr-2 h-4 w-4" />
             Home
           </CommandItem>
-          <CommandItem onSelect={() => openOrFocusTab("connections", "Connections")}>
-            <Cable className="mr-2 h-4 w-4" />
-            Connections
-          </CommandItem>
-          <CommandItem onSelect={() => openOrFocusTab("brain", "Duck Brain")}>
-            <Brain className="mr-2 h-4 w-4" />
-            Duck Brain
-          </CommandItem>
-          <CommandItem onSelect={() => openOrFocusTab("settings", "Settings")}>
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </CommandItem>
-          <CommandItem
-            onSelect={() => {
-              toggleBrainPanel();
-              setOpen(false);
-            }}
-          >
-            <Brain className="mr-2 h-4 w-4" />
-            Toggle AI Panel
-          </CommandItem>
+          {!ui.hideConnections && (
+            <CommandItem onSelect={() => openOrFocusTab("connections", "Connections")}>
+              <Cable className="mr-2 h-4 w-4" />
+              Connections
+            </CommandItem>
+          )}
+          {!ui.hideSettings && (
+            <CommandItem onSelect={() => openOrFocusTab("settings", "Settings")}>
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </CommandItem>
+          )}
+          {!ui.hideBrain && (
+            <CommandItem
+              onSelect={() => {
+                toggleBrainPanel();
+                setOpen(false);
+              }}
+            >
+              <Brain className="mr-2 h-4 w-4" />
+              Toggle AI Panel
+            </CommandItem>
+          )}
           <CommandItem
             onSelect={() => {
               setTheme(theme === "dark" ? "light" : "dark");
@@ -219,17 +224,17 @@ export default function CommandPalette() {
           <>
             <CommandSeparator />
             <CommandGroup heading="Tables">
-              {tableEntries.map(({ database, table }) => (
+              {tableEntries.map(({ database, schema, table }) => (
                 <CommandItem
-                  key={`${database}.${table}`}
+                  key={`${database}.${schema}.${table}`}
                   onSelect={() => {
-                    const query = `SELECT * FROM "${database}"."${table}" LIMIT 100`;
+                    const query = `SELECT * FROM ${qualifyTable(database, schema, table)} LIMIT 100`;
                     createTab("sql", query, table);
                     setOpen(false);
                   }}
                 >
                   <Table className="mr-2 h-4 w-4" />
-                  {database}.{table}
+                  {database}.{schema === "main" ? table : `${schema}.${table}`}
                   <CommandShortcut>SELECT</CommandShortcut>
                 </CommandItem>
               ))}

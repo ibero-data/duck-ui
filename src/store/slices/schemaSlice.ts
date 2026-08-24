@@ -1,14 +1,19 @@
 import type { StateCreator } from "zustand";
 import { toast } from "sonner";
 import {
-  executeExternalQuery,
-  resultToJSON,
-  validateConnection,
-  fetchExternalDatabases,
-  fetchWasmDatabases,
-} from "@/services/duckdb";
-import { sqlEscapeIdentifier, sqlEscapeString } from "@/lib/sqlSanitize";
-import type { DuckStoreState, SchemaSlice, DatabaseInfo, ColumnStats, QueryResult } from "../types";
+  catalogToDatabaseInfo,
+  requireLocalDuckSession,
+  runQuery,
+  type DataSession,
+} from "@/services/engine";
+import { sqlEscapeIdentifier, sqlEscapeString, qualifyTable } from "@/lib/sqlSanitize";
+import type { DuckStoreState, SchemaSlice, ColumnStats, QueryResult } from "../types";
+
+/** The active session, or a clear error when nothing is connected. */
+const requireSession = (session: DataSession | null): DataSession => {
+  if (!session) throw new Error("No active connection");
+  return session;
+};
 
 export const createSchemaSlice: StateCreator<
   DuckStoreState,
@@ -21,23 +26,17 @@ export const createSchemaSlice: StateCreator<
   schemaFetchError: null,
 
   fetchDatabasesAndTablesInfo: async () => {
-    const { currentConnection, connection } = get();
+    const session = get().currentSession;
     try {
       set({ isLoadingDbTablesFetch: true, schemaFetchError: null });
-      let databases: DatabaseInfo[] = [];
 
-      if (currentConnection?.scope === "External") {
-        databases = await fetchExternalDatabases(currentConnection);
-      } else if (currentConnection?.scope === "OPFS" || currentConnection?.scope === "WASM") {
-        if (!connection) {
-          set({ databases: [], error: null });
-          return;
-        }
-        const wasmConnection = validateConnection(connection);
-        databases = await fetchWasmDatabases(wasmConnection);
+      if (!session?.capabilities.supportsCatalog) {
+        set({ databases: [], schemaFetchError: null });
+        return;
       }
 
-      set({ databases, schemaFetchError: null });
+      const snapshot = await session.introspect();
+      set({ databases: catalogToDatabaseInfo(snapshot), schemaFetchError: null });
     } catch (error) {
       const errorMessage = `Failed to load schema: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -50,23 +49,14 @@ export const createSchemaSlice: StateCreator<
     }
   },
 
-  fetchTableColumnStats: async (databaseName, tableName) => {
-    const { currentConnection, connection } = get();
-    const query =
-      databaseName === "main" || databaseName === "memory" || databaseName === ":memory:"
-        ? `SUMMARIZE ${sqlEscapeIdentifier(tableName)}`
-        : `SUMMARIZE ${sqlEscapeIdentifier(databaseName)}.${sqlEscapeIdentifier(tableName)}`;
+  fetchTableColumnStats: async (databaseName, tableName, schema) => {
+    const useBareName =
+      databaseName === "main" || databaseName === "memory" || databaseName === ":memory:";
+    const query = `SUMMARIZE ${qualifyTable(useBareName ? undefined : databaseName, schema, tableName)}`;
 
     try {
-      let result: QueryResult;
-
-      if (currentConnection?.scope === "External" && currentConnection) {
-        result = await executeExternalQuery(query, currentConnection);
-      } else {
-        const wasmConnection = validateConnection(connection);
-        const wasmResult = await wasmConnection.query(query);
-        result = resultToJSON(wasmResult);
-      }
+      const result = await runQuery(requireSession(get().currentSession), query, "column-stats");
+      if (result.error) throw new Error(result.error);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const columnStats: ColumnStats[] = result.data.map((row: any) => ({
@@ -92,17 +82,75 @@ export const createSchemaSlice: StateCreator<
     }
   },
 
-  deleteTable: async (tableName, database = "memory") => {
+  fetchColumnDistribution: async (databaseName, tableName, columnName, columnType, schema) => {
+    const useBareName =
+      databaseName === "main" || databaseName === "memory" || databaseName === ":memory:";
+    const qualified = qualifyTable(useBareName ? undefined : databaseName, schema, tableName);
+    const col = sqlEscapeIdentifier(columnName);
+
+    const upperType = columnType.toUpperCase();
+    // INTERVAL contains "INT" but can't do the histogram arithmetic — send it
+    // down the top-k branch instead.
+    const isNumeric =
+      !upperType.includes("INTERVAL") &&
+      ["INT", "DOUBLE", "FLOAT", "DECIMAL", "REAL", "NUMERIC"].some((t) => upperType.includes(t));
+
+    // Numeric columns: 20-bin equi-width histogram. Everything else: top 5
+    // values by count. Both are one aggregate query, run only on expand.
+    const query = isNumeric
+      ? `WITH src AS (SELECT ${col} AS v FROM ${qualified} WHERE ${col} IS NOT NULL),
+              bounds AS (SELECT MIN(v) AS lo, MAX(v) AS hi FROM src)
+         SELECT LEAST(19, GREATEST(0, CAST(FLOOR((v - lo) * 20.0 / NULLIF(hi - lo, 0)) AS INT))) AS bucket,
+                COUNT(*) AS n
+         FROM src, bounds GROUP BY 1 ORDER BY 1`
+      : `SELECT CAST(${col} AS VARCHAR) AS v, COUNT(*) AS n
+         FROM ${qualified} WHERE ${col} IS NOT NULL
+         GROUP BY 1 ORDER BY n DESC, v LIMIT 5`;
+
     try {
-      const { connection, currentConnection } = get();
-      if (currentConnection?.scope === "External") {
-        throw new Error("Table deletion is not supported for external connections.");
-      }
-      const wasmConnection = validateConnection(connection);
-      set({ isLoading: true });
-      await wasmConnection.query(
-        `DROP TABLE IF EXISTS ${sqlEscapeIdentifier(database)}.${sqlEscapeIdentifier(tableName)}`
+      const result: QueryResult = await runQuery(
+        requireSession(get().currentSession),
+        query,
+        "column-distribution"
       );
+      if (result.error) throw new Error(result.error);
+
+      if (isNumeric) {
+        const bins = new Array<number>(20).fill(0);
+        for (const row of result.data) {
+          const count = Number(row.n ?? 0);
+          // A constant column yields a NULL bucket — pile it into one bar.
+          const bucket = row.bucket === null || row.bucket === undefined ? 0 : Number(row.bucket);
+          if (bucket >= 0 && bucket < 20) bins[bucket] += count;
+        }
+        return { kind: "histogram", bins };
+      }
+      return {
+        kind: "topk",
+        values: result.data.map((row) => ({
+          value: String(row.v),
+          count: Number(row.n ?? 0),
+        })),
+      };
+    } catch (error) {
+      console.error("Failed to fetch column distribution:", error);
+      return null;
+    }
+  },
+
+  deleteTable: async (tableName, database = "memory", schema) => {
+    try {
+      const session = requireSession(get().currentSession);
+      if (!session.capabilities.writable) {
+        throw new Error("This connection is read-only.");
+      }
+      set({ isLoading: true });
+      const result = await runQuery(
+        session,
+        `DROP TABLE IF EXISTS ${qualifyTable(database, schema, tableName)}`,
+        "delete-table"
+      );
+      if (result.error) throw new Error(result.error);
       await get().fetchDatabasesAndTablesInfo();
       set({ isLoading: false });
     } catch (error) {
@@ -125,13 +173,16 @@ export const createSchemaSlice: StateCreator<
     options = {}
   ) => {
     try {
-      const { db, connection, currentConnection } = get();
-
-      if (currentConnection?.scope === "External") {
-        throw new Error("File import is not supported for external connections.");
+      const session = requireSession(get().currentSession);
+      if (!session.capabilities.supportsFileImport) {
+        throw new Error(
+          "This connection can't import local files. Switch to an in-browser (memory or OPFS) connection."
+        );
       }
+      // Registering a file buffer has no SQL expression — it needs the engine
+      // handle directly.
+      const { db, connection } = requireLocalDuckSession(session).local;
 
-      if (!db || !connection) throw new Error("Database not initialized");
       const buffer = new Uint8Array(fileContent);
       try {
         await db.dropFile(fileName);
@@ -187,13 +238,16 @@ export const createSchemaSlice: StateCreator<
           SELECT * FROM read_${fileType.toLowerCase()}('${sqlEscapeString(fileName)}')
         `);
       }
+      // `database` ("memory") is the CATALOG, not the schema — the old query
+      // filtered table_schema by it and always counted 0, which the previous
+      // undefined === 0 row access silently masked.
       const verification = await connection.query(`
         SELECT COUNT(*) AS count
         FROM information_schema.tables
         WHERE table_name = '${sqlEscapeString(tableName)}'
-          AND table_schema = '${sqlEscapeString(database)}'
+          AND table_catalog = '${sqlEscapeString(database)}'
       `);
-      if (verification.toArray()[0][0] === 0) {
+      if (Number(verification.toArray()[0]?.count ?? 0) === 0) {
         throw new Error(`${createType} creation verification failed`);
       }
       await get().fetchDatabasesAndTablesInfo();

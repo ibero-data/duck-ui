@@ -1,5 +1,5 @@
 import "./index.css";
-import { StrictMode, useEffect, useRef, useState } from "react";
+import { StrictMode, useEffect, useRef, useState, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Suspense } from "react";
@@ -12,13 +12,17 @@ import { Toaster } from "@/components/ui/sonner";
 import { Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import { Navigate } from "react-router";
 import { initializeSystemDb } from "@/services/persistence/systemDb";
+import { cleanupOrphanedStorage } from "@/services/persistence/cleanup";
 import { listProfiles } from "@/services/persistence/repositories/profileRepository";
 import ProfilePicker from "@/components/profile/ProfilePicker";
 import type { Profile } from "@/store/types";
 
-// Import httpfs test utility for console access (window.testHttpfs) — dev only
-if (import.meta.env.DEV) {
-  import("@/lib/cloudStorage/testHttpfs");
+// Chrome-free embed viewer — loaded only on the /embed route.
+const EmbedView = lazy(() => import("@/pages/EmbedView"));
+
+/** True when the current path is the chrome-free embed viewer. */
+function isEmbedPath(): boolean {
+  return /\/embed\/?$/.test(window.location.pathname);
 }
 
 interface LoadingScreenProps {
@@ -79,6 +83,9 @@ const ProfileBootstrap = ({ children }: { children: React.ReactNode }) => {
     async function boot() {
       try {
         await initializeSystemDb();
+        // Clears storage left by removed features (see cleanup.ts). Never
+        // blocks boot.
+        cleanupOrphanedStorage().catch(() => {});
         const profiles = await listProfiles();
 
         if (profiles.length === 1 && !profiles[0].has_password) {
@@ -294,6 +301,10 @@ const App = () => {
       <div className="flex-1 overflow-hidden">
         <Routes>
           <Route path="/" element={<Home />} />
+          {/* Crawlable share links (/a/?s=…): humans land here and the analysis
+              opens via useQueryFromURL; crawlers are served an OG card by the
+              edge function on the marketing host. */}
+          <Route path="/a" element={<Home />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
@@ -301,11 +312,46 @@ const App = () => {
   );
 };
 
+// After a deploy, the auto-updating service worker purges the previous
+// build's precache; a mid-session lazy chunk load would then 404. Reload once
+// when a NEW worker replaces an existing one — the 2s-debounced workspace
+// auto-save makes this nearly lossless. The first-ever install also fires
+// controllerchange (clientsClaim), and reloading there would loop.
+if ("serviceWorker" in navigator) {
+  let hadController = !!navigator.serviceWorker.controller;
+  let reloadingForNewVersion = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) {
+      hadController = true;
+      return;
+    }
+    if (reloadingForNewVersion) return;
+    reloadingForNewVersion = true;
+    window.location.reload();
+  });
+}
+
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Failed to find root element");
 
-// Production render
-createRoot(rootElement).render(
+// The embed viewer is a public, profile-free widget: it boots the DuckDB engine
+// but skips ProfileBootstrap (no picker, no persistence, no autosave) and the
+// router (it reads the share payload straight from the URL).
+const EmbedRoot = () => (
+  <StrictMode>
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <AppInitializer>
+        <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+          <Suspense fallback={<LoadingScreen message="Loading analysis" />}>
+            <EmbedView />
+          </Suspense>
+        </ThemeProvider>
+      </AppInitializer>
+    </ErrorBoundary>
+  </StrictMode>
+);
+
+const FullApp = () => (
   <StrictMode>
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <ProfileBootstrap>
@@ -322,3 +368,6 @@ createRoot(rootElement).render(
     </ErrorBoundary>
   </StrictMode>
 );
+
+// Production render
+createRoot(rootElement).render(isEmbedPath() ? <EmbedRoot /> : <FullApp />);

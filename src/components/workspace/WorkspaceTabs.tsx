@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import SortableTab from "@/components/workspace/SortableTab";
 import { useDuckStore } from "@/store";
+import { isGatedTabHidden } from "@/lib/appConfig";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
@@ -59,7 +60,7 @@ const TabErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => (
 const HomeTab = lazy(() => import("@/components/workspace/HomeTab"));
 const SqlTab = lazy(() => import("@/components/workspace/SqlTab"));
 const NotebookTab = lazy(() => import("@/components/notebook/NotebookTab"));
-const BrainTab = lazy(() => import("@/components/workspace/BrainTab"));
+const DashboardTab = lazy(() => import("@/components/dashboard/DashboardTab"));
 const ConnectionsTab = lazy(() => import("@/components/workspace/ConnectionsTab"));
 const SettingsTab = lazy(() => import("@/components/workspace/SettingsTab"));
 
@@ -106,8 +107,11 @@ export default function WorkspaceTabs() {
   };
 
   const sortedTabs = useMemo(() => {
-    const homeTab = tabs.find((tab) => tab.id === "home");
-    const otherTabs = tabs.filter((tab) => tab.id !== "home");
+    // Backstop: a persisted or URL-restored tab of a gated type must never
+    // render in kiosk mode, even though createTab already refuses new ones.
+    const visibleTabs = tabs.filter((tab) => !isGatedTabHidden(tab.type));
+    const homeTab = visibleTabs.find((tab) => tab.id === "home");
+    const otherTabs = visibleTabs.filter((tab) => tab.id !== "home");
     return homeTab ? [homeTab, ...otherTabs] : otherTabs;
   }, [tabs]);
 
@@ -204,8 +208,8 @@ export default function WorkspaceTabs() {
                     <SqlTab tabId={tab.id} />
                   ) : tab.type === "notebook" ? (
                     <NotebookTab tabId={tab.id} />
-                  ) : tab.type === "brain" ? (
-                    <BrainTab />
+                  ) : tab.type === "dashboard" ? (
+                    <DashboardTab tabId={tab.id} />
                   ) : tab.type === "connections" ? (
                     <ConnectionsTab />
                   ) : tab.type === "settings" ? (

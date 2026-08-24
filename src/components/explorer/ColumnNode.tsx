@@ -1,9 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown, Hash, Type, Calendar, ToggleLeft } from "lucide-react";
-import { type ColumnStats } from "@/store";
+import { useDuckStore, type ColumnStats } from "@/store";
+import type { ColumnDistribution } from "@/store/types";
 
 interface ColumnNodeProps {
   stats: ColumnStats;
+  /** Context to fetch the value distribution lazily on expand. */
+  databaseName?: string;
+  tableName?: string;
+  schema?: string;
 }
 
 const getTypeIcon = (type: string) => {
@@ -46,8 +51,44 @@ const getFillColor = (percentage: number) => {
   return "bg-red-500";
 };
 
-export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
+export const ColumnNode: React.FC<ColumnNodeProps> = ({
+  stats,
+  databaseName,
+  tableName,
+  schema,
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [distribution, setDistribution] = useState<ColumnDistribution | null>(null);
+  // Ref, not state: it only gates the one-shot fetch and never drives rendering.
+  const distributionRequested = useRef(false);
+  const fetchColumnDistribution = useDuckStore((s) => s.fetchColumnDistribution);
+
+  // Fetch the value distribution once, when the column is first expanded.
+  useEffect(() => {
+    if (!isExpanded || distributionRequested.current || !databaseName || !tableName) return;
+    let stale = false;
+    distributionRequested.current = true;
+    fetchColumnDistribution(
+      databaseName,
+      tableName,
+      stats.column_name,
+      stats.column_type,
+      schema
+    ).then((dist) => {
+      if (!stale) setDistribution(dist);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [
+    isExpanded,
+    databaseName,
+    tableName,
+    schema,
+    stats.column_name,
+    stats.column_type,
+    fetchColumnDistribution,
+  ]);
 
   // Safe parsing function that handles both string and number types
   const parseValue = (value: string | number): number => {
@@ -122,6 +163,63 @@ export const ColumnNode: React.FC<ColumnNodeProps> = ({ stats }) => {
 
       {isExpanded && (
         <div className="ml-6 mt-1 mb-2 p-2 bg-muted/30 rounded-md space-y-2">
+          {/* Value distribution */}
+          {distribution?.kind === "histogram" && distribution.bins.some((b) => b > 0) && (
+            <div className="space-y-1">
+              <div className="text-[9px] text-muted-foreground font-medium">Distribution</div>
+              <div className="flex items-end gap-px h-8">
+                {distribution.bins.map((count, i) => {
+                  const maxCount = Math.max(...distribution.bins);
+                  const height =
+                    maxCount > 0 ? Math.max(count > 0 ? 8 : 0, (count / maxCount) * 100) : 0;
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 bg-primary/60 rounded-t-[1px] min-w-[2px]"
+                      style={{ height: `${height}%` }}
+                      title={`${count.toLocaleString()} rows`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex justify-between text-[8px] text-muted-foreground font-mono">
+                <span className="truncate max-w-[45%]" title={stats.min ?? ""}>
+                  {stats.min}
+                </span>
+                <span className="truncate max-w-[45%] text-right" title={stats.max ?? ""}>
+                  {stats.max}
+                </span>
+              </div>
+            </div>
+          )}
+          {distribution?.kind === "topk" && distribution.values.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[9px] text-muted-foreground font-medium">Top values</div>
+              {distribution.values.map(({ value, count }) => {
+                const maxCount = distribution.values[0]?.count || 1;
+                return (
+                  <div key={value} className="flex items-center gap-1.5">
+                    <span
+                      className="text-[9px] font-mono truncate w-[45%] text-muted-foreground"
+                      title={value}
+                    >
+                      {value}
+                    </span>
+                    <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary/60"
+                        style={{ width: `${(count / maxCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[8px] font-mono text-muted-foreground">
+                      {count.toLocaleString()}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Fill Percentage */}
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[10px]">

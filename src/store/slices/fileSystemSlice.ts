@@ -1,6 +1,5 @@
 import type { StateCreator } from "zustand";
 import { toast } from "sonner";
-import { cloudStorageService } from "@/lib/cloudStorage";
 import type { DuckStoreState, FileSystemSlice, MountedFolderInfo } from "../types";
 
 export const createFileSystemSlice: StateCreator<
@@ -11,9 +10,6 @@ export const createFileSystemSlice: StateCreator<
 > = (set) => ({
   mountedFolders: [],
   isFileSystemSupported: typeof window !== "undefined" && "showDirectoryPicker" in window,
-  cloudConnections: [],
-  cloudSupportStatus: null,
-  isCloudStorageInitialized: false,
 
   // File System Access Actions
   initFileSystem: async () => {
@@ -110,107 +106,5 @@ export const createFileSystemSlice: StateCreator<
     } catch (error) {
       console.error("Failed to refresh permissions:", error);
     }
-  },
-
-  // Cloud Storage Actions
-  initCloudStorage: async () => {
-    try {
-      await cloudStorageService.init();
-      const connections = cloudStorageService.getConnections();
-      const supportStatus = cloudStorageService.getSupportStatus();
-
-      set({
-        cloudConnections: connections,
-        cloudSupportStatus: supportStatus,
-        isCloudStorageInitialized: true,
-      });
-
-      if (supportStatus && !supportStatus.httpfsAvailable) {
-        console.warn("Cloud storage: httpfs not available in this browser");
-      }
-    } catch (error) {
-      console.error("Failed to initialize cloud storage:", error);
-    }
-  },
-
-  addCloudConnection: async (config) => {
-    try {
-      const conn = await cloudStorageService.addConnection(config);
-
-      set((state) => ({
-        cloudConnections: [...state.cloudConnections, conn],
-      }));
-
-      toast.success(`Cloud connection "${conn.name}" added`);
-      return conn;
-    } catch (error) {
-      console.error("Failed to add cloud connection:", error);
-      toast.error("Failed to add cloud connection");
-      return null;
-    }
-  },
-
-  removeCloudConnection: async (id) => {
-    try {
-      const conn = cloudStorageService.getConnection(id);
-      await cloudStorageService.removeConnection(id);
-
-      set((state) => ({
-        cloudConnections: state.cloudConnections.filter((c) => c.id !== id),
-      }));
-
-      toast.success(`Cloud connection "${conn?.name || id}" removed`);
-    } catch (error) {
-      console.error("Failed to remove cloud connection:", error);
-      toast.error("Failed to remove cloud connection");
-    }
-  },
-
-  connectCloudStorage: async (id) => {
-    try {
-      const success = await cloudStorageService.connect(id);
-
-      if (success) {
-        set((state) => ({
-          cloudConnections: state.cloudConnections.map((c) =>
-            c.id === id ? { ...c, isConnected: true, lastError: undefined } : c
-          ),
-        }));
-        toast.success("Connected to cloud storage");
-      }
-
-      return success;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-
-      set((state) => ({
-        cloudConnections: state.cloudConnections.map((c) =>
-          c.id === id ? { ...c, isConnected: false, lastError: errorMsg } : c
-        ),
-      }));
-
-      toast.error(`Failed to connect: ${errorMsg}`);
-      return false;
-    }
-  },
-
-  disconnectCloudStorage: async (id) => {
-    try {
-      await cloudStorageService.disconnect(id);
-
-      set((state) => ({
-        cloudConnections: state.cloudConnections.map((c) =>
-          c.id === id ? { ...c, isConnected: false } : c
-        ),
-      }));
-
-      toast.success("Disconnected from cloud storage");
-    } catch (error) {
-      console.error("Failed to disconnect cloud storage:", error);
-    }
-  },
-
-  testCloudConnection: async (id) => {
-    return cloudStorageService.testConnection(id);
   },
 });

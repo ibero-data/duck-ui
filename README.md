@@ -1,255 +1,131 @@
-# <img src="./public/logo.png" alt="Duck-UI Logo" title="Duck-UI Logo" width="50"> Duck-UI
+# <img src="./public/logo.png" alt="Duck-UI Logo" title="Duck-UI Logo" width="40"> Duck-UI
 
-Duck-UI is a web-based interface for interacting with DuckDB, a high-performance analytical database system. This project leverages DuckDB's WebAssembly (WASM) capabilities to provide a seamless and efficient user experience directly in the browser.
+**The fully open-source DuckDB workbench that runs in your browser.**
 
-# [Official Docs](https://duckui.com?utm_source=github&utm_medium=readme) 🚀
-#  [Demo](https://demo.duckui.com?utm_source=github&utm_medium=readme) 💻
+No install, no signup, no backend. Your data never leaves the tab.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
+[![GitHub stars](https://img.shields.io/github/stars/caioricciuti/duck-ui)](https://github.com/caioricciuti/duck-ui/stargazers)
+[![Release](https://img.shields.io/github/v/release/caioricciuti/duck-ui)](https://github.com/caioricciuti/duck-ui/releases)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue)](https://github.com/caioricciuti/duck-ui/pkgs/container/duck-ui)
 
-## Features
+**[Try it now → demo.duckui.com](https://demo.duckui.com?utm_source=github&utm_medium=readme)** · [Docs](https://duckui.com?utm_source=github&utm_medium=readme) · [Contributing](CONTRIBUTING.md)
 
-- **SQL Editor**: Write and execute SQL queries with syntax highlighting and auto-completion.
-- **Data Import**: Import data from CSV, JSON, Parquet, and Arrow files.
-- **Data Explorer**: Browse and manage databases and tables.
-- **Query History**: View and manage your recent SQL queries.
+![Duck-UI screenshot](./public/screenshot.png)
 
-## Getting Started
-
-
-### Docker (Recommended)
+Or run it yourself:
 
 ```bash
 docker run -p 5522:5522 ghcr.io/caioricciuti/duck-ui:latest
 ```
 
-Open your browser and navigate to `http://localhost:5522`.
+Open `http://localhost:5522`. That's the whole setup.
 
-### Environment Variables
+## What you get
 
-You can customize Duck-UI behavior using environment variables:
+- **SQL editor** — Monaco with schema-aware autocomplete, formatting, snippets, multi-tab workspace, query history, saved queries, EXPLAIN viewer.
+- **Notebooks** — SQL + markdown cells with per-cell results and charts.
+- **Import anything** — CSV, JSON, Parquet, Arrow, XLSX, and `.duckdb` files. Drag-drop, from URL, or straight from S3/GCS/Azure/R2/MinIO.
+- **Results grid** — virtualized scrolling, sorting, filtering, cell inspector, exports to CSV, JSON, XLSX, and Parquet.
+- **Charts** — 16 chart types with per-series config, transforms, annotations, and PNG/SVG export.
+- **Duck Brain (AI)** — text-to-SQL and one-click error fixing with your choice of provider: WebLLM fully in-browser (no API key, works offline), OpenAI, Anthropic, Chrome built-in AI, or any OpenAI-compatible endpoint (Ollama, DeepSeek, ...). Only your schema is ever sent, never your data — and with WebLLM, not even that.
+- **Share and embed** — encode a whole analysis (query, notebook, chart config) into a URL. No server involved. Embed live, runnable queries in any page with an iframe or the `<duck-embed>` web component.
+- **Persistence** — OPFS-backed local databases that survive reloads, profiles, encrypted credential storage (AES-256-GCM in your browser).
+- **Connections** — in-memory WASM, persistent OPFS, external [DuckDB httpserver](https://github.com/quackscience/duckdb-extension-httpserver) instances. DuckLake catalogs attach via the embedded-database manifest, `?load=ducklake:` links, or plain ATTACH SQL.
+- **Deploy anywhere** — Docker image, static hosting, GitHub Pages subpaths, air-gapped/offline setups, kiosk mode for publishing read-only datasets.
 
-```bash
-# For external DuckDB connections (API key auth)
-docker run -p 5522:5522 \
-  -e DUCK_UI_EXTERNAL_CONNECTION_NAME="My DuckDB Server" \
-  -e DUCK_UI_EXTERNAL_HOST="https://duckdb-server/duckdb" \
-  -e DUCK_UI_EXTERNAL_PORT="443" \
-  -e DUCK_UI_EXTERNAL_API_KEY="your-api-key" \
-  ghcr.io/caioricciuti/duck-ui:latest
+## Why Duck-UI and not the official `duckdb -ui`?
 
-# For external DuckDB connections (username/password auth)
-docker run -p 5522:5522 \
-  -e DUCK_UI_EXTERNAL_CONNECTION_NAME="My DuckDB Server" \
-  -e DUCK_UI_EXTERNAL_HOST="http://duckdb-server" \
-  -e DUCK_UI_EXTERNAL_PORT="8000" \
-  -e DUCK_UI_EXTERNAL_USER="username" \
-  -e DUCK_UI_EXTERNAL_PASS="password" \
-  -e DUCK_UI_EXTERNAL_DATABASE_NAME="my_database" \
-  -e DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS="true" \
-  ghcr.io/caioricciuti/duck-ui:latest
+Both are good tools. The differences that matter:
+
+| | Duck-UI | Official DuckDB UI |
+|---|---|---|
+| Frontend source | MIT, all of it in this repo | Closed source |
+| Runs from | Any static host, Docker, or a URL | Local `duckdb` process, UI assets loaded remotely |
+| Works offline / air-gapped | Yes | No |
+| Self-host / embed / kiosk | Yes | No |
+| AI assistant | Bring your own provider, or fully local WebLLM | MotherDuck account |
+| External DuckDB servers | Yes (httpserver) | Local + MotherDuck only |
+
+If you just want a quick local UI and don't care about any of that, the official one is fine. Duck-UI is for when the answers to "can I host it, embed it, extend it, run it offline, and read the code" need to be yes.
+
+## "Open in Duck-UI" links
+
+Any hosted dataset can become a one-click, runnable analysis. Add `?load=` (and optionally `&sql=`) to the app URL — [try this one](https://demo.duckui.com/?load=https://blobs.duckdb.org/stations.parquet&sql=SELECT%20country%2C%20count(*)%20AS%20stations%20FROM%20stations%20GROUP%20BY%20country%20ORDER%20BY%20stations%20DESC):
+
+```
+https://demo.duckui.com/?load=https://blobs.duckdb.org/stations.parquet
+  &sql=SELECT country, count(*) AS stations FROM stations GROUP BY country ORDER BY stations DESC
 ```
 
-| Runtime Variable | Description | Default |
-|----------|-------------|---------|
-| `DUCK_UI_EXTERNAL_CONNECTION_NAME` | Name for the external connection | "" |
-| `DUCK_UI_EXTERNAL_HOST` | Host URL for external DuckDB (may include path, e.g. `https://host/duckdb`) | "" |
-| `DUCK_UI_EXTERNAL_PORT` | Port for external DuckDB | null |
-| `DUCK_UI_EXTERNAL_API_KEY` | API key sent as `X-API-Key` header (takes priority over user/password) | "" |
-| `DUCK_UI_EXTERNAL_USER` | Username for Basic auth (used when no API key is set) | "" |
-| `DUCK_UI_EXTERNAL_PASS` | Password for Basic auth | "" |
-| `DUCK_UI_EXTERNAL_DATABASE_NAME` | Database name for external connection | "" |
-| `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow unsigned extensions in DuckDB | false |
-| `DUCK_UI_DUCKDB_WASM_USE_CDN` | Load DuckDB WASM from CDN (ignored when build-time `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true`) | false |
-| `DUCK_UI_DUCKDB_WASM_BASE_URL` | Custom CDN base URL (used when `DUCK_UI_DUCKDB_WASM_USE_CDN=true`) | auto jsDelivr |
+Openers see exactly what will load and what will run, confirm once, and get a live editor over your data — nothing touches a server. Parquet, CSV, JSON, `.duckdb` files, and `ducklake:` catalogs are supported. The Share dialog generates the link and a README badge for you:
 
-| Build-time Variable | Description | Default |
-|----------|-------------|---------|
-| `DUCK_UI_DUCKDB_WASM_CDN_ONLY` | Build a CDN-only artifact (local DuckDB WASM assets are not bundled). | false |
+[![Open in Duck-UI](./public/badge.svg)](https://demo.duckui.com/)
 
-When `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true`, runtime `DUCK_UI_DUCKDB_WASM_USE_CDN=false` cannot switch back to local WASM.
+The data host needs CORS enabled — see [hosting your data](docs/hosting-data.md) for a free R2/GitHub Pages setup.
 
+## Publish a dataset with kiosk mode
 
+Duck-UI doubles as a zero-backend data-publishing appliance. Drop a manifest next to the build, deploy to GitHub Pages, and visitors get a read-only SQL explorer for your data:
 
-### Prerequisites
-
-- Node.js >= 20.x
-- npm >= 10.x
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/caioricciuti/duck-ui.git
-   cd duck-ui
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-### Running the Application
-
-1. Start the development server:
-
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
-
-2. Open your browser and navigate to `http://localhost:5173`.
-
-### Building for Production
-
-To create a production build, run:
-
-```bash
-npm run build
-# or
-yarn build
-```
-
-The output will be in the `dist` directory.
-
-### Running with Docker
-
-1. Build the Docker image:
-
-   ```bash
-   docker build -t duck-ui .
-   ```
-
-2. Run the Docker container:
-
-   ```bash
-   docker run -p 5522:5522 duck-ui
-   ```
-
-3. Open your browser and navigate to `http://localhost:5522`.
-
-## Usage
-
-### SQL Editor
-
-- Write your SQL queries in the editor.
-- Use `Cmd/Ctrl + Enter` to execute the query.
-- View the results in the results pane.
-
-### Data Import
-
-- Click on the "Import Files" button to upload CSV, JSON, Parquet, or Arrow files.
-- Configure the table name and import settings.
-- For CSV files, you can customize import options:
-  - Header row detection
-  - Auto-detection of column types
-  - Delimiter specification
-  - Error handling (ignore errors, null padding for missing columns)
-- View the imported data in the Data Explorer.
-
-### Data Explorer
-
-- Browse through the databases and tables.
-- Preview table data and view table schemas.
-- Delete tables if needed.
-
-### Query History
-
-- Access your recent queries from the Query History section.
-- Copy queries to the clipboard or re-execute them.
-
-### Theme Toggle
-
-- Switch between light and dark themes using the theme toggle button.
-
-### Keyboard Shortcuts
-
-- `Cmd/Ctrl + B`: Expand/Shrink Sidebar
-- `Cmd/Ctrl + K`: Open Search Bar
-- `Cmd/Ctrl + Enter`: Run Query
-- `Cmd/Ctrl + Shift + Enter`: Run highlighted query
-
-## Deploying behind a reverse proxy
-
-When serving Duck-UI behind a two-layer nginx proxy (inner proxy + outer TLS/HTTP2 terminator such as [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy)), you **must** suppress `Accept-Encoding` on the upstream connection to the Duck-UI container.
-
-`bun serve` natively compresses responses when it sees `Accept-Encoding: gzip`. That chunked-gzip stream causes `ERR_HTTP2_PROTOCOL_ERROR` when the outer proxy converts it to HTTP/2 DATA frames, making the page appear to hang after loading the first few assets.
-
-**Required inner-nginx config:**
-
-```nginx
-# Assets: no auth, raw bytes — outer proxy handles compression over HTTP/2
-location /ui/assets/ {
-    proxy_set_header Accept-Encoding "";
-    proxy_pass http://duck-ui:5522/assets/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-
-# Main app: basic auth gates index.html (which carries the pre-configured API key)
-location /ui/ {
-    auth_basic "Duck UI";
-    auth_basic_user_file /etc/nginx/.htpasswd;
-    proxy_set_header Accept-Encoding "";
-    proxy_redirect http://duck-ui:5522 /ui/;
-    proxy_pass http://duck-ui:5522/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+```json
+{
+  "ui": { "kiosk": true },
+  "databases": [
+    { "name": "My Dataset", "file": "ducklake:https://pub-xxxx.r2.dev/catalog.ducklake" }
+  ]
 }
 ```
 
-Key points:
-- Do **not** add `gzip on` or `proxy_buffering on` to the Duck-UI locations in the inner proxy — the outer TLS terminator handles that
-- Split `/ui/assets/` (no auth) from `/ui/` (auth) so Web Workers can load WASM and JS without hitting an auth challenge
-- When building the image for a sub-path, pass `DUCK_UI_BASEPATH=/ui/` as a Docker build argument
+Bundled `.db` files, remote files over HTTPS, S3, and DuckLake catalogs are all supported — remote sources are attached in place and read-only by default. See [`public/databases/README.md`](public/databases/README.md) for the full manifest format and deploy steps.
+
+## Configuration
+
+Runtime environment variables (Docker):
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DUCK_UI_EXTERNAL_CONNECTION_NAME` | Name for a pre-configured external connection | "" |
+| `DUCK_UI_EXTERNAL_HOST` | Host URL for external DuckDB (may include a path) | "" |
+| `DUCK_UI_EXTERNAL_PORT` | Port for external DuckDB (NAME, HOST and PORT must all be set or the connection is skipped) | null |
+| `DUCK_UI_EXTERNAL_API_KEY` | API key sent as `X-API-Key` (takes priority over user/pass) | "" |
+| `DUCK_UI_EXTERNAL_USER` / `DUCK_UI_EXTERNAL_PASS` | Basic auth credentials | "" |
+| `DUCK_UI_EXTERNAL_DATABASE_NAME` | Database name for the external connection | "" |
+| `DUCK_UI_ALLOW_UNSIGNED_EXTENSIONS` | Allow unsigned DuckDB extensions | false |
+| `DUCK_UI_DUCKDB_WASM_USE_CDN` | Load DuckDB WASM from CDN | false |
+| `DUCK_UI_DUCKDB_WASM_BASE_URL` | Custom CDN base URL (the origin is added to the CSP automatically at container start) | auto jsDelivr |
+
+Build-time: `DUCK_UI_BASEPATH=/subpath/` for subpath deploys, `DUCK_UI_DUCKDB_WASM_CDN_ONLY=true` for CDN-only artifacts.
+
+Deployment guides: [reverse proxy / nginx](docs/reverse-proxy.md) · [hosting your data with CORS](docs/hosting-data.md)
+
+## Develop
+
+```bash
+git clone https://github.com/caioricciuti/duck-ui.git
+cd duck-ui
+bun install   # npm works too
+bun run dev   # http://localhost:5173
+```
+
+Build with `bun run build`, test with `bun run test`. Architecture notes live in [CLAUDE.md](CLAUDE.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
-Contributions are welcome! Please follow these steps to contribute:
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Commit your changes (`git commit -m 'Add some feature'`).
-4. Push to the branch (`git push origin feature/your-feature`).
-5. Open a pull request.
+Issues and PRs welcome — read [CONTRIBUTING.md](CONTRIBUTING.md) first (it's short and it will save you time). Bug reports with a reproducible query are gold.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE.md) file for details.
+MIT. See [LICENSE](LICENSE.md).
 
 ## Acknowledgements
 
-- [DuckDB](https://duckdb.org/)
-- [React](https://reactjs.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Zustand](https://github.com/pmndrs/zustand)
-- [Lucide Icons](https://lucide.dev/)
-
-## Contact
-
-For any inquiries or support, please contact [Caio Ricciuti](https://github.com/caioricciuti).
+[DuckDB](https://duckdb.org/) · [duckdb-wasm](https://github.com/duckdb/duckdb-wasm) · [React](https://react.dev/) · [Tailwind CSS](https://tailwindcss.com/) · [Zustand](https://github.com/pmndrs/zustand) · [Lucide](https://lucide.dev/)
 
 ## Sponsors
 
-This project is sponsored by:
-
-### [Ibero Data](https://iberodata.es/) 
-<img src="https://iberodata.es/logo.png" alt="Ibero Data Logo" title="Ibero Data Logo" width="100">
-
-### [qxip](https://qxip.net/?utm_source=duck-ui&utm_medium=sponsorship) 
+### [qxip](https://qxip.net/?utm_source=duck-ui&utm_medium=sponsorship)
 
 <img src="https://qxip.net/images/qxip.png" alt="qxip" title="qxip Logo" width="150">
 
-
-
-<br/>
-
-Want to be a sponsor? [Contact us](mailto:caio.ricciuti+sponsorship@outlook.com).
+Want to sponsor Duck-UI? [Get in touch](mailto:caio.ricciuti+sponsorship@outlook.com).

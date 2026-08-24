@@ -1,13 +1,21 @@
 import { rawResultToJSON } from "./resultParser";
-import { sqlEscapeIdentifier, sqlEscapeString } from "@/lib/sqlSanitize";
-import type {
-  CurrentConnection,
-  ConnectionProvider,
-  QueryResult,
-  ColumnInfo,
-  TableInfo,
-  DatabaseInfo,
-} from "@/store/types";
+import { sqlEscapeString, qualifyTable } from "@/lib/sqlSanitize";
+import type { QueryResult, ColumnInfo, TableInfo, DatabaseInfo } from "@/store/types";
+
+/**
+ * Everything needed to reach a DuckDB `httpserver` endpoint. Structural, so
+ * both the legacy `CurrentConnection`/`ConnectionProvider` shapes and the
+ * engine layer's `duck-http` config satisfy it without conversion.
+ */
+export interface ExternalEndpoint {
+  host?: string;
+  port?: number | string;
+  user?: string;
+  password?: string;
+  apiKey?: string;
+  authMode?: "none" | "password" | "api_key";
+  database?: string;
+}
 
 /**
  * Builds a properly formatted URL from a connection's host and port.
@@ -45,11 +53,13 @@ const buildConnectionUrl = (host: string, port?: string | number): string => {
 };
 
 /**
- * Executes a query against an external connection.
+ * Executes a query against an external connection. Pass an AbortSignal to make
+ * the request cancellable from the UI.
  */
 export const executeExternalQuery = async (
   query: string,
-  connection: CurrentConnection
+  connection: ExternalEndpoint,
+  signal?: AbortSignal
 ): Promise<QueryResult> => {
   if (!connection.host) {
     throw new Error("Host must be defined for external connections.");
@@ -75,6 +85,7 @@ export const executeExternalQuery = async (
       method: "POST",
       headers,
       body: query,
+      signal,
     });
 
     if (!response.ok) {
@@ -90,6 +101,9 @@ export const executeExternalQuery = async (
     const rawResult = await response.text();
     return rawResultToJSON(rawResult);
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Query cancelled");
+    }
     if (error instanceof TypeError && error.message.includes("fetch")) {
       throw new Error(
         `Network error: Cannot reach ${url}. Check your connection and CORS settings.`
@@ -102,7 +116,7 @@ export const executeExternalQuery = async (
 /**
  * Tests an external connection by executing a basic query.
  */
-export const testExternalConnection = async (connection: ConnectionProvider): Promise<void> => {
+export const testExternalConnection = async (connection: ExternalEndpoint): Promise<void> => {
   if (!connection.host) {
     throw new Error("Host must be defined for external connections.");
   }
@@ -151,7 +165,7 @@ export const testExternalConnection = async (connection: ConnectionProvider): Pr
  * Fetches databases and tables for an external connection.
  */
 export const fetchExternalDatabases = async (
-  connection: CurrentConnection
+  connection: ExternalEndpoint
 ): Promise<DatabaseInfo[]> => {
   try {
     // Try to get database list
@@ -163,18 +177,21 @@ export const fetchExternalDatabases = async (
       for (const dbRow of dbListResult.data) {
         const dbName = dbRow[dbListResult.columns[0] as string] as string;
         try {
+          // Enumerate (schema, table) pairs — external DuckDB databases can
+          // carry non-"main" schemas too (#3).
           const tablesResult = await executeExternalQuery(
-            `SELECT table_name FROM information_schema.tables WHERE table_catalog = '${sqlEscapeString(dbName)}'`,
+            `SELECT table_schema, table_name FROM information_schema.tables WHERE table_catalog = '${sqlEscapeString(dbName)}' ORDER BY table_schema, table_name`,
             connection
           );
 
           const tables: TableInfo[] = [];
           for (const tableRow of tablesResult.data) {
+            const schemaName = (tableRow.table_schema as string) || "main";
             const tableName = tableRow.table_name as string;
             try {
               // Try to get columns info
               const columnsResult = await executeExternalQuery(
-                `DESCRIBE ${sqlEscapeIdentifier(dbName)}.${sqlEscapeIdentifier(tableName)}`,
+                `DESCRIBE ${qualifyTable(dbName, schemaName, tableName)}`,
                 connection
               );
 
@@ -188,7 +205,7 @@ export const fetchExternalDatabases = async (
 
               tables.push({
                 name: tableName,
-                schema: dbName,
+                schema: schemaName,
                 columns,
                 rowCount: 0, // External connections don't provide row count easily
                 createdAt: new Date().toISOString(),
@@ -197,7 +214,7 @@ export const fetchExternalDatabases = async (
               // If describe fails, add table with basic info
               tables.push({
                 name: tableName,
-                schema: dbName,
+                schema: schemaName,
                 columns: [],
                 rowCount: 0,
                 createdAt: new Date().toISOString(),

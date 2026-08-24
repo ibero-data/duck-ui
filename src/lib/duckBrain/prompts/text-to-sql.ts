@@ -99,6 +99,25 @@ ORDER BY month`,
   },
 ];
 
+/**
+ * Builds the user request for one-click "Fix with Duck Brain" on a failed
+ * query. Sent through the regular text-to-SQL pipeline so it gets the same
+ * schema context, provider handling, and SQL extraction.
+ */
+export function buildFixQueryRequest(sql: string, errorMessage: string): string {
+  return [
+    "Fix this DuckDB query. It failed with the error below.",
+    "",
+    "QUERY:",
+    sql.trim(),
+    "",
+    "ERROR:",
+    errorMessage.trim(),
+    "",
+    "Respond with ONLY the corrected SQL query.",
+  ].join("\n");
+}
+
 export function buildTextToSQLMessages(
   userQuery: string,
   schemaContext: string,

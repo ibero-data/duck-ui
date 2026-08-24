@@ -1,5 +1,6 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
 import { sqlEscapeString, sqlEscapeIdentifier } from "@/lib/sqlSanitize";
+import { loadAppConfig, getEmbeddedDatabases, type EmbeddedDatabase } from "@/lib/appConfig";
 import { validateConnection } from "./utils";
 
 const getRuntimeEnv = (): Partial<NonNullable<Window["env"]>> =>
@@ -144,22 +145,53 @@ export const initializeWasmConnection = async (): Promise<{
 };
 
 /**
- * Loads embedded databases from the public/databases directory.
+ * A `file` value that DuckDB can ATTACH directly — a DuckLake catalog or any
+ * remote/scheme-qualified source — rather than a file bundled in
+ * public/databases/. Matches `ducklake:…`, `s3://…`, `https://…`, `md:…`, etc.
+ */
+const isConnectionString = (file: string): boolean =>
+  /:\/\//.test(file) || /^(ducklake|s3|gcs|azure|az|r2|md|motherduck|https?):/i.test(file);
+
+/** Derives a safe, non-empty attach alias from an explicit alias, name, or file. */
+const deriveAlias = (dbConfig: EmbeddedDatabase): string => {
+  const source = dbConfig.alias?.trim() || dbConfig.name?.trim() || dbConfig.file;
+  const cleaned = source
+    .replace(/^[a-z][a-z0-9+.-]*:/i, "") // strip a leading scheme (ducklake:, s3:)
+    .replace(/\.db$/i, "")
+    .replace(/[^a-zA-Z0-9_]/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return cleaned || "embedded_db";
+};
+
+/** Builds the `(READ_ONLY, DATA_PATH '…')` options clause for an ATTACH. */
+const buildAttachOptions = (dbConfig: EmbeddedDatabase, readOnlyDefault: boolean): string => {
+  const options: string[] = [];
+  if (dbConfig.readOnly ?? readOnlyDefault) {
+    options.push("READ_ONLY");
+  }
+  if (dbConfig.dataPath) {
+    options.push(`DATA_PATH '${sqlEscapeString(dbConfig.dataPath)}'`);
+  }
+  return options.length > 0 ? ` (${options.join(", ")})` : "";
+};
+
+/**
+ * Attaches the databases declared in the manifest (public/databases/manifest.json).
+ *
+ * Two kinds of entries are supported:
+ * - Connection strings (DuckLake catalogs, remote `.db`, s3://, https://…) are
+ *   attached in place, read-only by default. Nothing is downloaded into the
+ *   WASM engine — DuckDB reads the source directly.
+ * - Bundled files (e.g. `sales.db` sitting in public/databases/) are fetched,
+ *   registered in DuckDB's virtual FS, then attached.
  */
 export const loadEmbeddedDatabases = async (
   db: duckdb.AsyncDuckDB,
   connection: duckdb.AsyncDuckDBConnection
 ): Promise<void> => {
   try {
-    // Fetch the manifest file
-    const manifestResponse = await fetch("/databases/manifest.json");
-    if (!manifestResponse.ok) {
-      console.debug("No embedded databases manifest found");
-      return;
-    }
-
-    const manifest = await manifestResponse.json();
-    const databases = manifest.databases || [];
+    await loadAppConfig();
+    const databases = getEmbeddedDatabases();
 
     if (databases.length === 0) {
       console.debug("No embedded databases configured");
@@ -168,37 +200,42 @@ export const loadEmbeddedDatabases = async (
 
     console.info(`Loading ${databases.length} embedded database(s)...`);
 
-    // Load each database
+    const base = import.meta.env.BASE_URL ?? "/";
+
     for (const dbConfig of databases) {
-      if (!dbConfig.autoLoad) {
+      if (dbConfig.autoLoad === false) {
         console.info(`Skipping ${dbConfig.name} (autoLoad: false)`);
         continue;
       }
 
       try {
-        console.info(`Loading embedded database: ${dbConfig.name}`);
+        const alias = deriveAlias(dbConfig);
 
-        // Fetch the database file
-        const dbFileResponse = await fetch(`/databases/${dbConfig.file}`);
-        if (!dbFileResponse.ok) {
-          console.error(`Failed to fetch ${dbConfig.file}: ${dbFileResponse.statusText}`);
-          continue;
+        if (isConnectionString(dbConfig.file)) {
+          // Attach the remote source directly. Remote sources default to read-only.
+          console.info(`Attaching embedded database: ${dbConfig.name} (${dbConfig.file})`);
+          const options = buildAttachOptions(dbConfig, true);
+          await connection.query(
+            `ATTACH '${sqlEscapeString(dbConfig.file)}' AS ${sqlEscapeIdentifier(alias)}${options}`
+          );
+        } else {
+          // Bundled file: fetch, register in the virtual FS, then attach.
+          console.info(`Loading embedded database: ${dbConfig.name}`);
+          const dbFileResponse = await fetch(`${base}databases/${dbConfig.file}`);
+          if (!dbFileResponse.ok) {
+            console.error(`Failed to fetch ${dbConfig.file}: ${dbFileResponse.statusText}`);
+            continue;
+          }
+
+          const buffer = new Uint8Array(await dbFileResponse.arrayBuffer());
+          await db.registerFileBuffer(dbConfig.file, buffer);
+          const options = buildAttachOptions(dbConfig, false);
+          await connection.query(
+            `ATTACH '${sqlEscapeString(dbConfig.file)}' AS ${sqlEscapeIdentifier(alias)}${options}`
+          );
         }
 
-        const arrayBuffer = await dbFileResponse.arrayBuffer();
-        const buffer = new Uint8Array(arrayBuffer);
-
-        // Register the file in DuckDB's virtual file system
-        const fileName = dbConfig.file;
-        await db.registerFileBuffer(fileName, buffer);
-
-        // Attach the database (derive alias from filename without extension)
-        const dbAlias = fileName.replace(/\.db$/i, "").replace(/[^a-zA-Z0-9_]/g, "_");
-        await connection.query(
-          `ATTACH DATABASE '${sqlEscapeString(fileName)}' AS ${sqlEscapeIdentifier(dbAlias)}`
-        );
-
-        console.info(`Successfully loaded embedded database: ${dbConfig.name} as ${dbAlias}`);
+        console.info(`Successfully loaded embedded database: ${dbConfig.name} as ${alias}`);
       } catch (error) {
         console.error(`Error loading embedded database ${dbConfig.name}:`, error);
       }

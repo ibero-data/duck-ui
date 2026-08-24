@@ -13,4 +13,4 @@ export type { SchemaContext } from "./schemaFormatter";
 export { extractSQLFromResponse, formatSQLForDisplay } from "./sqlParser";
 export type { ParsedSQLResult } from "./sqlParser";
 
-export { buildTextToSQLMessages } from "./prompts/text-to-sql";
+export { buildTextToSQLMessages, buildFixQueryRequest } from "./prompts/text-to-sql";

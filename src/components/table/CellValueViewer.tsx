@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Copy, X, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import { formatTimestampUTC } from "@/lib/datetime";
 
 interface CellValueViewerProps {
   value: unknown;
@@ -24,6 +25,15 @@ export const CellValueViewer: React.FC<CellValueViewerProps> = ({
   const { displayValue, valueType } = useMemo(() => {
     if (value === null || value === undefined) {
       return { displayValue: "NULL", valueType: "null", isFormatted: false };
+    }
+
+    // Timestamps come through as Date objects — show the stored UTC wall time
+    if (value instanceof Date) {
+      return {
+        displayValue: formatTimestampUTC(value),
+        valueType: "timestamp",
+        isFormatted: false,
+      };
     }
 
     // Check if it's JSON

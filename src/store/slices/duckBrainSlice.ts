@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import { toast } from "sonner";
 import { generateUUID } from "@/lib/utils";
-import { executeExternalQuery, resultToJSON, validateConnection } from "@/services/duckdb";
+import { runQuery } from "@/services/engine";
 import type { DuckStoreState, DuckBrainSlice, DuckBrainMessage, QueryResult } from "../types";
 
 // Track the duckBrainService subscription to prevent leaks
@@ -24,8 +24,13 @@ export const createDuckBrainSlice: StateCreator<
     isGenerating: false,
     streamingContent: "",
     isPanelOpen: false,
-    aiProvider: "webllm",
-    providerConfigs: {},
+    // Default: a local OpenAI-compatible server, preset for Ollama. Real
+    // models at native speed, fully private — the honest "local AI" story.
+    // In-browser WebLLM stays available as the explicit experimental choice.
+    aiProvider: "openai-compatible",
+    providerConfigs: {
+      "openai-compatible": { baseUrl: "http://localhost:11434/v1", modelId: "" },
+    },
   },
 
   initializeDuckBrain: async (modelId) => {
@@ -81,13 +86,13 @@ export const createDuckBrainSlice: StateCreator<
       if (aiProvider === "openai-compatible") {
         const config = providerConfigs["openai-compatible"];
         if (!config?.baseUrl || !config?.modelId) {
-          toast.error("Please configure the Base URL and Model ID in Brain settings.");
+          toast.error("Pick a model in Settings → AI. With Ollama running it is one click.");
           return null;
         }
       } else {
         const config = providerConfigs[aiProvider as "openai" | "anthropic"];
         if (!config?.apiKey) {
-          toast.error(`Please configure your ${aiProvider} API key in Brain settings.`);
+          toast.error(`Add your ${aiProvider} API key in Settings → AI.`);
           return null;
         }
       }
@@ -122,9 +127,8 @@ export const createDuckBrainSlice: StateCreator<
 
       if (isExternalProvider) {
         const { createProvider } = await import("@/lib/duckBrain/providers");
+        const provider = createProvider(aiProvider);
         const config = providerConfigs[aiProvider as "openai" | "anthropic" | "openai-compatible"]!;
-        const provider = createProvider(aiProvider as "openai" | "anthropic" | "openai-compatible");
-
         await provider.initialize({
           apiKey: "apiKey" in config ? config.apiKey : undefined,
           modelId: config.modelId,
@@ -308,23 +312,17 @@ export const createDuckBrainSlice: StateCreator<
   },
 
   executeQueryInChat: async (messageId, sql) => {
-    const { currentConnection, connection, updateMessageQueryResult } = get();
+    const { currentSession, updateMessageQueryResult } = get();
 
     updateMessageQueryResult(messageId, { status: "running" });
 
     try {
-      let queryResult: QueryResult;
-
-      if (currentConnection?.scope === "External") {
-        queryResult = await executeExternalQuery(sql, currentConnection);
-      } else {
-        if (!connection) {
-          throw new Error("WASM connection not initialized");
-        }
-        const wasmConnection = validateConnection(connection);
-        const result = await wasmConnection.query(sql);
-        queryResult = resultToJSON(result);
+      if (!currentSession) {
+        throw new Error("No active connection");
       }
+      const queryResult: QueryResult = await runQuery(currentSession, sql, "duck-brain", {
+        maxRows: get().maxResultRows,
+      });
 
       if (queryResult.error) {
         updateMessageQueryResult(messageId, {
@@ -388,6 +386,8 @@ export const createDuckBrainSlice: StateCreator<
       duckBrain: {
         ...state.duckBrain,
         aiProvider: provider,
+        // webllm must be initialized before use; server-backed providers are
+        // ready once configured.
         modelStatus: provider === "webllm" ? "idle" : "ready",
         error: null,
       },

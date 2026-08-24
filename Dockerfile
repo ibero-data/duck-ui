@@ -6,8 +6,8 @@ ARG DUCK_UI_BASEPATH="/"
 # Set the working directory
 WORKDIR /app
 
-# Copy package.json and bun.lockb (if exists)
-COPY package.json bun.lockb* ./
+# Copy package.json and the lockfile (bun.lock text format, or legacy bun.lockb)
+COPY package.json bun.lock* ./
 
 # Install dependencies
 RUN bun install --frozen-lockfile

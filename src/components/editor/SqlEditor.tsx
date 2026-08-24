@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import {
   Play,
-  Loader2,
+  Square,
   Lightbulb,
   Command,
   Edit,
@@ -20,8 +20,11 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import FloatingActionButton from "@/components/common/FloatingActionButton";
-import { copyQueryURL } from "@/hooks/useQueryFromURL";
+import { ShareDialog } from "@/components/share/ShareDialog";
+import type { EditorTab } from "@/store/types";
 import SaveQueryDialog from "@/components/saved-queries/SaveQueryDialog";
+import { bindCollaborativeEditor, type CollaborativeBinding } from "./collaborativeBinding";
+import { getCollaboration } from "@/store/slices/sessionSlice";
 import { ExplainPlanViewer } from "@/components/workspace/ExplainPlanViewer";
 
 interface SqlEditorProps {
@@ -33,14 +36,17 @@ interface SqlEditorProps {
 const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<EditorInstance | null>(null);
+  const bindingRef = useRef<CollaborativeBinding | null>(null);
   const { theme } = useTheme();
   const tabs = useDuckStore((s) => s.tabs);
   const executeQuery = useDuckStore((s) => s.executeQuery);
+  const cancelQuery = useDuckStore((s) => s.cancelQuery);
   const isExecuting = useDuckStore((s) => !!s.executingTabs[tabId]);
   const updateTabTitle = useDuckStore((s) => s.updateTabTitle);
   const toggleBrainPanel = useDuckStore((s) => s.toggleBrainPanel);
   const duckBrain = useDuckStore((s) => s.duckBrain);
   const currentProfileId = useDuckStore((s) => s.currentProfileId);
+  const sessionStatus = useDuckStore((s) => s.session.status);
   const monacoConfig = useMonacoConfig(theme);
 
   const currentTab = tabs.find((tab) => tab.id === tabId);
@@ -52,6 +58,8 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [explainOpen, setExplainOpen] = useState(false);
   const [explainText, setExplainText] = useState("");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareTab, setShareTab] = useState<EditorTab | null>(null);
 
   // Stable callback for query execution
   const stableExecuteCallback = useCallback(
@@ -83,8 +91,43 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     };
   }, [tabId, monacoConfig, stableExecuteCallback]); // Keep stableExecuteCallback
 
+  // Collaborative binding — attaches only while a session is live, so a solo
+  // Duck-UI pays nothing for it.
+  useEffect(() => {
+    if (sessionStatus !== "connected") return;
+
+    const editor = editorInstanceRef.current?.editor;
+    const model = editor?.getModel();
+    const collaboration = getCollaboration();
+    if (!editor || !model || !collaboration) return;
+
+    // The tab must exist in shared state before it can be bound; a tab created
+    // locally mid-session would otherwise never reach the other person.
+    collaboration.document.addTab({ id: tabId, title, type: "sql" }, model.getValue());
+    const text = collaboration.document.textFor(tabId);
+    if (!text) return;
+
+    const binding = bindCollaborativeEditor({
+      text,
+      model,
+      editor,
+      presence: collaboration.presence,
+      tabId,
+    });
+    bindingRef.current = binding;
+
+    return () => {
+      binding.destroy();
+      bindingRef.current = null;
+    };
+  }, [tabId, title, sessionStatus]);
+
   // Content sync effect
   useEffect(() => {
+    // Skipped while collaborating: the shared document is the source of truth,
+    // and a setValue here would clobber concurrent remote edits.
+    if (bindingRef.current) return;
+
     const editor = editorInstanceRef.current?.editor;
     if (editor && currentContent !== editor.getValue()) {
       const position = editor.getPosition();
@@ -107,6 +150,15 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     } catch (error) {
       console.error("Query execution failed:", error);
       toast.error("Query execution failed");
+    }
+  };
+
+  const handleCancelQuery = async () => {
+    try {
+      await cancelQuery(tabId);
+      toast.info("Query cancelled");
+    } catch (error) {
+      console.error("Failed to cancel query:", error);
     }
   };
 
@@ -155,7 +207,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
     }
   };
 
-  const handleShareQuery = async () => {
+  const handleShareQuery = () => {
     const editor = editorInstanceRef.current?.editor;
     if (!editor) return;
 
@@ -165,12 +217,17 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
       return;
     }
 
-    const success = await copyQueryURL(query, false);
-    if (success) {
-      toast.success("Query URL copied to clipboard");
-    } else {
-      toast.error("Failed to copy URL");
-    }
+    // Capture the live editor content plus the tab's current chart config.
+    setShareTab({
+      id: tabId,
+      title: currentTitle || currentTab?.title || "Shared Query",
+      type: "sql",
+      content: query,
+      chartConfig: currentTab?.chartConfig,
+      // Carry the result so the share dialog can offer its columns as embed filters.
+      result: currentTab?.result ?? null,
+    });
+    setShareDialogOpen(true);
   };
 
   return (
@@ -252,7 +309,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>Copy shareable URL</p>
+                <p>Share query &amp; chart</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -310,17 +367,12 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
             </Tooltip>
           </TooltipProvider>
           <Button
-            onClick={handleExecuteQuery}
-            disabled={isExecuting}
+            onClick={isExecuting ? handleCancelQuery : handleExecuteQuery}
             variant="outline"
             className="flex items-center gap-2 min-w-[100px]"
           >
-            {isExecuting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-            {isExecuting ? "Running..." : "Run Query"}
+            {isExecuting ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {isExecuting ? "Stop" : "Run Query"}
           </Button>
         </div>
       </div>
@@ -332,10 +384,9 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
 
       {/* Mobile FAB */}
       <FloatingActionButton
-        onClick={handleExecuteQuery}
-        icon={isExecuting ? Loader2 : Play}
-        label={isExecuting ? "Running..." : "Run"}
-        disabled={isExecuting}
+        onClick={isExecuting ? handleCancelQuery : handleExecuteQuery}
+        icon={isExecuting ? Square : Play}
+        label={isExecuting ? "Stop" : "Run"}
         className={isExecuting ? "animate-pulse" : ""}
       />
 
@@ -351,6 +402,8 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ tabId, title, className }) => {
         onOpenChange={setExplainOpen}
         explainText={explainText}
       />
+
+      <ShareDialog open={shareDialogOpen} onOpenChange={setShareDialogOpen} tab={shareTab} />
     </div>
   );
 };

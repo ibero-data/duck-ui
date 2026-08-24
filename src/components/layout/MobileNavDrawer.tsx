@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/components/theme/theme-provider";
 import { useDuckStore, type EditorTabType } from "@/store";
+import { getUiConfig } from "@/lib/appConfig";
 import ConnectionSwitcher from "./ConnectionSwitcher";
 
 export const MobileNavDrawer = () => {
@@ -13,6 +14,8 @@ export const MobileNavDrawer = () => {
   const tabs = useDuckStore((s) => s.tabs);
   const setActiveTab = useDuckStore((s) => s.setActiveTab);
   const createTab = useDuckStore((s) => s.createTab);
+  const toggleBrainPanel = useDuckStore((s) => s.toggleBrainPanel);
+  const ui = getUiConfig();
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -67,22 +70,29 @@ export const MobileNavDrawer = () => {
             >
               Home
             </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => openOrFocusTab("connections", "Connections")}
-            >
-              <Cable className="mr-2 h-4 w-4" />
-              Manage Connections
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => openOrFocusTab("brain", "Duck Brain")}
-            >
-              <Brain className="mr-2 h-4 w-4" />
-              Duck Brain Settings
-            </Button>
+            {!ui.hideConnections && (
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => openOrFocusTab("connections", "Connections")}
+              >
+                <Cable className="mr-2 h-4 w-4" />
+                Manage Connections
+              </Button>
+            )}
+            {!ui.hideBrain && (
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  toggleBrainPanel();
+                  setOpen(false);
+                }}
+              >
+                <Brain className="mr-2 h-4 w-4" />
+                Duck Brain
+              </Button>
+            )}
           </div>
 
           <Separator />

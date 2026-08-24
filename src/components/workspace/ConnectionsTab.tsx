@@ -2,30 +2,10 @@ import { useState } from "react";
 import { useDuckStore, ConnectionProvider } from "@/store";
 import { generateUUID } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Plus, Edit2, Trash2, Database, ExternalLink, InfoIcon } from "lucide-react";
+import { Plus } from "lucide-react";
 import ConnectionManager from "@/components/connection/ConnectionsModal";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConnectionsList } from "@/components/connection/ConnectionsList";
 import * as z from "zod";
 
 const scopeEnum = z.enum(["External", "OPFS"]);
@@ -75,7 +55,6 @@ const ConnectionsTab = () => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(null);
-  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [isAddConnectionDialogOpen, setIsAddConnectionDialogOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<ConnectionFormValues | undefined>(
     undefined
@@ -187,126 +166,14 @@ const ConnectionsTab = () => {
           <CardDescription>List of all configured database connections</CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-400px)]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Host</TableHead>
-                  <TableHead>Database</TableHead>
-                  <TableHead>Environment</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {connectionList.connections.map((connection) => (
-                  <TableRow key={connection.id}>
-                    <TableCell
-                      className={
-                        connection.id === currentConnection?.id ? "border-l-4 border-green-500" : ""
-                      }
-                    >
-                      <div className="flex items-center gap-2">
-                        {connection.scope === "WASM" ? (
-                          <Database size={16} />
-                        ) : (
-                          <ExternalLink size={16} />
-                        )}
-                        {connection.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>{connection.scope}</TableCell>
-                    <TableCell>
-                      {connection.host || (connection.scope === "WASM" ? "Local" : "-")}
-                    </TableCell>
-                    <TableCell>
-                      {connection.database ||
-                        (connection.scope === "WASM" ? "memory" : connection.database)}
-                    </TableCell>
-                    <TableCell>{connection.environment}</TableCell>
-
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2 items-center">
-                        {connection.environment !== "BUILT_IN" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={connection.id === currentConnection?.id || isLoading}
-                            onClick={() => handleConnect(connection.id)}
-                          >
-                            {connection.id === currentConnection?.id ? "Connected" : "Connect"}
-                          </Button>
-                        )}
-
-                        {connection.environment === "BUILT_IN" ||
-                        connection.environment === "ENV" ? (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <InfoIcon size={18} className="text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="text-sm max-w-[220px] !text-center">
-                                  {connection.environment === "ENV"
-                                    ? "Configured via environment variables — cannot be edited or deleted."
-                                    : "Built-in connection — cannot be edited or deleted."}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onEdit(connection.id)}
-                              disabled={connection.id === "WASM"}
-                            >
-                              <Edit2 size={16} />
-                            </Button>
-                            <AlertDialog
-                              open={deleteConfirmationId === connection.id}
-                              onOpenChange={(isOpen) =>
-                                setDeleteConfirmationId(isOpen ? connection.id : null)
-                              }
-                            >
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" disabled={isLoading}>
-                                  <Trash2 size={16} className="text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Connection</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete the connection "
-                                    {connection.name}"? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => {
-                                      deleteConnection(connection.id);
-                                      setDeleteConfirmationId(null);
-                                    }}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+          <ConnectionsList
+            connections={connectionList.connections}
+            currentConnectionId={currentConnection?.id}
+            isLoading={isLoading}
+            onConnect={handleConnect}
+            onEdit={onEdit}
+            onDelete={deleteConnection}
+          />
         </CardContent>
       </Card>
     </div>

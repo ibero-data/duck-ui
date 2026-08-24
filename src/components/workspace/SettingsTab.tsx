@@ -29,8 +29,14 @@ import { useTheme } from "@/components/theme/theme-provider";
 import { useDuckStore } from "@/store";
 import { getSetting, setSetting } from "@/services/persistence/repositories/settingsRepository";
 import { DEFAULT_DUCKDB_MEMORY_LIMIT_MB } from "@/store/slices/duckdbSlice";
+import {
+  clampMaxResultRows,
+  MAX_MAX_RESULT_ROWS,
+  MIN_MAX_RESULT_ROWS,
+} from "@/store/slices/querySlice";
 import { toast } from "sonner";
 import ProfileEditor from "@/components/profile/ProfileEditor";
+import AISettings from "@/components/workspace/AISettings";
 import ProfileAvatar from "@/components/profile/ProfileAvatar";
 import PasswordDialog from "@/components/profile/PasswordDialog";
 import type { Profile } from "@/store/types";
@@ -50,6 +56,13 @@ export default function SettingsTab() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [pendingDeleteTargetId, setPendingDeleteTargetId] = useState<string | null>(null);
   const [memoryLimitMb, setMemoryLimitMb] = useState<number>(DEFAULT_DUCKDB_MEMORY_LIMIT_MB);
+  const storedMaxResultRows = useDuckStore((s) => s.maxResultRows);
+  const setStoredMaxResultRows = useDuckStore((s) => s.setMaxResultRows);
+  // Draft only exists while the field is being edited; until then the input
+  // shows the live store value, which arrives asynchronously at boot. Deriving
+  // it this way avoids an effect that would sync state on every load.
+  const [maxResultRowsDraft, setMaxResultRowsDraft] = useState<number | null>(null);
+  const maxResultRows = maxResultRowsDraft ?? storedMaxResultRows;
   const [isSavingPerformance, setIsSavingPerformance] = useState(false);
 
   useEffect(() => {
@@ -83,6 +96,24 @@ export default function SettingsTab() {
       toast.success("Memory limit saved. Reload to apply.");
     } catch {
       toast.error("Failed to save memory limit");
+    } finally {
+      setIsSavingPerformance(false);
+    }
+  };
+
+  const handleSaveMaxResultRows = async () => {
+    const clamped = clampMaxResultRows(maxResultRows || 0);
+    setMaxResultRowsDraft(null);
+    // Applied immediately — unlike the memory limit, nothing in the engine
+    // needs restarting for a JS-side row cap.
+    setStoredMaxResultRows(clamped);
+    if (!currentProfileId) return;
+    setIsSavingPerformance(true);
+    try {
+      await setSetting(currentProfileId, "duckdb", "max_result_rows", JSON.stringify(clamped));
+      toast.success("Row limit saved");
+    } catch {
+      toast.error("Failed to save row limit");
     } finally {
       setIsSavingPerformance(false);
     }
@@ -190,9 +221,14 @@ export default function SettingsTab() {
           <Tabs defaultValue="profile">
             <TabsList className="mb-6">
               <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="ai">AI</TabsTrigger>
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="performance">Performance</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="ai" className="mt-0 space-y-6">
+              <AISettings />
+            </TabsContent>
 
             <TabsContent value="profile" className="mt-0 space-y-6">
               {/* Edit Current Profile */}
@@ -304,6 +340,36 @@ export default function SettingsTab() {
                   Caps DuckDB heap usage. Raise this if large sorts or aggregations fail with
                   out-of-memory errors; lower it on memory-constrained devices. Browser WASM
                   practical ceiling is around 4 GB. Changes take effect after reload.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="max-result-rows" className="text-sm font-medium">
+                  Maximum rows per result
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="max-result-rows"
+                    type="number"
+                    min={MIN_MAX_RESULT_ROWS}
+                    max={MAX_MAX_RESULT_ROWS}
+                    step={1000}
+                    value={maxResultRows}
+                    onChange={(e) => setMaxResultRowsDraft(Number(e.target.value))}
+                    className="max-w-[160px]"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveMaxResultRows}
+                    disabled={isSavingPerformance}
+                  >
+                    Save
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  A query returning more than this stops early and says so, instead of turning
+                  millions of rows into JavaScript objects and freezing the tab. Exports to Parquet
+                  bypass the limit and always write the complete result.
                 </p>
               </div>
             </TabsContent>

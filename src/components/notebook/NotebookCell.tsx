@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { diffStrings } from "@/lib/textDiff";
 import {
   Play,
   Loader2,
@@ -151,15 +152,35 @@ export function NotebookCellComponent({
     };
   }, [cell.type, cell.id, monacoConfig, executeCallback, contentChangeCallback]);
 
-  // Sync content if changed externally
+  // Sync content if changed externally — applied as a MINIMAL edit rather
+  // than setValue. In a live session a peer's keystrokes arrive through here,
+  // and replacing the whole model would reset the undo stack and drag the
+  // caret to wherever the restored position lands; a targeted edit leaves
+  // both alone unless the change overlaps the caret itself.
   useEffect(() => {
     if (cell.type !== "sql") return;
     const editor = editorInstanceRef.current?.editor;
-    if (editor && cell.content !== editor.getValue()) {
-      const position = editor.getPosition();
-      editor.setValue(cell.content);
-      if (position) editor.setPosition(position);
-    }
+    const model = editor?.getModel();
+    if (!editor || !model) return;
+    const diff = diffStrings(model.getValue(), cell.content);
+    if (!diff) return;
+    const start = model.getPositionAt(diff.start);
+    const end = model.getPositionAt(diff.start + diff.deleteLength);
+    model.pushEditOperations(
+      [],
+      [
+        {
+          range: {
+            startLineNumber: start.lineNumber,
+            startColumn: start.column,
+            endLineNumber: end.lineNumber,
+            endColumn: end.column,
+          },
+          text: diff.insert,
+        },
+      ],
+      () => null
+    );
   }, [cell.content, cell.type]);
 
   // Markdown cell: auto-resize textarea

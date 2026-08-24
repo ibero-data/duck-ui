@@ -1,61 +1,107 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { useDuckStore } from "@/store";
 import { toast } from "sonner";
+import { decodeShare, readShareParam, clearShareHash, serializeShareCells } from "@/lib/share";
 
 /**
- * Hook to handle loading queries from URL parameters.
- * Supports base64-encoded queries via ?query=<base64>&execute=true
+ * Hook to load an analysis from the URL.
+ *
+ * Two formats are supported:
+ *  - `#s=<payload>`  — full-tab share (SQL or notebook + chart config), the
+ *    rich format produced by the Share button. See `src/lib/share`.
+ *  - `?query=<base64>&execute=true` — legacy query-only links.
  */
+// Module-level, not a ref: the workspace remounts when the profile gate
+// resolves, and a per-mount ref would process the URL once per mount —
+// duplicating the shared tab.
+let hasProcessedQueryFromURL = false;
+
 export function useQueryFromURL() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { createTab, executeQuery, isInitialized } = useDuckStore();
-  const hasProcessedRef = useRef(false);
+  const { createTab, executeQuery, updateTabChartConfig, isInitialized } = useDuckStore();
 
   useEffect(() => {
-    // Only process once and after DuckDB is initialized
-    if (hasProcessedRef.current || !isInitialized) return;
+    // Only process once and after DuckDB is initialized.
+    if (hasProcessedQueryFromURL || !isInitialized) return;
 
+    const shareParam = readShareParam();
     const queryParam = searchParams.get("query");
-    const executeParam = searchParams.get("execute");
+    if (!shareParam && !queryParam) return;
 
-    if (!queryParam) return;
+    hasProcessedQueryFromURL = true;
+    console.debug("[share] processing analysis from URL");
 
+    // Rich full-tab share takes precedence.
+    if (shareParam) {
+      void (async () => {
+        const payload = await decodeShare(shareParam);
+        clearShareHash();
+
+        if (!payload) {
+          toast.error("This shared link is invalid or corrupted.");
+          return;
+        }
+
+        if (payload.type === "notebook") {
+          const content = payload.cells ? serializeShareCells(payload.cells) : "";
+          createTab("notebook", content, payload.title);
+          toast.success("Shared notebook loaded");
+          return;
+        }
+
+        // SQL share
+        const sql = payload.sql ?? "";
+        const tabId = createTab("sql", sql, payload.title);
+        if (payload.chartConfig && tabId) {
+          updateTabChartConfig(tabId, payload.chartConfig);
+        }
+        toast.success("Shared analysis loaded");
+
+        if (payload.autoRun && sql.trim() && tabId) {
+          // Small delay to ensure the tab is mounted before executing.
+          setTimeout(() => {
+            executeQuery(sql, tabId).catch(() => {
+              toast.error(
+                "Couldn't run the shared query automatically — it may need data that isn't loaded yet."
+              );
+            });
+          }, 100);
+        }
+      })();
+      return;
+    }
+
+    // Legacy query-only link.
     try {
-      // Decode the base64 query
-      const decodedQuery = atob(queryParam);
-
+      const decodedQuery = atob(queryParam as string);
       if (!decodedQuery.trim()) {
         toast.error("Empty query in URL");
         return;
       }
 
-      // Create a new SQL tab with the decoded query
       const tabId = createTab("sql", decodedQuery);
-      hasProcessedRef.current = true;
-
       toast.success("Query loaded from URL");
 
-      // Auto-execute if requested
-      if (executeParam === "true" && tabId) {
-        // Small delay to ensure tab is created
+      if (searchParams.get("execute") === "true" && tabId) {
+        console.debug("[share] scheduling auto-run for tab", tabId);
         setTimeout(() => {
+          console.debug("[share] auto-running query for tab", tabId);
           executeQuery(decodedQuery, tabId);
         }, 100);
       }
 
-      // Clear the URL params after processing
       setSearchParams({}, { replace: true });
     } catch (error) {
       console.error("Failed to decode query from URL:", error);
       toast.error("Failed to decode query from URL. Invalid base64 encoding.");
-      hasProcessedRef.current = true;
     }
-  }, [searchParams, setSearchParams, createTab, executeQuery, isInitialized]);
+  }, [searchParams, setSearchParams, createTab, executeQuery, updateTabChartConfig, isInitialized]);
 }
 
 /**
- * Generate a shareable URL with the query encoded in base64
+ * Generate a shareable URL with the query encoded in base64 (legacy format).
+ * Prefer `buildTabShareUrl` from `src/lib/share` for full-tab shares.
  */
 export function generateQueryURL(query: string, autoExecute = false): string {
   const base64Query = btoa(query);
@@ -68,7 +114,7 @@ export function generateQueryURL(query: string, autoExecute = false): string {
 }
 
 /**
- * Copy the shareable query URL to clipboard
+ * Copy the shareable query URL to clipboard (legacy format).
  */
 export async function copyQueryURL(query: string, autoExecute = false): Promise<boolean> {
   try {

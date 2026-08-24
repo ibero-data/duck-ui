@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,13 +35,15 @@ export default function SaveQueryDialog({
   const currentProfileId = useDuckStore((s) => s.currentProfileId);
   const bumpSavedQueriesVersion = useDuckStore((s) => s.bumpSavedQueriesVersion);
 
-  // Reset form when dialog opens
-  useEffect(() => {
+  // Reset form when dialog opens (state adjustment during render, per react.dev)
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setName(defaultName);
       setDescription("");
     }
-  }, [open, defaultName]);
+  }
 
   const handleSave = async () => {
     if (!name.trim() || !currentProfileId) return;

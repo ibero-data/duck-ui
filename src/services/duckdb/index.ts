@@ -14,4 +14,10 @@ export {
   fetchExternalDatabases,
 } from "./externalConnection";
 export { fetchWasmDatabases } from "./schemaFetcher";
-export { retryWithBackoff, validateConnection, updateHistory } from "./utils";
+export {
+  retryWithBackoff,
+  validateConnection,
+  updateHistory,
+  explainEngineError,
+  stageRemoteTextFile,
+} from "./utils";

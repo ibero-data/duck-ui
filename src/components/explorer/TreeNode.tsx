@@ -26,11 +26,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useDuckStore, type ColumnStats } from "@/store";
+import { getUiConfig } from "@/lib/appConfig";
+import { qualifyTable } from "@/lib/sqlSanitize";
 import { ColumnNode } from "./ColumnNode";
 
 export interface TreeNodeData {
   name: string;
   type: "database" | "table" | "view";
+  /** Schema the table lives in. Anything but "main" is shown as a prefix. */
+  schema?: string;
   children?: TreeNodeData[];
   query?: string;
 }
@@ -62,7 +66,7 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
         if (isOpen && node.type === "table" && parentDatabaseName && columnStats.length === 0) {
           setIsLoadingStats(true);
           try {
-            const stats = await fetchTableColumnStats(parentDatabaseName, node.name);
+            const stats = await fetchTableColumnStats(parentDatabaseName, node.name, node.schema);
             setColumnStats(stats);
           } catch (error) {
             console.error("Failed to fetch column stats:", error);
@@ -77,6 +81,7 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
       isOpen,
       node.type,
       node.name,
+      node.schema,
       parentDatabaseName,
       columnStats.length,
       fetchTableColumnStats,
@@ -95,8 +100,8 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
     }, [node.type]);
 
     const handleQueryData = useCallback(
-      (databaseName: string, tableName: string) => async () => {
-        const query = `SELECT * FROM "${databaseName}"."${tableName}" LIMIT 100`;
+      (databaseName: string, tableName: string, schema?: string) => async () => {
+        const query = `SELECT * FROM ${qualifyTable(databaseName, schema, tableName)} LIMIT 100`;
 
         createTab("sql", query, tableName);
 
@@ -110,9 +115,9 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
     );
 
     const handleDeleteTable = useCallback(
-      (databaseName: string, tableName: string) => async () => {
+      (databaseName: string, tableName: string, schema?: string) => async () => {
         try {
-          await deleteTable(tableName, databaseName);
+          await deleteTable(tableName, databaseName, schema);
           toast.success(`Table "${tableName}" deleted successfully.`);
           await fetchDatabasesAndTablesInfo();
           refreshData();
@@ -128,8 +133,8 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
     );
 
     const handleShowSchema = useCallback(
-      (databaseName: string, tableName: string) => async () => {
-        const query = `DESCRIBE "${databaseName}"."${tableName}"`;
+      (databaseName: string, tableName: string, schema?: string) => async () => {
+        const query = `DESCRIBE ${qualifyTable(databaseName, schema, tableName)}`;
 
         createTab("sql", query, `${tableName} Schema`);
 
@@ -150,7 +155,7 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
             label: "Query Table",
             icon: <TerminalIcon className="w-4 h-4 mr-2" />,
             action: parentDatabaseName
-              ? handleQueryData(parentDatabaseName, node.name)
+              ? handleQueryData(parentDatabaseName, node.name, node.schema)
               : () => {
                   toast.error("Parent database name is undefined.");
                 },
@@ -159,23 +164,35 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
             label: "Show Schema",
             icon: <FileSpreadsheet className="w-4 h-4 mr-2" />,
             action: parentDatabaseName
-              ? handleShowSchema(parentDatabaseName, node.name)
+              ? handleShowSchema(parentDatabaseName, node.name, node.schema)
               : () => {
                   toast.error("Parent database name is undefined.");
                 },
           },
-          {
-            label: "Delete Table",
-            icon: <Trash className="w-4 h-4 mr-2" />,
-            action: parentDatabaseName
-              ? handleDeleteTable(parentDatabaseName, node.name)
-              : () => {
-                  toast.error("Parent database name is undefined.");
+          // Destructive action is hidden in read-only / kiosk mode.
+          ...(getUiConfig().readOnly
+            ? []
+            : [
+                {
+                  label: "Delete Table",
+                  icon: <Trash className="w-4 h-4 mr-2" />,
+                  action: parentDatabaseName
+                    ? handleDeleteTable(parentDatabaseName, node.name, node.schema)
+                    : () => {
+                        toast.error("Parent database name is undefined.");
+                      },
                 },
-          },
+              ]),
         ],
       }),
-      [parentDatabaseName, node.name, handleQueryData, handleDeleteTable, handleShowSchema]
+      [
+        parentDatabaseName,
+        node.name,
+        node.schema,
+        handleQueryData,
+        handleDeleteTable,
+        handleShowSchema,
+      ]
     );
 
     const matchesSearch = node.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -220,7 +237,17 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
                 )}
                 {getIcon}
                 <div className="text-xs">
-                  <p className="truncate"> {node.name}</p>
+                  <p className="truncate">
+                    {" "}
+                    {node.schema && node.schema !== "main" ? (
+                      <>
+                        <span className="text-muted-foreground">{node.schema}.</span>
+                        {node.name}
+                      </>
+                    ) : (
+                      node.name
+                    )}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center">
@@ -261,7 +288,7 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
               {node.children.length > 0 ? (
                 node.children.map((child) => (
                   <TreeNode
-                    key={`${node.type === "database" ? node.name : parentDatabaseName}-${child.name}`}
+                    key={`${node.type === "database" ? node.name : parentDatabaseName}-${child.schema || "main"}-${child.name}`}
                     node={child}
                     level={level + 1}
                     searchTerm={searchTerm}
@@ -286,7 +313,15 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(
                   <span>Loading column statistics...</span>
                 </div>
               ) : columnStats.length > 0 ? (
-                columnStats.map((stats) => <ColumnNode key={stats.column_name} stats={stats} />)
+                columnStats.map((stats) => (
+                  <ColumnNode
+                    key={stats.column_name}
+                    stats={stats}
+                    databaseName={parentDatabaseName}
+                    tableName={node.name}
+                    schema={node.schema}
+                  />
+                ))
               ) : null}
             </div>
           )}

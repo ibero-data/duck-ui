@@ -22,6 +22,7 @@ import {
   Table,
 } from "lucide-react";
 import { useDuckStore, type QueryResult } from "@/store";
+import { stageRemoteTextFile } from "@/services/duckdb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -594,6 +595,10 @@ const FileDetails: React.FC<FileDetailsProps> = ({
 };
 
 const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen }) => {
+  const db = useDuckStore((s) => s.db);
+  const supportsFileImport = useDuckStore(
+    (s) => s.currentSession?.capabilities.supportsFileImport ?? false
+  );
   const importFile = useDuckStore((s) => s.importFile);
   const executeQuery = useDuckStore((s) => s.executeQuery);
   const [activeTab, setActiveTab] = useState("upload");
@@ -926,6 +931,24 @@ const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen
     [toast]
   );
 
+  /**
+   * Downloads text formats in JS and registers them in the virtual filesystem,
+   * returning the name to read from. duckdb-wasm's CSV/JSON sniffer reads
+   * remote files through range requests and mis-detects the dialect, which
+   * silently collapses every row into one column. Parquet is unaffected and
+   * streams as usual, and external servers fetch the URL themselves.
+   */
+  const resolveUrlSource = async (url: string, extension?: string): Promise<string> => {
+    if (extension !== "csv" && extension !== "json") return url;
+    if (!db || !supportsFileImport) return url;
+    try {
+      return (await stageRemoteTextFile(db, url)) ?? url;
+    } catch (error) {
+      console.error("Failed to stage remote file, falling back to httpfs:", error);
+      return url;
+    }
+  };
+
   // Preview handlers - Phase 2
   const handlePreviewUrl = async (url: string, tableName: string) => {
     setIsPreviewing(true);
@@ -935,13 +958,15 @@ const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen
       const urlPath = url.split("?")[0];
       const extension = urlPath.split(".").pop()?.toLowerCase();
 
+      const source = await resolveUrlSource(url, extension);
+
       let previewQuery = "";
       if (extension === "csv") {
-        previewQuery = `SELECT * FROM read_csv('${url}', auto_detect=true, header=true) LIMIT ${PREVIEW_ROW_LIMIT}`;
+        previewQuery = `SELECT * FROM read_csv('${source}', auto_detect=true, header=true) LIMIT ${PREVIEW_ROW_LIMIT}`;
       } else if (extension === "json") {
-        previewQuery = `SELECT * FROM read_json('${url}', auto_detect=true) LIMIT ${PREVIEW_ROW_LIMIT}`;
+        previewQuery = `SELECT * FROM read_json('${source}', auto_detect=true) LIMIT ${PREVIEW_ROW_LIMIT}`;
       } else if (extension === "parquet") {
-        previewQuery = `SELECT * FROM read_parquet('${url}') LIMIT ${PREVIEW_ROW_LIMIT}`;
+        previewQuery = `SELECT * FROM read_parquet('${source}') LIMIT ${PREVIEW_ROW_LIMIT}`;
       } else {
         throw new Error(`Unsupported file type for preview: .${extension}`);
       }
@@ -1136,12 +1161,14 @@ const FileImporter: React.FC<FileImporterProps> = ({ isSheetOpen, setIsSheetOpen
       const createType = importMode === "view" ? "VIEW" : "TABLE";
       const resultType = importMode === "view" ? "view" : "table";
 
+      const source = await resolveUrlSource(url, extension);
+
       if (extension === "csv") {
-        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_csv('${url}', auto_detect=true, ignore_errors=true, header=true)`;
+        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_csv('${source}', auto_detect=true, ignore_errors=true, header=true)`;
       } else if (extension === "json") {
-        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_json('${url}', auto_detect=true, ignore_errors=true)`;
+        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_json('${source}', auto_detect=true, ignore_errors=true)`;
       } else if (extension === "parquet") {
-        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_parquet('${url}')`;
+        query = `CREATE OR REPLACE ${createType} ${urlTableName} AS SELECT * FROM read_parquet('${source}')`;
       } else {
         throw new Error(`Unsupported file type: .${extension}. Supported: CSV, JSON, Parquet`);
       }

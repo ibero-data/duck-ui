@@ -110,7 +110,19 @@ export const createProfileSlice: StateCreator<
     const workspace = await loadWorkspace(profileId);
     if (workspace) {
       try {
-        const tabs = JSON.parse(workspace.tabs) as EditorTab[];
+        // Tab types that no longer exist (the old Brain settings tab) are
+        // dropped rather than rendered as a mystery blank.
+        const validTypes = new Set([
+          "sql",
+          "notebook",
+          "dashboard",
+          "home",
+          "connections",
+          "settings",
+        ]);
+        const tabs = (JSON.parse(workspace.tabs) as EditorTab[]).filter((tab) =>
+          validTypes.has(tab.type)
+        );
         set({
           tabs: tabs.length > 0 ? tabs : [{ id: "home", title: "Home", type: "home", content: "" }],
           activeTabId: workspace.active_tab_id ?? tabs[0]?.id ?? "home",
@@ -150,24 +162,28 @@ export const createProfileSlice: StateCreator<
       set({ queryHistory });
     }
 
+    // Dashboards, so a restored dashboard tab has something to render rather
+    // than reporting that it no longer exists.
+    await get().loadDashboards(profileId);
+
     // Load AI provider configs
     const aiConfigs = await getProviderConfigs(profileId, cryptoKey);
     if (aiConfigs.length > 0) {
       const providerConfigs: ProviderConfigs = {};
-      let aiProvider: AIProviderType = "webllm";
+      let aiProvider: AIProviderType = "openai-compatible";
 
       for (const cfg of aiConfigs) {
         const config = cfg.config as Record<string, string>;
         if (cfg.provider === "openai") {
           providerConfigs.openai = {
             apiKey: cfg.apiKey ?? "",
-            modelId: config.modelId ?? "gpt-4o-mini",
+            modelId: config.modelId ?? "gpt-5-mini",
           };
           if (cfg.apiKey) aiProvider = "openai";
         } else if (cfg.provider === "anthropic") {
           providerConfigs.anthropic = {
             apiKey: cfg.apiKey ?? "",
-            modelId: config.modelId ?? "claude-sonnet-4-5-20250929",
+            modelId: config.modelId ?? "claude-sonnet-5",
           };
           if (cfg.apiKey) aiProvider = "anthropic";
         } else if (cfg.provider === "openai-compatible") {
@@ -178,6 +194,13 @@ export const createProfileSlice: StateCreator<
           };
           if (config.baseUrl) aiProvider = "openai-compatible";
         }
+      }
+
+      if (!providerConfigs["openai-compatible"]?.baseUrl) {
+        providerConfigs["openai-compatible"] = {
+          baseUrl: "http://localhost:11434/v1",
+          modelId: providerConfigs["openai-compatible"]?.modelId ?? "",
+        };
       }
 
       set((state) => ({

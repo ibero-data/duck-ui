@@ -1,5 +1,5 @@
 export * from "./types";
-export { OpenAIProvider } from "./openai.provider";
+export { OpenAIProvider, listCompatibleModels } from "./openai.provider";
 export { AnthropicProvider } from "./anthropic.provider";
 
 import type { AIProvider, AIProviderType, ProviderConfig } from "./types";
@@ -19,8 +19,6 @@ export function createProvider(type: AIProviderType): AIProvider {
     case "webllm":
       // WebLLM uses the existing service, not this factory
       throw new Error("WebLLM should use the existing duckBrainService");
-    case "gemini":
-      throw new Error("Gemini provider not yet implemented");
     default:
       throw new Error(`Unknown provider type: ${type}`);
   }

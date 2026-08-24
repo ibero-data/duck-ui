@@ -1,4 +1,6 @@
+import { DataType, TimeUnit } from "apache-arrow";
 import type { QueryResult, ExternalQueryResponse } from "@/store/types";
+import { wkbToWkt, blobToString, varintToString, intervalToString } from "./cellDecoders";
 
 /**
  * Converts a raw result (from an external HTTP endpoint) into a QueryResult.
@@ -149,69 +151,216 @@ export const rawResultToJSON = (rawResult: string): QueryResult => {
   }
 };
 
+const MAX_SAFE = 9007199254740991n; // Number.MAX_SAFE_INTEGER
+
 /**
- * Converts a WASM query result into a QueryResult.
+ * Interprets Arrow decimal storage (little-endian 32-bit words, two's
+ * complement) as the unscaled BigInt. Covers Decimal128 (4 words) and
+ * Decimal256 (8 words). Exported for tests.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const decimalWordsToBigInt = (words: Uint32Array | Int32Array): bigint => {
+  let unscaled = 0n;
+  for (let i = words.length - 1; i >= 0; i--) {
+    unscaled = (unscaled << 32n) | BigInt(words[i] >>> 0);
+  }
+  const signBit = (words[words.length - 1] & 0x80000000) !== 0;
+  if (signBit) {
+    unscaled -= 1n << BigInt(words.length * 32);
+  }
+  return unscaled;
+};
+
+/**
+ * Applies the scale to an unscaled decimal. Returns a number when it is
+ * exactly representable, otherwise a lossless decimal string (DuckDB decimals
+ * go up to 38 digits — far past 2^53). Exported for tests.
+ */
+export const formatDecimal = (unscaled: bigint, scale: number): number | string => {
+  const negative = unscaled < 0n;
+  const abs = negative ? -unscaled : unscaled;
+  let text: string;
+  if (scale <= 0) {
+    text = abs.toString();
+  } else {
+    const digits = abs.toString().padStart(scale + 1, "0");
+    text = `${digits.slice(0, digits.length - scale)}.${digits.slice(digits.length - scale)}`;
+  }
+  const signed = negative ? `-${text}` : text;
+  return abs <= MAX_SAFE ? Number(signed) : signed;
+};
+
+/** Converts whatever the Arrow decimal vector hands back into a display value. */
+const decimalCellToJs = (value: unknown, scale: number): number | string | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return formatDecimal(value, scale);
+  if (value instanceof Uint32Array || value instanceof Int32Array) {
+    return formatDecimal(decimalWordsToBigInt(value), scale);
+  }
+  // Fallback for BN-style wrappers whose toString() yields the unscaled digits.
+  const text = String(value);
+  if (/^-?\d+$/.test(text)) return formatDecimal(BigInt(text), scale);
+  const parsed = Number(text);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+/**
+ * DATE columns → "YYYY-MM-DD". Arrow reports the day as UTC-midnight epoch
+ * millis; formatting through local time shifts it a day west of UTC (#15), so
+ * this goes through the UTC getters. Exported for tests.
+ */
+export const dateCellToIso = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  const ms = value instanceof Date ? value.getTime() : Number(value);
+  if (!Number.isFinite(ms)) return String(value);
+  return new Date(ms).toISOString().slice(0, 10);
+};
+
+/** TIME columns → "HH:MM:SS[.ffffff]". Exported for tests. */
+export const timeCellToString = (value: unknown, unit: TimeUnit): string | null => {
+  if (value === null || value === undefined) return null;
+  const raw = typeof value === "bigint" ? value : BigInt(Math.trunc(Number(value)));
+  const perSecond =
+    unit === TimeUnit.SECOND
+      ? 1n
+      : unit === TimeUnit.MILLISECOND
+        ? 1000n
+        : unit === TimeUnit.MICROSECOND
+          ? 1000000n
+          : 1000000000n;
+  const totalSeconds = raw / perSecond;
+  const fraction = raw % perSecond;
+  const hh = String(totalSeconds / 3600n).padStart(2, "0");
+  const mm = String((totalSeconds % 3600n) / 60n).padStart(2, "0");
+  const ss = String(totalSeconds % 60n).padStart(2, "0");
+  if (fraction === 0n) return `${hh}:${mm}:${ss}`;
+  const fracDigits = String(fraction).padStart(String(perSecond).length - 1, "0");
+  return `${hh}:${mm}:${ss}.${fracDigits.replace(/0+$/, "")}`;
+};
+
+const EXTENSION_NAME_KEY = "ARROW:extension:name";
+const EXTENSION_METADATA_KEY = "ARROW:extension:metadata";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+const getExtensionName = (field: any): string | null =>
+  field?.metadata?.get?.(EXTENSION_NAME_KEY) ?? null;
+
+/** DuckDB tags VARINT as `arrow.opaque` carrying a "bignum" type name. */
+const isVarintField = (field: any): boolean => {
+  if (getExtensionName(field) !== "arrow.opaque") return false;
+  try {
+    return JSON.parse(field.metadata.get(EXTENSION_METADATA_KEY) ?? "{}").type_name === "bignum";
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Reports the DuckDB type where Arrow's own name would mislead — a GEOMETRY
+ * column should not read as "Binary" in the grid header.
+ *
+ * Exported so the engine layer can describe a result's schema (before any row
+ * arrives) with exactly the labels the grid will later show.
+ */
+export const columnTypeLabel = (field: any): string => {
+  if (getExtensionName(field) === "geoarrow.wkb") return "GEOMETRY";
+  if (isVarintField(field)) return "VARINT";
+  return field.type.toString();
+};
+
+/**
+ * Arrow JS reads only the first two words of a MONTH_DAY_NANO interval, which
+ * silently drops the whole time component (INTERVAL '90' MINUTE arrives as
+ * zero). These are read straight out of the chunk buffers instead: each value
+ * is a 16-byte stride of int32 months, int32 days, int64 nanoseconds.
+ */
+const buildIntervalReader = (vector: any): ((rowIndex: number) => string | null) => {
+  const bounds: { start: number; chunk: any }[] = [];
+  let cursor = 0;
+  for (const chunk of vector?.data ?? []) {
+    bounds.push({ start: cursor, chunk });
+    cursor += chunk.length;
+  }
+
+  return (rowIndex: number): string | null => {
+    for (let i = bounds.length - 1; i >= 0; i--) {
+      const { start, chunk } = bounds[i];
+      if (rowIndex < start) continue;
+      const local = chunk.offset + (rowIndex - start);
+
+      const nullBitmap = chunk.nullBitmap;
+      if (nullBitmap?.length && (nullBitmap[local >> 3] & (1 << (local % 8))) === 0) return null;
+
+      const values = chunk.values;
+      if (!values?.buffer) return null;
+      const view = new DataView(values.buffer, values.byteOffset, values.byteLength);
+      const offset = local * 16;
+      if (offset + 16 > view.byteLength) return null;
+      return intervalToString(
+        view.getInt32(offset, true),
+        view.getInt32(offset + 4, true),
+        view.getBigInt64(offset + 8, true)
+      );
+    }
+    return null;
+  };
+};
+
+/**
+ * Converts a WASM query result (an Arrow table) into a QueryResult.
+ *
+ * Type-specific coercions, driven by the Arrow type (not its string name, so
+ * TIMESTAMPTZ variants like `Timestamp<MICROSECOND, UTC>` are covered):
+ * - Decimal → number (or lossless string past 2^53), scale applied (#13)
+ * - Date32/Date64 → "YYYY-MM-DD" via UTC (#15)
+ * - Timestamp (all units, with or without timezone) → Date object
+ * - Time → "HH:MM:SS[.ffffff]" string
+ * - Interval → "1 year 2 months 3 days 04:05:06"
+ * - GEOMETRY → WKT, VARINT → decimal string, BLOB → `\xHH` (see cellDecoders)
+ * Int64/UInt64 stay BigInt (lossless), everything else passes through.
+ */
 export const resultToJSON = (result: any): QueryResult => {
   try {
     const schema = result.schema;
     const fields = schema.fields;
 
-    // Pre-extract column vectors for Decimal types
+    // Decimal values must be read from the column vectors — row.toJSON() drops them.
     const columnVectors = fields.map((_: unknown, colIdx: number) => result.getChildAt(colIdx));
 
-    // Use the standard toArray().map() approach, but fix Decimal values from column vectors
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Resolved once per column rather than once per cell.
+    const binaryDecoders = fields.map((field: any) => {
+      if (!DataType.isBinary(field.type)) return null;
+      if (getExtensionName(field) === "geoarrow.wkb") return wkbToWkt;
+      if (isVarintField(field)) return varintToString;
+      return blobToString;
+    });
+    const intervalReaders = fields.map((field: any, colIdx: number) =>
+      DataType.isInterval(field.type) ? buildIntervalReader(columnVectors[colIdx]) : null
+    );
+
     const data = result.toArray().map((row: any, rowIndex: number) => {
       const jsonRow = row.toJSON();
 
-      // Fix Decimal types by reading directly from column vectors
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       fields.forEach((field: any, columnIndex: number) => {
         const col = field.name;
-        const type = field.type.toString();
+        const type = field.type;
 
-        // Only fix Decimal types - they come as null from toJSON()
-        if (type.includes("Decimal")) {
-          try {
-            // Get the value directly from the column vector
-            const value = columnVectors[columnIndex].get(rowIndex);
-
-            if (value !== null && value !== undefined) {
-              // Convert Decimal object to number
-              // Arrow Decimals store unscaled values - we need to apply the scale
-              if (typeof value === "object" && typeof value.valueOf === "function") {
-                const unscaledValue = Number(value.valueOf());
-                const scale = field.type.scale || 0; // Get scale from Arrow type metadata
-                const scaledValue = unscaledValue / Math.pow(10, scale);
-                jsonRow[col] = scaledValue;
-              } else if (typeof value === "number") {
-                jsonRow[col] = value;
-              } else if (typeof value === "string") {
-                const parsed = parseFloat(value);
-                jsonRow[col] = isNaN(parsed) ? null : parsed;
-              } else {
-                jsonRow[col] = null;
-              }
-            }
-          } catch (error) {
-            console.error(`Error processing Decimal column ${col} at row ${rowIndex}:`, error);
-          }
-        }
-        // Fix Date types
-        else if (type === "Date32<DAY>") {
+        if (DataType.isDecimal(type)) {
+          const value = columnVectors[columnIndex]?.get(rowIndex);
+          jsonRow[col] = decimalCellToJs(value, type.scale ?? 0);
+        } else if (DataType.isDate(type)) {
+          jsonRow[col] = dateCellToIso(jsonRow[col]);
+        } else if (DataType.isTimestamp(type)) {
           const value = jsonRow[col];
-          if (value !== null && value !== undefined) {
-            jsonRow[col] = new Date(value).toLocaleDateString();
-          }
-        }
-        // Fix Timestamp types
-        else if (type === "Date64<MILLISECOND>" || type === "Timestamp<MICROSECOND>") {
+          jsonRow[col] = value === null || value === undefined ? null : new Date(Number(value));
+        } else if (DataType.isTime(type)) {
+          jsonRow[col] = timeCellToString(jsonRow[col], type.unit);
+        } else if (intervalReaders[columnIndex]) {
+          jsonRow[col] = intervalReaders[columnIndex](rowIndex);
+        } else if (binaryDecoders[columnIndex]) {
           const value = jsonRow[col];
-          if (value !== null && value !== undefined) {
-            jsonRow[col] = new Date(value);
-          }
+          if (value instanceof Uint8Array) jsonRow[col] = binaryDecoders[columnIndex](value);
         }
       });
 
@@ -219,10 +368,8 @@ export const resultToJSON = (result: any): QueryResult => {
     });
 
     return {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       columns: fields.map((field: any) => field.name),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      columnTypes: fields.map((field: any) => field.type.toString()),
+      columnTypes: fields.map(columnTypeLabel),
       data,
       rowCount: result.numRows,
     };

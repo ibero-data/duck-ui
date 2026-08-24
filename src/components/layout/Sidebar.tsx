@@ -5,10 +5,10 @@
 
 import { useState } from "react";
 import {
+  LayoutDashboard,
   Home,
   Database,
   Cable,
-  Brain,
   Moon,
   Sun,
   HelpCircle,
@@ -22,6 +22,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useDuckStore, type EditorTabType } from "@/store";
+import { getUiConfig } from "@/lib/appConfig";
 import { setSetting } from "@/services/persistence/repositories/settingsRepository";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -36,7 +37,14 @@ import {
 import { useTheme } from "@/components/theme/theme-provider";
 import { Separator } from "@/components/ui/separator";
 import QueryHistory from "../workspace/QueryHistory";
+import SessionIndicator from "@/components/collaboration/SessionIndicator";
 import SavedQueriesPanel from "@/components/saved-queries/SavedQueriesPanel";
+import DashboardsPanel from "@/components/dashboard/DashboardsPanel";
+import { lazy, Suspense } from "react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+
+// Loaded on demand: most sessions never open connection management.
+const ConnectionsContent = lazy(() => import("@/components/workspace/ConnectionsTab"));
 import PasswordDialog from "@/components/profile/PasswordDialog";
 import ProfileAvatar from "@/components/profile/ProfileAvatar";
 
@@ -57,7 +65,11 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
   const switchProfile = useDuckStore((s) => s.switchProfile);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [savedQueriesOpen, setSavedQueriesOpen] = useState(false);
+  const dashboardsOpen = useDuckStore((s) => s.isDashboardsPanelOpen);
+  const setDashboardsOpen = useDuckStore((s) => s.setDashboardsPanelOpen);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [switchTarget, setSwitchTarget] = useState<(typeof profiles)[0] | null>(null);
+  const ui = getUiConfig();
 
   // Get connection status color
   const getConnectionColor = (scope?: string) => {
@@ -68,6 +80,9 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
         return "text-blue-500";
       case "OPFS":
         return "text-purple-500";
+      // Hosted by another participant — amber matches the live-session accent.
+      case "Peer":
+        return "text-amber-500";
       default:
         return "text-gray-500";
     }
@@ -158,11 +173,15 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   ))}
                 </>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openOrFocusTab("settings", "Settings")}>
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </DropdownMenuItem>
+              {!ui.hideSettings && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => openOrFocusTab("settings", "Settings")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -210,40 +229,46 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
           <Separator className="my-2 mx-2" />
 
           {/* Connections */}
+          {!ui.hideConnections && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="mx-auto h-9 w-9"
+                    onClick={() => setConnectionsOpen(true)}
+                    aria-label="Connections"
+                  >
+                    <Cable className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Connections</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
+          {/* Dashboards index. A dashboard must always be reachable from
+              here — a closed tab or a reload must never mean a lost report. */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={isTabActive("connections") ? "secondary" : "ghost"}
+                  variant={dashboardsOpen ? "secondary" : "ghost"}
                   size="icon"
                   className="mx-auto h-9 w-9"
-                  onClick={() => openOrFocusTab("connections", "Connections")}
-                  aria-label="Connections"
+                  onClick={() => setDashboardsOpen(!dashboardsOpen)}
+                  aria-label="Dashboards"
                 >
-                  <Cable className="h-4 w-4" />
+                  <LayoutDashboard className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Connections</TooltipContent>
+              <TooltipContent side="right">Dashboards</TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
-          {/* Brain */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isTabActive("brain") ? "secondary" : "ghost"}
-                  size="icon"
-                  className="mx-auto h-9 w-9"
-                  onClick={() => openOrFocusTab("brain", "Duck Brain")}
-                  aria-label="Duck Brain"
-                >
-                  <Brain className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Duck Brain</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {/* Live session — a primary capability, not a footer utility. */}
+          <SessionIndicator />
 
           <Separator className="my-2 mx-2" />
 
@@ -318,7 +343,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                   variant="ghost"
                   size="icon"
                   className="mx-auto h-9 w-9 relative"
-                  onClick={() => openOrFocusTab("connections", "Connections")}
+                  onClick={ui.hideConnections ? undefined : () => setConnectionsOpen(true)}
                   aria-label="Connection status"
                 >
                   <Circle
@@ -331,7 +356,7 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
                 <div className="text-xs">
                   <div className="font-medium">{currentConnection?.name || "No connection"}</div>
                   <div className="text-muted-foreground">
-                    {currentConnection?.scope || "Click to manage"}
+                    {currentConnection?.scope || (ui.hideConnections ? "" : "Click to manage")}
                   </div>
                 </div>
               </TooltipContent>
@@ -339,22 +364,24 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
           </TooltipProvider>
 
           {/* Settings */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isTabActive("settings") ? "secondary" : "ghost"}
-                  size="icon"
-                  className="mx-auto h-9 w-9"
-                  onClick={() => openOrFocusTab("settings", "Settings")}
-                  aria-label="Settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {!ui.hideSettings && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isTabActive("settings") ? "secondary" : "ghost"}
+                    size="icon"
+                    className="mx-auto h-9 w-9"
+                    onClick={() => openOrFocusTab("settings", "Settings")}
+                    aria-label="Settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Settings</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
           {/* Theme Toggle */}
           <TooltipProvider>
@@ -441,6 +468,29 @@ export default function Sidebar({ isExplorerOpen, onToggleExplorer }: SidebarPro
       )}
 
       {/* Saved Queries Panel */}
+      {/* Connections as a sheet: a setup step, not a document (user call).
+          The workspace tab type still renders for restored old workspaces. */}
+      <Sheet open={connectionsOpen} onOpenChange={setConnectionsOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-3xl">
+          <SheetHeader className="border-b px-4 py-3">
+            <SheetTitle>Connections</SheetTitle>
+          </SheetHeader>
+          <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+            {connectionsOpen && <ConnectionsContent />}
+          </Suspense>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={dashboardsOpen} onOpenChange={setDashboardsOpen}>
+        <SheetContent
+          side="right"
+          className="w-full gap-0 overflow-hidden p-0 sm:max-w-md [&>button]:hidden"
+        >
+          <SheetTitle className="sr-only">Dashboards</SheetTitle>
+          <DashboardsPanel onClose={() => setDashboardsOpen(false)} />
+        </SheetContent>
+      </Sheet>
+
       {savedQueriesOpen && (
         <div className="fixed right-0 top-0 h-full w-96 border-l bg-background z-40 shadow-lg">
           <SavedQueriesPanel onClose={() => setSavedQueriesOpen(false)} />
