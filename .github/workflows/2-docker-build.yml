@@ -1,74 +1,171 @@
-# .github/workflows/2-docker-build.yml
-name: Build and Push Docker Image
+# .github/workflows/release.yml  (replaces 2-docker-build.yml)
+name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
-      - 'v*'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-  pull_request:
-    branches:
-      - main
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-  workflow_dispatch:
+      - "v*"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write # keyless Cosign signing via OIDC
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
-    if: |
-      (!contains(github.event.head_commit.message, 'docker-false') && !contains(github.event.head_commit.message, 'docs-only')) ||
-      contains(github.event.head_commit.message, 'docker-only')
-    permissions:
-      contents: read
-      packages: write
-    
+    timeout-minutes: 45
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Extract release metadata
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          PKG_VERSION="$(jq -r .version package.json)"
+          if [ "${TAG}" != "v${PKG_VERSION}" ]; then
+            echo "tag ${TAG} does not match package.json version ${PKG_VERSION}" >&2
+            exit 1
+          fi
+          echo "version=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "build_date=$(git show -s --format=%cI "${GITHUB_SHA}")" >> "${GITHUB_OUTPUT}"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint, typecheck, test
+        run: |
+          bun run lint
+          bun run typecheck
+          bun run test
+
+      - name: Build static dist
+        env:
+          DUCK_UI_BASEPATH: ${{ vars.DUCK_UI_BASEPATH || '/' }}
+        run: bun run build
+
+      - name: Package dist
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          tar -C dist -czf "release/duck-ui-${VERSION}-dist.tar.gz" .
+          cp serve.json inject-env.js release/
+          (cd release && sha256sum duck-ui-*.tar.gz serve.json inject-env.js > checksums.txt && cat checksums.txt)
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign checksums
+        working-directory: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes \
+            --output-signature checksums.txt.sig \
+            --output-certificate checksums.txt.pem \
+            checksums.txt
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOTES_FILE="$(mktemp)"
+          cat > "${NOTES_FILE}" <<EOF
+          ## Docker
+
+          \`\`\`bash
+          docker run -p 5522:5522 ghcr.io/${REPO}:${VERSION#v}
+          \`\`\`
+
+          ## Static hosting
+
+          Download \`duck-ui-${VERSION}-dist.tar.gz\`, extract it behind any static server that sends the
+          COOP/COEP headers in \`serve.json\`.
+
+          ## Verify
+
+          \`\`\`bash
+          sha256sum -c checksums.txt
+          cosign verify-blob --certificate checksums.txt.pem --signature checksums.txt.sig \\
+            --certificate-identity-regexp 'https://github.com/${REPO}/' \\
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com checksums.txt
+          \`\`\`
+          EOF
+
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            gh release edit "${VERSION}" --title "${VERSION}" --notes-file "${NOTES_FILE}"
+          else
+            gh release create "${VERSION}" --title "${VERSION}" --notes-file "${NOTES_FILE}"
+          fi
+          gh release upload "${VERSION}" release/* --clobber
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          # GITHUB_TOKEN needs Actions write access granted on the GHCR package
-          # (package settings → Manage Actions access) before it can push; the
-          # existing package was created with a PAT, so keep using it for now.
-          password: ${{ secrets.GHCR_PAT }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
+      - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
             type=sha,format=long
-            type=ref,event=pr
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        id: docker_build
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
+          provenance: true
+          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             DUCK_UI_BASEPATH=${{ vars.DUCK_UI_BASEPATH || '/' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Sign Docker image
+        env:
+          DIGEST: ${{ steps.docker_build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
