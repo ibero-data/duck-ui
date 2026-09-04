@@ -156,8 +156,10 @@ export const createDuckdbSlice: StateCreator<
     }
 
     // An ENV-configured external server takes over as the active connection.
-    if (initialConnections[0].id !== WASM_CONNECTION_ID) {
-      await get().setCurrentConnection(initialConnections[0].id);
+    // The WASM provider is always pushed first, so index 0 is never it.
+    const envConnection = initialConnections.find((c) => c.environment === "ENV");
+    if (envConnection) {
+      await get().setCurrentConnection(envConnection.id);
     } else {
       await get().fetchDatabasesAndTablesInfo();
     }
