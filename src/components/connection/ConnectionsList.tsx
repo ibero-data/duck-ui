@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -184,6 +184,10 @@ export function ConnectionsList({
           })}
         </TableBody>
       </Table>
+      {/* Without this, Radix's ScrollArea only enables the vertical axis —
+          a narrow container (e.g. the sidebar's Sheet) clips the table's
+          right-hand columns with no way to reach them. */}
+      <ScrollBar orientation="horizontal" />
     </ScrollArea>
   );
 }
